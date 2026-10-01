@@ -2,9 +2,10 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **2.7.0** — long-press a chat: Mark as unread, Pin, New section, Hide, More; pinned chats as
-  big characters on top, sections, Hidden chats. SHA-256:
-  `a9a610d9b4edb51c49ce4d77ee464c3c190220da04c732826f38dc618ca885b6`
+- Version **2.7.1** — fixes bots answering "(no response)": the ChatGPT-account provider now reads the
+  streamed answer; empty answers are retried once and otherwise reported with the provider, model and
+  reason. Includes 2.7.0 (long-press menu, pinned characters, sections, hidden chats). SHA-256:
+  `c81017f935ec48a54c964a058111cf2538ce900bd68f7b1034240f48736d0529`
 - Android 8.0+ (API 26). Podpis kluczem testowym — instaluje się jako aktualizacja poprzedniej wersji
   z tego katalogu. Instalacja spoza Sklepu Play: zezwól przeglądarce/menedżerowi plików na
   „instalowanie nieznanych aplikacji”.

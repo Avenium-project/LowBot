@@ -103,6 +103,7 @@ public class SelfTest extends BroadcastReceiver {
         check("ok".equals(api(r, "GET", "/api/v2/health", null).optString("status")), "health");
 
         JSONArray script = new JSONArray()
+                .put(J.obj("when", "say nothing", "reply", ""))
                 .put(J.obj("when", "Write the new handoff now", "reply", "## Goal\nKeep testing LowBot.\n## Next steps\n- continue"))
                 .put(J.obj("when", "write a file", "call", J.obj("name", "workspace.write", "arguments", J.obj("path", "notes/a.txt", "content", "hello phone"))))
                 .put(J.obj("after_tool", "workspace.write", "reply", "file written"))
@@ -195,6 +196,12 @@ public class SelfTest extends BroadcastReceiver {
         check(b.mind.handoff(bot.optString("id")).contains("Keep testing LowBot"), "handoff replaced agents.md");
         check(b.mind.handoffSeq(bot.optString("id"), cid) > 0, "context restarts after the handoff");
         check(lastBotMessage(b, cid).optString("text").equals("[mock] hello rotation"), "bot continues after the handoff");
+
+        // 7c. an empty model answer is retried once, then reported clearly (never "(no response)")
+        api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "say nothing"));
+        b.engine.drain(30000);
+        check(b.core.db.count("SELECT COUNT(*) FROM messages WHERE text = '(no response)'") == 0
+                && b.core.db.count("SELECT COUNT(*) FROM messages WHERE author_type = 'system' AND text LIKE '%empty answer%'") == 1, "empty answer reported, not '(no response)'");
 
         // 8. Always allow stores a rule for this bot + tool
         JSONObject t8 = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "post it again")).optJSONArray("tasks").getJSONObject(0);

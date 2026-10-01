@@ -363,6 +363,15 @@ public final class Engine {
             throw new Parked();
         }
         b.providers.confirm(usageId, res.profile, res.model, resp.inputTokens, resp.outputTokens);
+        if (resp.text.trim().isEmpty() && resp.toolCalls.isEmpty()) {
+            String why = "The model returned an empty answer (provider " + res.profile.optString("name") + ", model " + res.model
+                    + (resp.finish.isEmpty() ? "" : ", finish reason " + resp.finish) + ").";
+            int attempt = (int) db.count("SELECT attempt FROM runs WHERE id = ?", run.optString("id"));
+            if (attempt < 1) { scheduleRetry(run, why, 2); throw new Parked(); }
+            failHard(run, task, new Model.ProviderError("empty", why + ("length".equals(resp.finish) || "max_output_tokens".equals(resp.finish)
+                    ? " It ran out of output tokens — try a non-reasoning model or a shorter request." : " Check the model id in the bot profile or try another model.")));
+            throw new Parked();
+        }
         final List<JSONObject> calls = new ArrayList<JSONObject>();
         if (toolsSupported) for (Model.ToolCall c : resp.toolCalls) {
             String name = wireMap.containsKey(c.name) ? wireMap.get(c.name) : c.name;

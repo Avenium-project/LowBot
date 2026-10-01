@@ -54,6 +54,23 @@ public final class Model {
         public List<ToolCall> toolCalls = new ArrayList<ToolCall>();
         public int inputTokens, outputTokens;
         public String model = "";
+        public String finish = "";
+    }
+
+    /** Text from a Chat Completions "content", which may be a string or an array of parts. */
+    static String contentText(Object c) {
+        if (c instanceof String) return (String) c;
+        if (c instanceof JSONArray) {
+            StringBuilder sb = new StringBuilder();
+            JSONArray a = (JSONArray) c;
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject p = a.optJSONObject(i);
+                if (p != null && ("text".equals(p.optString("type")) || "output_text".equals(p.optString("type")))) sb.append(p.optString("text"));
+                else if (a.opt(i) instanceof String) sb.append(a.optString(i));
+            }
+            return sb.toString();
+        }
+        return "";
     }
 
     /** kind: auth | rate_limit | server | bad_request | timeout | network | capability | config | budget */
@@ -246,7 +263,8 @@ public final class Model {
             JSONObject msg = choices.optJSONObject(0).optJSONObject("message");
             if (msg == null) msg = new JSONObject();
             Response r = new Response();
-            r.text = msg.isNull("content") ? "" : msg.optString("content", "");
+            r.text = contentText(msg.opt("content"));
+            r.finish = choices.optJSONObject(0).optString("finish_reason", "");
             JSONArray tcs = msg.optJSONArray("tool_calls");
             if (tcs != null) for (int i = 0; i < tcs.length(); i++) {
                 JSONObject c = tcs.optJSONObject(i);
@@ -304,6 +322,9 @@ public final class Model {
         public static Response parse(JSONObject data) throws ProviderError {
             if ("failed".equals(data.optString("status"))) throw new ProviderError("server", "Responses API reported a failed response.", true, 0);
             Response r = new Response();
+            r.finish = data.optString("status", "");
+            JSONObject inc = data.optJSONObject("incomplete_details");
+            if (inc != null) r.finish = inc.optString("reason", r.finish);
             StringBuilder text = new StringBuilder();
             JSONArray out = data.optJSONArray("output");
             if (out != null) for (int i = 0; i < out.length(); i++) {
