@@ -34,7 +34,7 @@ function useLongPress(onLong) {
     onPointerMove: (e) => { if (start.current && Math.hypot(e.clientX - start.current[0], e.clientY - start.current[1]) > 10) clear(); },
     onPointerUp: clear,
     onPointerCancel: clear,
-    onContextMenu: (e) => { e.preventDefault(); clear(); fired.current = true; onLong(e.currentTarget); },
+    onContextMenu: (e) => { e.preventDefault(); const already = fired.current; clear(); fired.current = true; if (!already) onLong(e.currentTarget); },
     wasLong: () => fired.current,
   };
 }
@@ -51,11 +51,13 @@ function MenuItem({ icon, label, onClick, danger, chevron }) {
 
 function ContextMenu({ at, onClose, children }) {
   const [closing, setClosing] = useState(false);
+  const armed = useRef(false); // only a tap that STARTS on the backdrop closes the menu
   const close = () => { setClosing(true); setTimeout(onClose, 150); };
   const top = Math.min(at.bottom + 8, (typeof window !== 'undefined' ? window.innerHeight : 800) - 380);
   return (
-    <div className={cls('fixed inset-0 z-50', closing ? 'lb-backdrop-out' : 'lb-backdrop-in')} onClick={close} onContextMenu={(e) => { e.preventDefault(); close(); }}>
-      <div className="absolute inset-0 bg-black/40" />
+    <div className={cls('fixed inset-0 z-50', closing ? 'lb-backdrop-out' : 'lb-backdrop-in')} onPointerDown={(e) => { armed.current = e.target === e.currentTarget || e.target.dataset.backdrop === '1'; }}
+      onClick={() => { if (armed.current) close(); armed.current = false; }} onContextMenu={(e) => e.preventDefault()}>
+      <div data-backdrop="1" className="absolute inset-0 bg-black/40" />
       <div onClick={(e) => e.stopPropagation()} style={{ top: Math.max(16, top), left: 16 }}
         className={cls('absolute w-[min(86vw,360px)] rounded-[26px] bg-[#2a2a2c] border border-white/10 shadow-2xl overflow-hidden py-2 lb-stagger', closing ? 'lb-backdrop-out' : 'lb-pop')}>
         {children(close)}

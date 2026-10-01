@@ -2,9 +2,9 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **2.7.3** — voice chat removed for now (the microphone button for dictation stays); includes
-  2.7.2 (Android speech recognition) and 2.7.1 ("(no response)" fix). SHA-256:
-  `c21ff9e6fafb14d04c9a1a7ed0a1752e0a60ff2def278a3a43f0a42c2d00d89d`
+- Version **2.7.4** — long-press menu on a chat no longer closes by itself when you lift your finger;
+  includes 2.7.3 (voice chat removed), 2.7.2 (Android speech recognition), 2.7.1 ("(no response)" fix).
+  SHA-256: `2036a841be64ab217eafcddb8963870587252286f053f34fe07d1a054e2fefed`
 - Android 8.0+ (API 26). Podpis kluczem testowym — instaluje się jako aktualizacja poprzedniej wersji
   z tego katalogu. Instalacja spoza Sklepu Play: zezwól przeglądarce/menedżerowi plików na
   „instalowanie nieznanych aplikacji”.
