@@ -1,7 +1,6 @@
 # Dependencies
 node_modules/
 client/node_modules/
-client/package-lock.json
 
 # Next.js build output
 .next/
