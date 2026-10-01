@@ -205,7 +205,10 @@ class Engine:
                 await asyncio.wait(list(self._active.values()), timeout=0.5)
                 continue
             if not spawned:
-                return
+                nb = self.db.scalar("SELECT MIN(not_before) FROM runs WHERE status = 'retry_scheduled'")
+                if not nb:
+                    return
+                await asyncio.sleep(max(0.01, min(1.0, (parse_iso(nb) - now_dt()).total_seconds())))
         raise TimeoutError("drain timed out")
 
     # ===================================================== execution ======
@@ -565,7 +568,7 @@ class Engine:
                 self._release(run, "waiting_input" if result.kind == "input" else "waiting_dependency",
                               waiting_json={"step_id": step["id"], "kind": result.kind, **result.detail})
                 self.core.emit("run.waiting", task_id=task["id"], run_id=run["id"], bot_id=bot["id"],
-                               kind=result.kind, **result.detail)
+                               kind=result.kind, detail=result.detail)
             raise RunParked()
         with self.db.tx():
             self._fence(run)

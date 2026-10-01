@@ -63,7 +63,7 @@ class _Conn:
     async def _main(self) -> None:
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
-        from mcp.client.streamable_http import streamablehttp_client
+        from mcp.client.streamable_http import streamable_http_client
         row = self.row
         try:
             async with AsyncExitStack() as stack:
@@ -79,8 +79,11 @@ class _Conn:
                     headers = {}
                     if row["auth_secret_id"]:
                         headers["Authorization"] = f"Bearer {self.m.core.secrets.get(row['auth_secret_id'])}"
-                    read, write, _ = await stack.enter_async_context(
-                        streamablehttp_client(row["url"], headers=headers, timeout=float(row["timeout_s"])))
+                    import httpx
+                    http = await stack.enter_async_context(httpx.AsyncClient(
+                        headers=headers, timeout=httpx.Timeout(float(row["timeout_s"]), read=300.0),
+                        follow_redirects=False))
+                    read, write, _ = await stack.enter_async_context(streamable_http_client(row["url"], http_client=http))
                 session = await stack.enter_async_context(ClientSession(
                     read, write, read_timeout_seconds=timedelta(seconds=float(row["timeout_s"]) + 600),
                     elicitation_callback=self._elicit, logging_callback=self._log))
