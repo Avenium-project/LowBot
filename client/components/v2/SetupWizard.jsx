@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { api, getConfig, isLocal, isNative, pairDevice, pairWithOwnerToken, setConfig, webLogin } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Card, Field, inputCls } from './ui';
-import { CodexConnect } from './Integrations';
+import { ChatGptPhone, CodexConnect } from './Integrations';
 
 export default function SetupWizard({ onReady, startAt = 0 }) {
   const { t, lang, setLang } = useT();
@@ -60,6 +60,11 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
   });
 
   const saveProvider = () => run(async () => {
+    if (prov.kind === 'chatgpt_oauth') { // the profile is created on sign-in
+      const d = await api('/providers');
+      const existing = d.profiles.find((x) => x.kind === 'chatgpt_oauth');
+      if (existing) { setProfile(existing); setStep(3); return; }
+    }
     const p = await api('/providers', { method: 'POST', body: { ...prov, base_url: prov.base_url || undefined, api_key: prov.api_key || undefined } });
     setProfile(p); setStep(3);
   });
@@ -105,13 +110,14 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
           <Field label={t('provider')}><select className={inputCls} value={prov.kind} onChange={(e) => setProv({ ...prov, kind: e.target.value })}>
             {presets.map((p) => <option key={p.kind} value={p.kind}>{p.label}</option>)}</select></Field>
           {prov.kind === 'codex_cli' && integ && <CodexConnect status={integ} onChanged={loadInteg} compact />}
-          {!['scripted_mock', 'codex_cli', 'opencode_cli'].includes(prov.kind) && <>
+          {prov.kind === 'chatgpt_oauth' && integ && <ChatGptPhone status={integ} onChanged={loadInteg} compact />}
+          {!['scripted_mock', 'codex_cli', 'opencode_cli', 'chatgpt_oauth'].includes(prov.kind) && <>
             <Field label="Base URL"><input className={inputCls} value={prov.base_url} placeholder={presets.find((p) => p.kind === prov.kind)?.base_url} onChange={(e) => setProv({ ...prov, base_url: e.target.value })} /></Field>
             <Field label="API key"><input className={inputCls} type="password" autoComplete="off" value={prov.api_key} onChange={(e) => setProv({ ...prov, api_key: e.target.value })} /></Field>
           </>}
           <Field label={t('model')} hint={prov.kind === 'codex_cli' ? (lang === 'pl' ? 'Opcjonalnie — puste = domyślny model Twojego planu ChatGPT.' : 'Optional — empty = your ChatGPT plan default.') : (lang === 'pl' ? 'Dokładny identyfikator modelu u dostawcy (puste = pierwszy z listy dostawcy po teście).' : 'Exact model id at your provider (empty = first model the provider lists, after the test).')}><input className={inputCls} value={prov.default_model} onChange={(e) => setProv({ ...prov, default_model: e.target.value })} /></Field>
           {prov.kind === 'scripted_mock' && <div className="text-xs text-amber-300">{t('mockWarning')}</div>}
-          <Button kind="primary" disabled={busy || (prov.kind === 'codex_cli' && !integ?.codex?.logged_in)} onClick={saveProvider}>{t('next')}</Button>
+          <Button kind="primary" disabled={busy || (prov.kind === 'codex_cli' && !integ?.codex?.logged_in) || (prov.kind === 'chatgpt_oauth' && !integ?.chatgpt?.logged_in)} onClick={saveProvider}>{t('next')}</Button>
         </>}
         {step === 3 && <>
           <Button disabled={busy} onClick={runTest}>{t('testConnection')}</Button>

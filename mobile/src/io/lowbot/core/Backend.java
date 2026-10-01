@@ -36,6 +36,7 @@ public final class Backend {
     public final Skills skills;
     public final Artifacts artifacts;
     public final Routines routines;
+    public final ChatGpt chatgpt;
     public final Tools tools = new Tools();
     public final Engine engine;
     public volatile Platform platform;
@@ -69,6 +70,7 @@ public final class Backend {
         skills = new Skills(this);
         artifacts = new Artifacts(this);
         routines = new Routines(this);
+        chatgpt = new ChatGpt(this);
         Builtin.register(tools);
         engine = new Engine(this);
         String tz = core.kvGet("timezone");

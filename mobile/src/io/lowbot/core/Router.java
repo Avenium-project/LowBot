@@ -414,6 +414,7 @@ public final class Router {
             if (id == null && get) return Response.json(J.obj(
                     "phone", true,
                     "codex", J.obj("installed", false, "logged_in", false, "reason", "The Codex CLI cannot run inside an Android app."),
+                    "chatgpt", b.chatgpt.status(),
                     "opencode", J.obj("installed", false, "go_key_configured", b.core.kvGet("opencode_go_secret_id") != null)));
             if ("opencode".equals(id) && "key".equals(sub)) {
                 String key = body.optString("api_key").trim();
@@ -424,6 +425,8 @@ public final class Router {
                 if (!J.str(body, "default_model", "").isEmpty()) b.core.kvSet("opencode_default_model", body.optString("default_model"));
                 return Response.json(J.obj("go_key_configured", !key.isEmpty()));
             }
+            if ("chatgpt".equals(id) && "login".equals(sub)) return Response.json(b.chatgpt.startLogin(J.bool(body, "accept_risk")));
+            if ("chatgpt".equals(id) && "logout".equals(sub)) { b.chatgpt.logout(); return Response.json(J.obj("ok", true)); }
             if ("codex".equals(id)) throw new ApiError(501, "ChatGPT sign-in via Codex needs a computer; on the phone use an API key (xAI, OpenAI, OpenCode Go, OpenRouter).");
         }
 

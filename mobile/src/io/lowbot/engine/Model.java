@@ -187,6 +187,8 @@ public final class Model {
         return J.truncate(J.redact(msg), 300);
     }
 
+    public static String errorDetailPublic(String text) { return errorDetail(text); }
+
     static String argsString(Object a) {
         return a instanceof JSONObject ? a.toString() : String.valueOf(a);
     }
@@ -263,6 +265,12 @@ public final class Model {
         public Responses(String base, String key, JSONObject headers) throws ProviderError { super(base, key, headers); }
 
         @Override public Response complete(Request req) throws ProviderError {
+            JSONObject data = post("/responses", body(req), req.timeoutS);
+            return parse(data);
+        }
+
+        /** Responses API request body (also used by the ChatGPT-account adapter). */
+        public static JSONObject body(Request req) {
             JSONArray items = new JSONArray();
             for (JSONObject m : req.messages) {
                 String role = m.optString("role");
@@ -290,7 +298,10 @@ public final class Model {
                 for (ToolWire t : req.tools) tools.put(J.obj("type", "function", "name", t.name, "description", t.description, "parameters", t.parameters));
                 J.put(body, "tools", tools);
             }
-            JSONObject data = post("/responses", body, req.timeoutS);
+            return body;
+        }
+
+        public static Response parse(JSONObject data) throws ProviderError {
             if ("failed".equals(data.optString("status"))) throw new ProviderError("server", "Responses API reported a failed response.", true, 0);
             Response r = new Response();
             StringBuilder text = new StringBuilder();

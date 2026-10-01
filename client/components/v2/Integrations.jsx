@@ -59,6 +59,56 @@ export function CodexConnect({ status, onChanged, compact }) {
   );
 }
 
+// Phone: sign in with a ChatGPT account (OAuth + PKCE, the approach used by OpenCode and
+// github.com/7shi/codex-oauth). Unofficial for third-party apps — opt-in with a clear warning.
+export function ChatGptPhone({ status, onChanged, ws, compact }) {
+  const { lang } = useT();
+  const pl = lang === 'pl';
+  const [accept, setAccept] = useState(Boolean(status?.chatgpt?.accepted_risk));
+  const [err, setErr] = useState('');
+  const c = status?.chatgpt || {};
+  const waiting = c.login?.status === 'waiting_for_user';
+  useEffect(() => {
+    if (!waiting) return undefined;
+    const h = setInterval(() => { onChanged(); ws?.reload?.(); }, 2500);
+    return () => clearInterval(h);
+  }, [waiting, onChanged, ws]);
+  const start = async () => {
+    setErr('');
+    try {
+      const r = await api('/integrations/chatgpt/login', { method: 'POST', body: { accept_risk: accept } });
+      if (!window.LowBotNative?.openExternal?.(r.url)) window.open(r.url, '_blank');
+      onChanged();
+    } catch (e) { setErr(e.message); }
+  };
+  return (
+    <Card className="mb-3 space-y-3">
+      <div className="font-semibold">ChatGPT</div>
+      {c.logged_in ? (
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="text-sm text-emerald-400">● {pl ? 'Połączono' : 'Connected'}{c.account ? ` · ${c.account}` : ''}{c.plan ? ` · ${c.plan}` : ''}</span>
+          {!compact && <Button small onClick={() => api('/integrations/chatgpt/logout', { method: 'POST' }).then(onChanged)}>{pl ? 'Wyloguj' : 'Sign out'}</Button>}
+        </div>
+      ) : (
+        <>
+          <div className="text-sm text-zinc-400">{pl
+            ? 'Zaloguj się swoim kontem ChatGPT (Plus/Pro) na stronie OpenAI — LowBot nie widzi hasła, a zużycie liczy się do limitów Twojego planu. Działa tak jak logowanie w OpenCode: przez nieudokumentowany backend Codex.'
+            : 'Sign in with your ChatGPT (Plus/Pro) account on OpenAI’s page — LowBot never sees your password and usage counts against your plan limits. Works like OpenCode’s sign-in: through the undocumented Codex backend.'}</div>
+          <label className="flex items-start gap-2 text-xs text-amber-300"><input type="checkbox" className="mt-0.5" checked={accept} onChange={(e) => setAccept(e.target.checked)} />
+            <span>{pl
+              ? 'Rozumiem, że to nieoficjalna metoda: OpenAI może ją zmienić lub zablokować w każdej chwili, a korzystam z niej na własne ryzyko.'
+              : 'I understand this is unofficial: OpenAI may change or block it at any time, and I use it at my own risk.'}</span></label>
+          {waiting ? <div className="text-sm text-zinc-400">{pl ? 'Dokończ logowanie w przeglądarce i wróć do aplikacji…' : 'Finish signing in in the browser, then come back…'}</div>
+            : <button onClick={start} disabled={!accept} className="w-full rounded-full bg-white text-black py-3 font-medium disabled:opacity-40">{pl ? 'Zaloguj przez ChatGPT' : 'Sign in with ChatGPT'}</button>}
+          {c.login?.status === 'failed' && <div className="text-xs text-rose-300">{(c.login.output || []).join(' ')}</div>}
+        </>
+      )}
+      {err && <div className="text-xs text-rose-300">{err}</div>}
+      {c.logged_in && !compact && <div className="text-xs text-zinc-500">{pl ? 'Profil „ChatGPT (your account)” został dodany w Modelach — wybierz go w ustawieniach bota albo ustaw jako domyślny.' : 'A “ChatGPT (your account)” profile was added under Models — pick it in a bot’s settings or make it the default.'}</div>}
+    </Card>
+  );
+}
+
 export default function Integrations({ ws }) {
   const { lang } = useT();
   const pl = lang === 'pl';
@@ -85,14 +135,7 @@ export default function Integrations({ ws }) {
 
   return (
     <Section title={pl ? 'Integracje' : 'Integrations'}>
-      {isLocal() ? (
-        <Card className="mb-3 space-y-2">
-          <div className="font-semibold">ChatGPT · Codex</div>
-          <div className="text-sm text-zinc-400">{pl
-            ? 'Logowanie kontem ChatGPT działa tylko przez program Codex na komputerze — nie da się go uruchomić w aplikacji na telefonie. Na telefonie użyj klucza API: xAI (modele Grok), OpenAI, OpenCode Go albo OpenRouter.'
-            : 'ChatGPT sign-in only works through the Codex program on a computer and cannot run inside a phone app. On the phone use an API key: xAI (Grok models), OpenAI, OpenCode Go or OpenRouter.'}</div>
-        </Card>
-      ) : (
+      {isLocal() ? <ChatGptPhone status={status} onChanged={load} ws={ws} /> : (
       <Card className="mb-3 space-y-3">
         <div className="font-semibold">ChatGPT · Codex</div>
         {status && <CodexConnect status={status} onChanged={load} />}

@@ -229,6 +229,22 @@ public class SelfTest extends BroadcastReceiver {
         check(b2.core.db.count("SELECT COUNT(*) FROM events WHERE type = 'run.recovered'") >= 1, "recovery audited");
         b2.engine.stop();
 
+        // 12b. ChatGPT sign-in plumbing (no network): consent required, PKCE URL, loopback listener, JWT claims
+        boolean needsConsent = false;
+        try { b2.chatgpt.startLogin(false); } catch (ApiError e) { needsConsent = e.status == 422; }
+        check(needsConsent, "chatgpt sign-in requires explicit consent");
+        String url = b2.chatgpt.startLogin(true).optString("url");
+        check(url.startsWith("https://auth.openai.com/oauth/authorize?") && url.contains("code_challenge_method=S256") && url.contains("state="), "chatgpt PKCE authorize URL");
+        java.net.Socket probe = new java.net.Socket("127.0.0.1", 1455);
+        probe.getOutputStream().write("GET /auth/callback?state=wrong&code=x HTTP/1.1\r\nHost: localhost\r\n\r\n".getBytes("UTF-8"));
+        String reply = new java.util.Scanner(probe.getInputStream(), "UTF-8").useDelimiter("\\A").next();
+        probe.close();
+        check(reply.contains("400") && reply.contains("state mismatch"), "chatgpt callback rejects wrong state (CSRF)");
+        String payload = android.util.Base64.encodeToString("{\"https://api.openai.com/auth\":{\"chatgpt_account_id\":\"acc_1\"}}".getBytes("UTF-8"),
+                android.util.Base64.URL_SAFE | android.util.Base64.NO_WRAP | android.util.Base64.NO_PADDING);
+        check("acc_1".equals(io.lowbot.core.ChatGpt.accountIdOf("h." + payload + ".s")), "chatgpt account id from JWT");
+        b2.chatgpt.logout();
+
         // 13. SSRF guard
         boolean blocked = false;
         try { io.lowbot.tools.Net.vet("http://169.254.169.254/latest/meta-data", true); } catch (io.lowbot.tools.Net.Denied e) { blocked = true; }

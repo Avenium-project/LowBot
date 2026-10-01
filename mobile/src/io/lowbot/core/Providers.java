@@ -18,6 +18,7 @@ public final class Providers {
     public static final Map<String, JSONObject> PRESETS = new LinkedHashMap<String, JSONObject>();
     static {
         PRESETS.put("xai", J.obj("label", "xAI API (Grok models)", "adapter", "chat", "base_url", "https://api.x.ai/v1", "key_required", true));
+        PRESETS.put("chatgpt_oauth", J.obj("label", "ChatGPT account (unofficial sign-in, Plus/Pro)", "adapter", "chatgpt", "base_url", ChatGpt.BASE_URL, "key_required", false));
         PRESETS.put("opencode_go", J.obj("label", "OpenCode Go (subscription, API key)", "adapter", "chat", "base_url", "https://opencode.ai/zen/go/v1", "key_required", true));
         PRESETS.put("openai_responses", J.obj("label", "OpenAI Responses API", "adapter", "responses", "base_url", "https://api.openai.com/v1", "key_required", true));
         PRESETS.put("openrouter", J.obj("label", "OpenRouter", "adapter", "chat", "base_url", "https://openrouter.ai/api/v1", "key_required", true));
@@ -77,7 +78,7 @@ public final class Providers {
         final String kind = d.has("kind") ? d.optString("kind") : cur == null ? "" : cur.optString("kind");
         final JSONObject preset = PRESETS.get(kind);
         if (preset == null) throw new ApiError(422, "Unknown provider kind. Use one of: " + PRESETS.keySet());
-        if (d.has("base_url")) validateUrl(d.optString("base_url").trim(), kind);
+        if (d.has("base_url") && !"chatgpt_oauth".equals(kind)) validateUrl(d.optString("base_url").trim(), kind);
         if ("scripted_mock".equals(kind) && d.has("script") && d.optJSONArray("script") == null)
             throw new ApiError(422, "Mock script must be a JSON list of rules.");
         final String pid = existing != null ? existing : J.id("prov");
@@ -148,6 +149,14 @@ public final class Providers {
         String model = J.str(bot, "model", null);
         if (model == null || model.isEmpty()) model = p.optString("default_model");
         if ("scripted_mock".equals(p.optString("kind")) && model.isEmpty()) model = "scripted-mock";
+        if ("chatgpt_oauth".equals(p.optString("kind")) && model.isEmpty()) {
+            List<String> ms = b.chatgpt.adapter().listModels();
+            if (ms != null && !ms.isEmpty()) {
+                final String first = ms.get(0), pid2 = p.optString("id");
+                model = first;
+                db.tx(new Runnable() { public void run() { db.exec("UPDATE provider_profiles SET default_model = ? WHERE id = ?", first, pid2); } });
+            }
+        }
         if (model.isEmpty()) throw new Model.ProviderError("config", "No model id set for this bot or provider profile.");
         Resolved r = new Resolved();
         r.profile = p;
@@ -161,6 +170,7 @@ public final class Providers {
         if (o != null) return o;
         JSONObject preset = PRESETS.get(p.optString("kind"));
         if (preset == null) throw new Model.ProviderError("config", "This provider kind is not available on the phone.");
+        if ("chatgpt".equals(preset.optString("adapter"))) return b.chatgpt.adapter();
         if ("mock".equals(preset.optString("adapter"))) {
             JSONObject caps = p.optJSONObject("capabilities");
             return new Model.Scripted(caps == null ? null : caps.optJSONArray("script"));

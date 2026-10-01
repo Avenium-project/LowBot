@@ -15,7 +15,7 @@ import java.util.Set;
 /** Bot profiles: lifecycle, permission narrowing, Duplicate, export. Mirrors server/app/v2/bots.py. */
 public final class Bots {
     public static final String[] DEFAULT_TOOLS = {
-        "workspace.*", "web.fetch", "memory.*", "user.ask", "secret.request",
+        "workspace.*", "web.fetch", "http.post", "memory.*", "user.ask", "secret.request",
         "task.delegate", "task.get_status", "task.complete", "bot.message", "artifact.share",
         "browser.*", "routine.create",
     };
