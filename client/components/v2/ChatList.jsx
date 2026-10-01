@@ -40,7 +40,7 @@ export default function ChatList({ ws, activeId, onOpen, onProfile, onNew, atten
     const m = r.conv?.last_message;
     if (!m) return { text: r.bot?.role_description || (t('typeMessage')), tone: 'text-zinc-500' };
     const who = m.author_type === 'user' ? `${t('you')}: ` : (r.group && m.author_id ? `${ws.bots.find((b) => b.id === m.author_id)?.name || ''}: ` : '');
-    return { text: who + m.text.replace(/\s+/g, ' '), tone: 'text-zinc-400' };
+    return { text: who + m.text.replace(/[*_`#>~]+/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\s+/g, ' '), tone: 'text-zinc-400' };
   };
 
   return (

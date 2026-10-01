@@ -42,7 +42,8 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
   const authenticate = () => run(async () => {
     if (native || code) await pairDevice(server, code, native ? 'Open Dots app' : 'Browser');
     else await webLogin(token);
-    const d = await api('/providers');
+    const [d, bots] = await Promise.all([api('/providers'), api('/bots')]);
+    if (bots.length) { onReady(); return; } // existing install: straight to the chats
     setPresets(await api('/providers/presets'));
     if (d.profiles.length) { setProfile(d.profiles[0]); setStep(4); } else setStep(2);
   });

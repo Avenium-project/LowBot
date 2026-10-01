@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
-import { Button, Card, Empty, Section, TaskBadge, fmtTime } from './ui';
+import { BotBlob, Button, Card, Empty, Section, TaskBadge, fmtTime } from './ui';
 
 function StepRow({ s }) {
   const out = s.output || {};
@@ -78,7 +78,7 @@ export function TaskDetail({ taskId, ws, onClose }) {
 }
 
 export default function TasksPanel({ ws }) {
-  const { t } = useT();
+  const { lang } = useT();
   const [sel, setSel] = useState(null);
   const botsById = useMemo(() => Object.fromEntries(ws.bots.map((b) => [b.id, b])), [ws.bots]);
   if (sel) return <TaskDetail taskId={sel} ws={ws} onClose={() => setSel(null)} />;
@@ -86,7 +86,7 @@ export default function TasksPanel({ ws }) {
   const recent = ws.tasks.filter((x) => ['completed', 'failed', 'cancelled'].includes(x.status)).slice(0, 40);
   const row = (x) => (
     <button key={x.id} onClick={() => setSel(x.id)} className="w-full text-left rounded-lg px-2 py-2 hover:bg-white/5 flex items-center gap-2 min-h-[44px]">
-      <span>{botsById[x.bot_id]?.avatar || '🤖'}</span>
+      <BotBlob bot={botsById[x.bot_id]} size={30} />
       <span className="flex-1 min-w-0">
         <span className="block text-sm truncate">{x.title}</span>
         <span className="block text-[11px] text-zinc-500">{botsById[x.bot_id]?.name} · {x.requester_type}{x.parent_task_id ? ' · ↳' : ''} · {fmtTime(x.created_at)}</span>
@@ -96,8 +96,8 @@ export default function TasksPanel({ ws }) {
   );
   return (
     <div>
-      <Section title={`${t('tasks')} — active (${active.length})`}>{active.length ? active.map(row) : <Empty />}</Section>
-      <Section title="Recent">{recent.length ? recent.map(row) : <Empty />}</Section>
+      <Section title={`${lang === 'pl' ? 'Aktywne' : 'Active'} (${active.length})`}>{active.length ? active.map(row) : <Empty />}</Section>
+      <Section title={lang === 'pl' ? 'Ostatnie' : 'Recent'}>{recent.length ? recent.map(row) : <Empty />}</Section>
     </div>
   );
 }
