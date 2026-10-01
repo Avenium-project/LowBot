@@ -62,12 +62,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build --build-arg WITH_BROWSER=1 -t open-dots:ci .
+      - run: docker build --build-arg WITH_BROWSER=1 -t lowbot:ci .
       - name: Smoke test hardened container
         run: |
-          docker run -d --name od --read-only --tmpfs /tmp --cap-drop ALL -e APP_AUTH_TOKEN=ci-token-0123456789 \
+          docker run -d --name od --read-only --tmpfs /tmp --cap-drop ALL -v od-data:/data -e APP_AUTH_TOKEN=ci-token-0123456789 \
             -e APP_ENCRYPTION_KEY=$(python3 -c "import base64,os;print(base64.urlsafe_b64encode(os.urandom(32)).decode())") \
-            -p 8000:8000 open-dots:ci
+            -p 8000:8000 lowbot:ci
           for i in $(seq 1 30); do curl -fs localhost:8000/api/v2/health && break; sleep 2; done
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/api/v2/bots)" = 401
           curl -fs localhost:8000/bots/ > /dev/null
