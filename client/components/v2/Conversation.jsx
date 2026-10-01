@@ -1,8 +1,8 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { FiArrowUp, FiCheckCircle, FiChevronLeft, FiClock, FiMic, FiMonitor, FiPaperclip, FiPlus, FiSquare, FiStopCircle, FiXCircle } from 'react-icons/fi';
-import { api, downloadPath, pendingOutbox, sendMessage } from '../../lib/v2/api';
+import { FiArrowUp, FiCheckCircle, FiChevronLeft, FiClock, FiHeadphones, FiLock, FiMic, FiMonitor, FiPaperclip, FiPlus, FiSquare, FiStopCircle, FiXCircle } from 'react-icons/fi';
+import { api, downloadPath, isLocal, pendingOutbox, sendMessage } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { ElicitationCard } from './InboxPanel';
 import { BotBlob, cls } from './ui';
@@ -27,7 +27,48 @@ function Attachment({ a }) {
   return <button onClick={open} className="mt-1 mr-2 inline-flex items-center gap-1 rounded-full bg-black/30 px-3 py-1 text-[13px] text-sky-300">📎 {a.name || 'file'}</button>;
 }
 
-function Bubble({ m, bot, showName }) {
+// Grok-style secure secret request: the value goes to the encrypted vault, never into the chat or the model.
+function SecretCard({ m }) {
+  const { lang } = useT();
+  const [value, setValue] = useState('');
+  const [state, setState] = useState('');
+  const req = m.meta.secret_request;
+  const save = async (e) => {
+    e.preventDefault();
+    try { await api(`/tasks/${m.task_id}/secret`, { method: 'POST', body: { value } }); setValue(''); setState('ok'); }
+    catch (err) { setState(err.message); }
+  };
+  return (
+    <div className="my-2 rounded-[22px] bg-[#262626] px-4 py-4">
+      <div className="flex items-center gap-2 text-[17px] font-semibold text-white"><FiLock /> {lang === 'pl' ? 'Bezpieczne podanie sekretu' : 'Secure secret request'}</div>
+      <div className="text-[15px] text-zinc-300 mt-1">{req.description} <span className="text-zinc-500">({req.name})</span></div>
+      {state === 'ok' ? <div className="mt-3 rounded-xl py-2.5 text-center bg-emerald-900/40 text-emerald-400">{lang === 'pl' ? 'Zapisano w sejfie telefonu' : 'Saved in the phone vault'}</div> : (
+        <form onSubmit={save} className="mt-3 flex gap-2">
+          <input type="password" autoComplete="off" className="flex-1 min-w-0 rounded-xl bg-black/40 px-3 py-2.5 outline-none text-zinc-100" value={value} onChange={(e) => setValue(e.target.value)}
+            placeholder={lang === 'pl' ? 'Wartość (ukryta przed botem)' : 'Value (hidden from the bot)'} />
+          <button disabled={!value} className="rounded-xl bg-white text-black px-4 font-medium disabled:opacity-50">{lang === 'pl' ? 'Zapisz' : 'Save'}</button>
+        </form>)}
+      {state && state !== 'ok' && <div className="text-xs text-rose-300 mt-2">{state}</div>}
+      <div className="text-[12px] text-zinc-500 mt-2">{lang === 'pl' ? 'Bot zobaczy tylko nazwę, nie wartość.' : 'The bot only sees the name, never the value.'}</div>
+    </div>
+  );
+}
+
+function TakeoverCard({ m, onOpenComputer }) {
+  const { lang } = useT();
+  return (
+    <div className="my-2 rounded-[22px] bg-[#262626] px-4 py-4">
+      <div className="flex items-center gap-2 text-[17px] font-semibold text-white"><FiMonitor /> {lang === 'pl' ? 'Bot potrzebuje Ciebie przy komputerze' : 'The bot needs you on the computer'}</div>
+      <div className="text-[15px] text-zinc-300 mt-1 whitespace-pre-wrap">{m.text.replace(/^🖥️\s*/, '')}</div>
+      <button onClick={() => onOpenComputer(m.meta.takeover_request)} className="mt-3 w-full rounded-xl bg-white text-black py-2.5 font-medium">
+        {lang === 'pl' ? 'Przejmij komputer' : 'Take over the computer'}</button>
+    </div>
+  );
+}
+
+function Bubble({ m, bot, showName, onOpenComputer }) {
+  if (m.meta?.secret_request && m.author_type === 'bot') return <SecretCard m={m} />;
+  if (m.meta?.takeover_request && m.author_type === 'bot') return <TakeoverCard m={m} onOpenComputer={onOpenComputer} />;
   if (m.author_type === 'system') {
     return <div className="text-center text-[13px] text-zinc-500 my-2 px-8 whitespace-pre-wrap">{m.text}</div>;
   }
@@ -74,6 +115,7 @@ function ApprovalInline({ a, ws, onChanged }) {
     <div className="my-2 rounded-[22px] bg-[#262626] px-4 py-4">
       <div className="text-[17px] font-semibold text-white">{lang === 'pl' ? 'Prośba o zgodę' : 'Approval request'}</div>
       <button onClick={() => setOpen(!open)} className={cls('text-left text-[15px] text-zinc-200 mt-1', !open && 'line-clamp-3')}>{description}</button>
+      {a.review?.decision && <div className="mt-2 text-[13px] text-sky-300">Auto Review: {a.review.reason}</div>}
       {open && !editing && <pre className="mt-2 text-xs bg-black/30 rounded-xl p-3 whitespace-pre-wrap break-all max-h-48 overflow-y-auto text-zinc-300">{JSON.stringify(a.display, null, 2)}</pre>}
       {editing && <textarea className="mt-2 w-full rounded-xl bg-black/40 p-3 font-mono text-xs h-32 text-zinc-100 outline-none" value={draft} onChange={(e) => setDraft(e.target.value)} />}
       {err && <div className="text-xs text-rose-300 mt-2">{err}</div>}
@@ -85,8 +127,9 @@ function ApprovalInline({ a, ws, onChanged }) {
           <button onClick={() => setEditing(false)} className="rounded-xl bg-[#3a3a3c] py-2.5">{t('cancel')}</button>
         </div>
       ) : (
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <button onClick={() => decide('approve')} className="rounded-xl bg-white text-black py-2.5 font-medium">{t('approve')}</button>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button onClick={() => decide('approve')} className="rounded-xl bg-white text-black py-2.5 font-medium">{lang === 'pl' ? 'Zezwól raz' : 'Allow once'}</button>
+          <button onClick={() => decide('always')} className="rounded-xl bg-[#3a3a3c] py-2.5">{lang === 'pl' ? 'Zawsze zezwalaj' : 'Always allow'}</button>
           <button onClick={() => decide('deny')} className="rounded-xl bg-[#3a3a3c] py-2.5">{t('deny')}</button>
           <button onClick={() => { setOpen(true); setEditing(true); }} className="rounded-xl bg-[#3a3a3c] py-2.5">{t('edit')}</button>
         </div>
@@ -95,10 +138,10 @@ function ApprovalInline({ a, ws, onChanged }) {
   );
 }
 
-function WorkingStrip({ task, bot, onAnswer }) {
+function WorkingStrip({ task, bot, onAnswer, special }) {
   const { t } = useT();
   const [answer, setAnswer] = useState('');
-  const asking = task.run_status === 'waiting_input';
+  const asking = task.run_status === 'waiting_input' && !special;
   return (
     <div className="my-2 rounded-[18px] bg-[#1f1f1f] border border-white/5 px-4 py-2.5 text-[14px]">
       <div className="flex items-center gap-2">
@@ -127,6 +170,9 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
   const [recording, setRecording] = useState(null);
   const [listening, setListening] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
+  const [voiceChat, setVoiceChat] = useState(false);
+  const local = isLocal();
+  const lastSpoken = useRef(null);
   const [firstUnread] = useState(conversation.unread > 0 ? conversation.last_read_seq : null);
   const endRef = useRef(null);
   const fileRef = useRef(null);
@@ -148,6 +194,10 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
   }, [conversation.id]);
 
   useEffect(() => { load(); }, [load, ws.tick]);
+  // Text shared from another app (Android share sheet) lands in the composer.
+  useEffect(() => {
+    if (window.__lowbotPendingShare) { setText(window.__lowbotPendingShare); window.__lowbotPendingShare = null; }
+  }, []);
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [messages.length, approvals.length, activeTasks.length]);
 
   // Timeline: messages and approval cards ordered by time.
@@ -228,6 +278,58 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
     } catch (err) { setError(`${lang === 'pl' ? 'Brak dostępu do mikrofonu' : 'Microphone unavailable'}: ${err.message}`); }
   };
 
+  // Tasks currently parked on a secure secret request or a computer takeover: no plain answer box.
+  const specialTasks = useMemo(() => {
+    const out = new Set();
+    messages.forEach((m) => {
+      if (m.meta?.secret_request || m.meta?.takeover_request) out.add(m.task_id);
+      if (m.meta?.secret_provided) out.delete(m.task_id);
+    });
+    return out;
+  }, [messages]);
+
+  const openComputer = async (target) => {
+    if (local) {
+      try { await api('/computers/open', { method: 'POST', body: { bot_id: target?.bot_id || target?.id || lead?.id } }); }
+      catch (err) { setError(err.message); }
+      return;
+    }
+    onOpenComputer?.(lead);
+  };
+
+  // Voice chat (Grok "Start voice chat"): Android speech recognition in, text-to-speech out.
+  const listenForVoiceChat = useCallback(() => {
+    if (!window.LowBotNative?.startDictation) return;
+    const onEv = (e) => {
+      const d = e.detail || {};
+      if (d.type === 'listening') return;
+      window.removeEventListener('lowbot:dictation', onEv);
+      setListening(false);
+      if (d.type === 'result' && d.text) sendMessage(conversation.id, d.text, []).then(load).catch((err) => setError(err.message));
+    };
+    window.addEventListener('lowbot:dictation', onEv);
+    setListening(true);
+    window.LowBotNative.startDictation(lang);
+  }, [conversation.id, lang, load]);
+
+  useEffect(() => {
+    if (!voiceChat || !messages.length) return;
+    const last = messages[messages.length - 1];
+    if (last.author_type !== 'bot' || last.id === lastSpoken.current) return;
+    lastSpoken.current = last.id;
+    const plain = last.text.replace(/[`*_#>\[\]()]/g, '').slice(0, 2000);
+    window.LowBotNative?.speak?.(plain, lang);
+    const h = setTimeout(listenForVoiceChat, Math.min(60000, 1200 + plain.split(/\s+/).length * 380));
+    return () => clearTimeout(h);
+  }, [messages, voiceChat, lang, listenForVoiceChat]);
+
+  const toggleVoiceChat = () => {
+    if (voiceChat) { setVoiceChat(false); window.LowBotNative?.stopSpeaking?.(); return; }
+    lastSpoken.current = messages.length ? messages[messages.length - 1].id : null;
+    setVoiceChat(true);
+    listenForVoiceChat();
+  };
+
   const pending = pendingOutbox(conversation.id);
   const title = conversation.title || (conversation.kind === 'group' ? members.map((b) => b.name).join(', ') : lead?.name);
   const placeholder = conversation.kind === 'group'
@@ -246,6 +348,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
           <span className="font-semibold text-[17px] truncate">{title}</span>
         </button>
         <span className="flex-1" />
+        {voiceChat && <button onClick={toggleVoiceChat} className="h-10 shrink-0 rounded-full bg-rose-600 px-4 text-[14px] flex items-center gap-2"><FiHeadphones /> {lang === 'pl' ? 'Zakończ' : 'End'}</button>}
         <button aria-label={t('computer')} title={t('computer')} onClick={() => onOpenComputer?.(conversation.kind === 'group' ? null : lead)}
           className="h-12 w-12 shrink-0 rounded-full bg-[#2a2a2a]/95 border border-white/10 flex items-center justify-center text-xl"><FiMonitor /></button>
       </header>
@@ -263,7 +366,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
               {showDivider && <div className="flex items-center gap-3 my-4"><span className="flex-1 h-px bg-blue-500/50" /><span className="text-[13px] font-semibold tracking-wider text-blue-400">{lang === 'pl' ? 'NOWE' : 'NEW'}</span><span className="flex-1 h-px bg-blue-500/50" /></div>}
               {sep && <div className="text-center text-[14px] text-zinc-500 my-4">{dayLabel(it.at, lang)}</div>}
               {it.kind === 'msg'
-                ? <Bubble m={it.m} bot={botsById[it.m.author_id]} showName={conversation.kind === 'group' && it.m.author_type === 'bot'
+                ? <Bubble m={it.m} bot={botsById[it.m.author_id]} onOpenComputer={openComputer} showName={conversation.kind === 'group' && it.m.author_type === 'bot'
                     && !(prev?.kind === 'msg' && prev.m.author_id === it.m.author_id && !sep)} />
                 : <ApprovalInline a={it.a} ws={ws} onChanged={load} />}
             </div>
@@ -271,7 +374,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
         })}
         {elicitations.map((e) => <div key={e.id} className="my-2"><ElicitationCard e={e} ws={ws} /></div>)}
         {pending.map((p) => <div key={p.client_msg_id} className="flex justify-end my-1.5"><div className="max-w-[85%] rounded-[22px] bg-[#3a3a3c]/60 px-4 py-3 text-[16px] text-zinc-300">⏳ {p.text}</div></div>)}
-        {activeTasks.map((task) => <WorkingStrip key={task.id} task={task} bot={botsById[task.bot_id]}
+        {activeTasks.map((task) => <WorkingStrip key={task.id} task={task} bot={botsById[task.bot_id]} special={specialTasks.has(task.id)}
           onAnswer={(id, a) => api(`/tasks/${id}/answer`, { method: 'POST', body: { answer: a } }).then(load)} />)}
         {!timeline.length && lead && (
           <div className="flex flex-col items-center text-center mt-16 px-6 text-zinc-400">
@@ -297,6 +400,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); fileRef.current.click(); }}><FiPaperclip /> {t('attach')}</button>
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); setText('/'); }}>⚡ {t('skills')}</button>
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); onOpenComputer?.(lead); }}><FiMonitor /> {t('computer')}</button>
+            {local && <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); toggleVoiceChat(); }}><FiHeadphones /> {lang === 'pl' ? 'Rozmowa głosowa' : 'Voice chat'}</button>}
           </div>
         )}
         {attachments.length > 0 && <div className="text-[13px] text-zinc-400 mb-2">{attachments.map((a) => `📎 ${a.name}`).join('  ')}</div>}
@@ -313,8 +417,8 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
               <button type="submit" aria-label={t('send')} title={t('send')} className="h-11 w-11 rounded-full bg-white text-black flex items-center justify-center shrink-0 text-xl"><FiArrowUp /></button>
             ) : <>
               <button type="button" aria-label={t('dictate')} title={t('dictate')} onClick={dictate} className={cls('h-11 w-10 flex items-center justify-center shrink-0 text-xl', listening ? 'text-rose-400' : 'text-zinc-400')}><FiMic /></button>
-              <button type="button" aria-label={t('voiceNote')} title={t('voiceNote')} onClick={toggleVoice}
-                className={cls('h-11 w-14 rounded-full flex items-center justify-center shrink-0', recording ? 'bg-rose-600 text-white' : 'bg-white text-black')}>
+              <button type="button" aria-label={local ? 'Voice chat' : t('voiceNote')} title={local ? (lang === 'pl' ? 'Rozpocznij rozmowę głosową' : 'Start voice chat') : t('voiceNote')} onClick={local ? toggleVoiceChat : toggleVoice}
+                className={cls('h-11 w-14 rounded-full flex items-center justify-center shrink-0', recording || voiceChat ? 'bg-rose-600 text-white' : 'bg-white text-black')}>
                 {recording ? <FiSquare /> : <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor">{[4, 8, 12, 16, 20].map((x, i) => <rect key={x} x={x - 1} y={[9, 5, 3, 6, 9][i]} width="2" height={[6, 14, 18, 12, 6][i]} rx="1" />)}</g></svg>}
               </button>
             </>}

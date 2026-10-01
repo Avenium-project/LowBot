@@ -24,6 +24,58 @@ function defaultServer() {
   return '';
 }
 
+// LowBot for Android hosts the whole backend inside the app; the UI reaches it
+// through window.LowBotNative.request (no network, no server, no token).
+export function isLocal() {
+  if (typeof window === 'undefined') return false;
+  try { return Boolean(window.LowBotNative?.isLocal?.()); } catch { return false; }
+}
+
+const pending = new Map();
+let seq = 0;
+function installLocalHooks() {
+  if (window.__lowbotResolve) return;
+  window.__lowbotResolve = (id, status, type, payload, isB64, filename) => {
+    const p = pending.get(id);
+    if (!p) return;
+    pending.delete(id);
+    let body;
+    if (isB64) {
+      const bin = atob(payload);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+      body = new Blob([bytes], { type });
+    } else body = payload;
+    const headers = { 'Content-Type': type };
+    if (filename) headers['Content-Disposition'] = `attachment; filename="${filename}"`;
+    p(new Response(body, { status, headers }));
+  };
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
+async function localFetch(path, method, body, form) {
+  installLocalHooks();
+  let payload = body === undefined ? '' : JSON.stringify(body);
+  if (form) {
+    const file = form.get('file');
+    payload = JSON.stringify({ name: file?.name || 'upload', mime: file?.type || '', data_base64: file ? await blobToBase64(file) : '' });
+  }
+  seq += 1;
+  const id = `r${Date.now()}_${seq}`;
+  return new Promise((resolve) => {
+    pending.set(id, resolve);
+    window.LowBotNative.request(id, method, `/api/v2${path}`, payload);
+  });
+}
+
 export function isNative() {
   if (typeof window === 'undefined') return false;
   return Boolean(window.LowBotNative || window.__TAURI_INTERNALS__ || window.__TAURI__);
@@ -38,6 +90,7 @@ export function platform() {
 
 export function getConfig() {
   if (typeof window === 'undefined') return { server: '', mode: 'web' };
+  if (isLocal()) return { server: '', mode: 'local' };
   try {
     const saved = JSON.parse(window.localStorage.getItem(CONFIG_KEY) || 'null');
     if (saved?.server) return saved; // only the server URL + mode; no credentials
@@ -64,13 +117,18 @@ async function authHeaders() {
 
 export async function api(path, { method = 'GET', body, form, signal, raw } = {}) {
   const cfg = getConfig();
-  const headers = { ...(await authHeaders()) };
-  let payload;
-  if (form) payload = form;
-  else if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-  const res = await fetch(`${cfg.server}/api/v2${path}`, {
-    method, headers, body: payload, signal, credentials: cfg.mode === 'web' ? 'include' : 'omit',
-  });
+  let res;
+  if (cfg.mode === 'local') {
+    res = await localFetch(path, method, body, form);
+  } else {
+    const headers = { ...(await authHeaders()) };
+    let payload;
+    if (form) payload = form;
+    else if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+    res = await fetch(`${cfg.server}/api/v2${path}`, {
+      method, headers, body: payload, signal, credentials: cfg.mode === 'web' ? 'include' : 'omit',
+    });
+  }
   if (res.status === 401) {
     window.dispatchEvent(new Event('opendots:auth-required'));
     throw new ApiError(401, 'Authentication required');
@@ -178,6 +236,14 @@ export function pendingOutbox(conversationId) {
 // SSE over fetch so device tokens travel in a header (EventSource cannot set
 // headers, and tokens must never go into URLs). Resumes from the last cursor.
 export function subscribeEvents(onEvent, onStatus) {
+  if (isLocal()) {
+    // Events are pushed by the in-app backend; nothing to reconnect.
+    const prev = window.__lowbotEvent;
+    window.__lowbotEvent = (ev) => { try { onEvent(ev); } catch { /* ignore */ } };
+    window.LowBotNative.subscribe();
+    onStatus?.('live');
+    return () => { window.__lowbotEvent = prev; };
+  }
   let stopped = false;
   let controller;
   let cursor = Number(window.sessionStorage.getItem(CURSOR_KEY) || 0) || null;

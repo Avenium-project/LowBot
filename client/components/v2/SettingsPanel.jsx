@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { api, downloadPath } from '../../lib/v2/api';
+import { api, downloadPath, isLocal } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Card, Empty, Field, Section, fmtTime, inputCls } from './ui';
 import Integrations from './Integrations';
@@ -10,7 +10,7 @@ function Providers({ ws }) {
   const { t } = useT();
   const [data, setData] = useState({ profiles: [] });
   const [presets, setPresets] = useState([]);
-  const [form, setForm] = useState({ kind: 'openai_responses', name: '', base_url: '', api_key: '', default_model: '', models: '' });
+  const [form, setForm] = useState({ kind: isLocal() ? 'xai' : 'openai_responses', name: '', base_url: '', api_key: '', default_model: '', models: '' });
   const [tests, setTests] = useState({});
   const [err, setErr] = useState('');
   const load = () => api('/providers').then(setData);
@@ -38,7 +38,7 @@ function Providers({ ws }) {
         {form.kind !== 'scripted_mock' && <>
           <Field label="Base URL" hint={preset?.base_url ? `default: ${preset.base_url}` : 'e.g. https://host/v1'}>
             <input className={inputCls} value={form.base_url} onChange={(e) => setForm({ ...form, base_url: e.target.value })} placeholder={preset?.base_url} /></Field>
-          <Field label="API key" hint="Stored encrypted on the server; never shown again."><input type="password" autoComplete="off" className={inputCls} value={form.api_key} onChange={(e) => setForm({ ...form, api_key: e.target.value })} /></Field>
+          <Field label="API key" hint="Stored encrypted; never shown again."><input type="password" autoComplete="off" className={inputCls} value={form.api_key} onChange={(e) => setForm({ ...form, api_key: e.target.value })} /></Field>
         </>}
         <Field label={t('model')} hint="Exact model id from your provider (use Test connection to list models)."><input className={inputCls} value={form.default_model} onChange={(e) => setForm({ ...form, default_model: e.target.value })} /></Field>
         {form.kind === 'scripted_mock' && <div className="text-xs text-amber-300">{t('mockWarning')}</div>}
@@ -162,15 +162,46 @@ function Policies({ ws }) {
   );
 }
 
+// Grok Bot settings that apply to the phone-hosted backend.
+function PhoneSettings() {
+  const { lang } = useT();
+  const pl = lang === 'pl';
+  const [st, setSt] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => { api('/settings').then(setSt).catch((e) => setErr(e.message)); }, []);
+  const save = (patch) => api('/settings', { method: 'POST', body: patch }).then(setSt).catch((e) => setErr(e.message));
+  if (!st) return err ? <div className="text-xs text-rose-300">{err}</div> : null;
+  return (
+    <Section title={pl ? 'Bezpieczeństwo i wykonywanie' : 'Safety & execution'}>
+      <label className="flex items-start gap-2 text-sm mb-3"><input type="checkbox" className="mt-1" checked={st.auto_review} onChange={(e) => save({ auto_review: e.target.checked })} />
+        <span><b>Auto Review</b><br /><span className="text-xs text-zinc-400">{pl
+          ? 'Niezależne wywołanie modelu ocenia akcje wymagające zgody: przepuszcza oczywiste, odrzuca szkodliwe, resztę zostawia Tobie. Płatności, publikacje i inne akcje „zawsze pytaj” zawsze trafiają do Ciebie.'
+          : 'A separate model call rates actions that need approval: allows obvious ones, denies harmful ones, leaves the rest to you. Payments, publishing and other always-ask actions always come to you.'}</span></span></label>
+      <Field label={pl ? 'Wykonywanie na tym telefonie (terminal)' : 'Execution on this phone (terminal)'}>
+        <select className={inputCls} value={st.local_execution} onChange={(e) => save({ local_execution: e.target.value })}>
+          <option value="ask">{pl ? 'Pytaj za każdym razem' : 'Ask every time'}</option>
+          <option value="always">{pl ? 'Zawsze zezwalaj' : 'Always allow'}</option>
+          <option value="never">{pl ? 'Nigdy nie zezwalaj' : 'Never allow'}</option>
+        </select></Field>
+      <label className="flex items-start gap-2 text-sm my-3"><input type="checkbox" className="mt-1" checked={st.allow_private_network} onChange={(e) => save({ allow_private_network: e.target.checked })} />
+        <span>{pl ? 'Pozwól botom łączyć się z siecią lokalną (LAN)' : 'Let bots reach your local network (LAN)'}</span></label>
+      <Field label={pl ? 'Strefa czasowa rutyn' : 'Routine time zone'}><input className={inputCls} defaultValue={st.timezone} onBlur={(e) => e.target.value !== st.timezone && save({ timezone: e.target.value })} /></Field>
+      {err && <div className="text-xs text-rose-300">{err}</div>}
+    </Section>
+  );
+}
+
 function Admin() {
   const { t } = useT();
   const [b, setB] = useState(null);
   const [usage, setUsage] = useState(null);
+  const [last, setLast] = useState(null);
   const load = () => { api('/admin/backups').then(setB); api('/usage').then(setUsage); };
   useEffect(() => { load(); }, []);
   const exportAudit = () => downloadPath('/audit/export', 'lowbot-audit.jsonl');
   return (
-    <Section title={t('backup')} actions={<><Button small onClick={() => api('/admin/backup', { method: 'POST' }).then(load)}>{t('create')}</Button><Button small onClick={exportAudit}>Audit export</Button></>}>
+    <Section title={t('backup')} actions={<><Button small onClick={() => api('/admin/backup', { method: 'POST' }).then((r) => { setLast(r); load(); if (r.artifact_id) downloadPath(`/artifacts/${r.artifact_id}/download`, r.name); })}>{t('create')}</Button><Button small onClick={exportAudit}>Audit export</Button></>}>
+      {last?.note && <div className="text-xs text-amber-300 mb-1">{last.name}: {last.note}</div>}
       {b && <div className="text-xs text-zinc-400 space-y-1">{b.backups.map((x) => <div key={x.name}>{x.name} · {(x.size / 1024).toFixed(0)} KB</div>)}<div>{b.restore}</div><div className="text-amber-300">{b.note}</div></div>}
       {usage && <details className="mt-2"><summary className="text-xs text-zinc-400 cursor-pointer">Usage</summary><pre className="text-[11px] whitespace-pre-wrap">{JSON.stringify(usage, null, 1)}</pre></details>}
     </Section>
@@ -189,9 +220,10 @@ export default function SettingsPanel({ ws }) {
           onChange={(e) => window.localStorage.setItem('opendots.name', e.target.value)} />
         {ws.health && <div className="text-xs text-zinc-500 mt-2">schema v{ws.health.schema_version} · {ws.health.timezone} · {ws.health.capabilities.join(', ')} · runs ≤ {ws.health.limits.max_active_runs}, screens ≤ {ws.health.limits.max_active_surfaces}</div>}
       </Section>
+      {isLocal() && <PhoneSettings />}
       <Integrations ws={ws} />
       <Providers ws={ws} />
-      <Devices />
+      {!isLocal() && <Devices />}
       <Mcp />
       <Policies ws={ws} />
       <Admin />

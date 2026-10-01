@@ -23,9 +23,13 @@ urządzenia) albo wklej klucz OpenCode Go w *Menu → Ustawienia → Integracje*
 ChatGPT/Codex, działać na modelach OpenCode Go z pełnymi narzędziami LowBot, albo delegować zadania
 programistyczne narzędziami `codex.run` / `opencode.run` (zawsze po Twojej zgodzie).
 
-**Android:** `LowBot-2.0.0-test.apk` — zob. [`mobile/README.md`](mobile/README.md).
+**Android — wszystko w telefonie:** aplikacja `dist/LowBot.apk` zawiera cały backend (bazę, silnik
+zadań, rutyny, narzędzia, przeglądarkę botów). Nie potrzebujesz serwera: instalujesz, wklejasz swój klucz
+API (np. xAI dla modeli Grok albo OpenCode Go) i tworzysz boty. Praca trwa po wyjściu z aplikacji, ale
+nie przy wyłączonym telefonie. Szczegóły i ograniczenia: [`mobile/README.md`](mobile/README.md),
+mapowanie funkcji Grok Bota: [`docs/grok-bot-spec.md`](docs/grok-bot-spec.md).
 
-**Czego jeszcze nie ma:** pełny pulpit (tylko przeglądarka), Team Bots dla wielu ludzi, Slack, push,
+**Czego jeszcze nie ma:** pełny pulpit (tylko przeglądarka), Team Bots dla wielu ludzi, Slack, push z serwera,
 real-time voice, lokalny backend w kliencie Windows, PostgreSQL. EXE jest budowany w CI
 (nie mógł zostać zbudowany w środowisku, w którym powstał kod); APK buduje `mobile/build-apk.sh` — zob. [`BUILD.md`](BUILD.md).
 

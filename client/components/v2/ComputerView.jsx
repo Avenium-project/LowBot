@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { api, fetchBlobUrl } from '../../lib/v2/api';
+import { api, fetchBlobUrl, isLocal } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Card, Empty, Section, inputCls } from './ui';
 
@@ -13,6 +13,16 @@ function LiveSurface({ s, ws }) {
   const imgRef = useRef(null);
   const human = s.controller.startsWith('human:');
   const bot = ws.bots.find((b) => b.id === s.bot_id);
+  const local = isLocal();
+  const { lang } = useT();
+  const [skillName, setSkillName] = useState('');
+  const [taught, setTaught] = useState('');
+  const teach = async () => {
+    try {
+      const sk = await api('/skills/teach', { method: 'POST', body: { bot_id: s.bot_id, name: skillName || 'Taught task', consent: true } });
+      setTaught(`/${sk.slug}`);
+    } catch (e) { setErr(e.message); }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -58,7 +68,15 @@ function LiveSurface({ s, ws }) {
       {img ? <img ref={imgRef} src={img} alt={t('liveView')} onClick={click}
         className={`w-full rounded border border-white/10 ${human ? 'cursor-crosshair' : ''}`} /> : <Empty>{s.live ? '…' : t('noSurfaces')}</Empty>}
       {err && <div className="text-xs text-rose-300">{err}</div>}
-      {human && (
+      {local && !human && s.recorded_steps > 0 && (
+        <div className="mt-2 space-y-2 rounded-xl bg-black/30 p-3">
+          <div className="text-sm">{lang === 'pl' ? `Nagrano ${s.recorded_steps} kroków. Utwórz z nich skill (szkic do przejrzenia):` : `${s.recorded_steps} steps recorded. Turn them into a draft skill:`}</div>
+          <div className="flex gap-2"><input className={inputCls} value={skillName} onChange={(e) => setSkillName(e.target.value)} placeholder={lang === 'pl' ? 'Nazwa skilla' : 'Skill name'} />
+            <Button small kind="primary" onClick={teach}>{lang === 'pl' ? 'Naucz' : 'Teach'}</Button></div>
+          {taught && <div className="text-xs text-emerald-300">{lang === 'pl' ? 'Utworzono' : 'Created'} {taught}</div>}
+        </div>
+      )}
+      {human && !local && (
         <div className="mt-2 space-y-2">
           <div className="flex gap-2"><input className={inputCls} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
             <Button small onClick={() => input({ type: 'navigate', url })}>Go</Button></div>
@@ -77,15 +95,21 @@ function LiveSurface({ s, ws }) {
 }
 
 export default function ComputerView({ ws, botId }) {
-  const { t } = useT();
+  const { t, lang } = useT();
+  const local = isLocal();
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
   useEffect(() => { api('/computers/surfaces').then(setData).catch((e) => setErr(e.message)); }, [ws.tick]);
   if (err) return <Empty>{err}</Empty>;
   if (!data) return <Empty>…</Empty>;
+  const openOwn = () => api('/computers/open', { method: 'POST', body: { bot_id: botId } }).then(() => ws.reload()).catch((e) => setErr(e.message));
   return (
-    <Section title={`${t('computer')} — ${data.kind}`}>
-      <div className="text-xs text-zinc-500 mb-2">max {data.max_active_surfaces} active surfaces</div>
+    <Section title={`${t('computer')} — ${local ? (lang === 'pl' ? 'ten telefon' : 'this phone') : data.kind}`}>
+      <div className="text-xs text-zinc-500 mb-2">{local
+        ? (lang === 'pl' ? 'Boty używają przeglądarki w telefonie (wspólne ciasteczka). „Przejmij” pokazuje prawdziwą stronę: zaloguj się sam, potem „Oddaj sterowanie”. Zaznacz „Nagrywaj”, aby nauczyć bota zadania.'
+          : 'Bots use a browser inside this phone (shared cookies). Take over shows the real page: sign in yourself, then Give back control. Tick Record to teach a task.')
+        : `max ${data.max_active_surfaces} active surfaces`}</div>
+      {local && botId && <Button kind="primary" onClick={openOwn}>{lang === 'pl' ? 'Otwórz przeglądarkę bota' : "Open the bot's browser"}</Button>}
       {(() => {
         const list = botId ? data.surfaces.filter((s) => s.bot_id === botId) : data.surfaces;
         return list.length ? list.map((s) => <LiveSurface key={s.id} s={s} ws={ws} />) : <Empty>{t('noSurfaces')}</Empty>;

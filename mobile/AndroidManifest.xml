@@ -73,5 +73,8 @@
             </intent-filter>
         </receiver>
         <receiver android:name=".ActionReceiver" android:exported="false" />
+        <!-- On-device acceptance test for CI: only the shell/system hold DUMP, apps cannot trigger it.
+             It uses its own database and the labelled scripted mock provider. -->
+        <receiver android:name=".SelfTest" android:exported="true" android:permission="android.permission.DUMP" />
     </application>
 </manifest>

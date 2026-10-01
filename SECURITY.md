@@ -73,3 +73,22 @@ dla wielu użytkowników ani do uruchamiania wrogiego kodu.**
 
 Zgłoś prywatnie właścicielowi repozytorium (Security Advisory w GitHub). Nie publikuj szczegółów
 podatności w publicznym issue.
+
+## Android: backend w telefonie
+
+- Dane w prywatnym katalogu aplikacji (SQLite), `allowBackup=false`. Klucze API i sekrety: AES-256-GCM,
+  klucz w Android Keystore — nie trafiają do wiadomości, zdarzeń, logów ani kontekstu modelu
+  (`secret.request` → placeholder `{{secret:NAZWA}}` podstawiany dopiero przy wykonaniu narzędzia).
+- Most `window.LowBotNative` działa tylko, gdy główny WebView pokazuje dołączone UI
+  (`https://appassets.androidplatform.net`). Przeglądarka botów to osobne WebView bez tego mostu.
+- Ruch sieciowy tylko HTTPS (cleartext zablokowany konfiguracją sieci). `web.fetch`, `http.post`,
+  MCP i nawigacja przeglądarki botów sprawdzają adres docelowy (blokada adresów prywatnych i metadanych,
+  ręczne przekierowania). **Ograniczenie:** `HttpURLConnection` rozwiązuje nazwę ponownie po sprawdzeniu,
+  więc istnieje okno na DNS rebinding; podzasoby stron w przeglądarce botów nie są filtrowane.
+- `terminal.run` uruchamia `sh` Androida jako użytkownik aplikacji (bez roota), domyślnie „Pytaj za każdym
+  razem”; to ograniczenie uprawnień, nie piaskownica.
+- Boty nie wpisują haseł (pola `password` są odrzucane) — logowanie, 2FA i CAPTCHA robisz sam po
+  „Przejmij”. Nagrywanie „Naucz zadania” zapisuje etykiety elementów i wpisany tekst (bez haseł) tylko
+  gdy zaznaczysz „Nagrywaj”; strona otwarta w przeglądarce bota może w tym czasie dopisać własne kroki
+  do nagrania, dlatego skill powstaje jako szkic do przejrzenia.
+- `SelfTest` (receiver) wymaga uprawnienia `DUMP`, którego aplikacje nie dostają; używa osobnej bazy.

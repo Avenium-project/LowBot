@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FiBookOpen, FiCheckSquare, FiChevronLeft, FiClock, FiFile, FiInbox, FiMonitor, FiPlus, FiSettings, FiUsers, FiZap } from 'react-icons/fi';
 import ChatList from './ChatList';
-import { api, downloadPath } from '../../lib/v2/api';
+import { api, downloadPath, isLocal } from '../../lib/v2/api';
 import { DICT, LangContext, detectLang, useT } from '../../lib/v2/i18n';
 import { BotEditor, GroupCreator } from './BotEditor';
 import Conversation from './Conversation';
@@ -149,6 +149,27 @@ function Shell() {
   const activeCount = ws.tasks.filter((x) => !['completed', 'failed', 'cancelled'].includes(x.status)).length;
 
   const openConv = (id) => { setActive(id); setPage(null); setSheet(null); };
+  const [share, setShare] = useState(null);
+
+  // Android: text shared from another app, and taps on notifications.
+  useEffect(() => {
+    if (!isLocal()) return undefined;
+    const take = () => { const x = window.LowBotNative.consumeShare?.(); if (x) setShare(x); };
+    const open = (e) => { if (e.detail?.conversation_id) { setActive(null); setTimeout(() => openConv(e.detail.conversation_id), 0); } };
+    take();
+    window.addEventListener('lowbot:share', take);
+    window.addEventListener('lowbot:open', open);
+    return () => { window.removeEventListener('lowbot:share', take); window.removeEventListener('lowbot:open', open); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sendShareTo = async (bot, conv) => {
+    window.__lowbotPendingShare = share;
+    setShare(null);
+    const id = conv ? conv.id : (await api(`/bots/${bot.id}/conversation`, { method: 'POST' })).id;
+    setActive(null);
+    await ws.reload();
+    setTimeout(() => openConv(id), 0);
+  };
   const openTask = (id) => setPage({ kind: 'task', data: id });
   const panels = {
     tasks: () => <TasksPanel ws={ws} />,
@@ -197,16 +218,26 @@ function Shell() {
     </Sheet>
   );
 
+  const shareSheet = share && (
+    <Sheet onClose={() => setShare(null)}>
+      <div className="px-4 pb-2 text-[13px] text-zinc-400 line-clamp-3">{t('send')}: {share}</div>
+      {ws.conversations.filter((c) => c.kind === 'group').map((c) => (
+        <SheetItem key={c.id} icon={<FiUsers />} label={c.title || c.bot_ids.map((id) => ws.bots.find((b) => b.id === id)?.name).join(', ')} onClick={() => sendShareTo(null, c)} />))}
+      {ws.bots.filter((b) => !b.hidden).map((b) => <SheetItem key={b.id} icon={b.avatar || '🤖'} label={b.name} onClick={() => sendShareTo(b, null)} />)}
+    </Sheet>
+  );
+
   // Android Back button: close the top-most layer; false = let the app go to background.
   useEffect(() => {
     window.__lowbotBack = () => {
+      if (share) { setShare(null); return true; }
       if (sheet) { setSheet(null); return true; }
       if (page) { setPage(null); return true; }
       if (active && !wide) { setActive(null); return true; }
       return false;
     };
     return () => { delete window.__lowbotBack; };
-  }, [sheet, page, active, wide]);
+  }, [sheet, page, active, wide, share]);
 
   const list = <ChatList ws={ws} activeId={active} onOpen={openConv} onProfile={() => setSheet('menu')} onNew={() => setSheet('new')}
     attention={attention} compact={wide} />;
@@ -232,6 +263,7 @@ function Shell() {
       {pageView}
       {menu}
       {newSheet}
+      {shareSheet}
     </div>
   );
 }

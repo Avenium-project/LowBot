@@ -41,10 +41,12 @@ jobs:
         with: { name: LowBot-apk, path: "mobile/build/LowBot-*.apk" }
 
   install-test:
-    # Installs the APK on an Android 15 emulator, launches it and captures a screenshot.
+    # Installs the APK on an Android 15 emulator, launches it, checks the first screen and
+    # runs the on-device self-test of the phone-hosted backend.
     needs: apk
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with: { name: LowBot-apk, path: apk }
       - name: Enable KVM
@@ -56,16 +58,12 @@ jobs:
           api-level: 35
           target: google_apis
           arch: x86_64
-          script: |
-            adb install -r apk/LowBot-*-test.apk
-            adb shell am start -W -n io.lowbot.app/.MainActivity
-            sleep 15
-            adb shell pidof io.lowbot.app
-            adb exec-out screencap -p > lowbot-launch.png
-            adb shell uiautomator dump /sdcard/ui.xml && adb pull /sdcard/ui.xml ui.xml
-            grep -oE 'text="[^"]{2,80}"' ui.xml | head -40
-            grep -qE "Set up LowBot|Konfiguracja LowBot" ui.xml
-            adb logcat -d | grep -iE "chromium|lowbot|AndroidRuntime" | tail -50 || true
+          script: bash mobile/ci-emulator-test.sh
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: LowBot-emulator-screenshot, path: "lowbot-launch.png\nui.xml" }
+        with:
+          name: LowBot-emulator-results
+          path: |
+            lowbot-launch.png
+            ui.xml
+            selftest-log.txt

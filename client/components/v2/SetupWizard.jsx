@@ -1,7 +1,7 @@
 'use client';
 // First-run wizard: instance -> pairing / sign-in -> model -> test -> first bot.
 import { useEffect, useState } from 'react';
-import { api, getConfig, isNative, pairDevice, pairWithOwnerToken, setConfig, webLogin } from '../../lib/v2/api';
+import { api, getConfig, isLocal, isNative, pairDevice, pairWithOwnerToken, setConfig, webLogin } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Card, Field, inputCls } from './ui';
 import { CodexConnect } from './Integrations';
@@ -15,14 +15,20 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [prov, setProv] = useState({ kind: 'codex_cli', base_url: '', api_key: '', default_model: '' });
+  const local = isLocal();
+  const [prov, setProv] = useState({ kind: local ? 'xai' : 'codex_cli', base_url: '', api_key: '', default_model: '' });
   const [presets, setPresets] = useState([]);
   const [profile, setProfile] = useState(null);
   const [test, setTest] = useState(null);
   const [botName, setBotName] = useState(lang === 'pl' ? 'Asystent' : 'Assistant');
   const [integ, setInteg] = useState(null);
   const loadInteg = () => api('/integrations').then(setInteg).catch(() => {});
-  useEffect(() => { if (step === 2) loadInteg(); }, [step]);
+  useEffect(() => {
+    if (step !== 2) return;
+    loadInteg();
+    if (!presets.length) api('/providers/presets').then(setPresets).catch(() => {});
+    if (local && !profile) api('/providers').then((d) => { if (d.profiles.length) { setProfile(d.profiles[0]); setStep(4); } }).catch(() => {});
+  }, [step, presets.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const native = isNative();
 
   useEffect(() => {
@@ -63,10 +69,13 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
   const createBot = () => run(async () => {
     const bots = await api('/bots');
     if (!bots.length) await api('/bots', { method: 'POST', body: { name: botName, provider_profile_id: profile?.id } });
+    window.LowBotNative?.requestNotifications?.();
     onReady();
   });
 
-  const steps = [t('serverUrl'), native ? t('pairDevice') : t('signIn'), t('models'), t('testConnection'), t('firstBot')];
+  const steps = local
+    ? [null, null, t('models'), t('testConnection'), t('firstBot')]
+    : [t('serverUrl'), native ? t('pairDevice') : t('signIn'), t('models'), t('testConnection'), t('firstBot')];
   return (
     <div className="min-h-[100dvh] flex items-center justify-center p-4 bg-zinc-950 text-zinc-100 select-text">
       <Card className="w-full max-w-md space-y-3">
@@ -74,7 +83,10 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
           <h1 className="text-lg font-semibold">{t('setupTitle')}</h1>
           <button className="text-xs text-zinc-400" onClick={() => setLang(lang === 'pl' ? 'en' : 'pl')}>{lang === 'pl' ? 'EN' : 'PL'}</button>
         </div>
-        <ol className="flex gap-1 text-[11px] text-zinc-500 flex-wrap">{steps.map((s, i) => <li key={s} className={i === step ? 'text-sky-300' : ''}>{i + 1}. {s}{i < steps.length - 1 ? ' ›' : ''}</li>)}</ol>
+        {local && step === 2 && <div className="text-sm text-zinc-400">{lang === 'pl'
+          ? 'LowBot działa w całości na tym telefonie — bez serwera. Wybierz dostawcę modelu i wklej swój klucz API (np. xAI dla modeli Grok albo OpenCode Go). Klucz jest szyfrowany w sejfie Androida.'
+          : 'LowBot runs entirely on this phone — no server. Pick a model provider and paste your API key (e.g. xAI for Grok models, or OpenCode Go). The key is encrypted with the Android keystore.'}</div>}
+        <ol className="flex gap-1 text-[11px] text-zinc-500 flex-wrap">{steps.map((s, i) => s && <li key={s} className={i === step ? 'text-sky-300' : ''}>{local ? i - 1 : i + 1}. {s}{i < steps.length - 1 ? ' ›' : ''}</li>)}</ol>
         {step === 0 && <>
           <Field label={t('serverUrl')} hint={lang === 'pl' ? 'Adres Twojego serwera LowBot (HTTPS poza siecią lokalną).' : 'Your LowBot server (use HTTPS outside your LAN).'}>
             <input className={inputCls} value={server} onChange={(e) => setServer(e.target.value)} placeholder="https://dots.example.com" inputMode="url" /></Field>
@@ -97,7 +109,7 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
             <Field label="Base URL"><input className={inputCls} value={prov.base_url} placeholder={presets.find((p) => p.kind === prov.kind)?.base_url} onChange={(e) => setProv({ ...prov, base_url: e.target.value })} /></Field>
             <Field label="API key"><input className={inputCls} type="password" autoComplete="off" value={prov.api_key} onChange={(e) => setProv({ ...prov, api_key: e.target.value })} /></Field>
           </>}
-          <Field label={t('model')} hint={prov.kind === 'codex_cli' ? (lang === 'pl' ? 'Opcjonalnie — puste = domyślny model Twojego planu ChatGPT.' : 'Optional — empty = your ChatGPT plan default.') : (lang === 'pl' ? 'Dokładny identyfikator modelu u dostawcy.' : 'Exact model id at your provider.')}><input className={inputCls} value={prov.default_model} onChange={(e) => setProv({ ...prov, default_model: e.target.value })} /></Field>
+          <Field label={t('model')} hint={prov.kind === 'codex_cli' ? (lang === 'pl' ? 'Opcjonalnie — puste = domyślny model Twojego planu ChatGPT.' : 'Optional — empty = your ChatGPT plan default.') : (lang === 'pl' ? 'Dokładny identyfikator modelu u dostawcy (puste = pierwszy z listy dostawcy po teście).' : 'Exact model id at your provider (empty = first model the provider lists, after the test).')}><input className={inputCls} value={prov.default_model} onChange={(e) => setProv({ ...prov, default_model: e.target.value })} /></Field>
           {prov.kind === 'scripted_mock' && <div className="text-xs text-amber-300">{t('mockWarning')}</div>}
           <Button kind="primary" disabled={busy || (prov.kind === 'codex_cli' && !integ?.codex?.logged_in)} onClick={saveProvider}>{t('next')}</Button>
         </>}

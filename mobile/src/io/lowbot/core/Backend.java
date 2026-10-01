@@ -54,6 +54,11 @@ public final class Backend {
         return new Backend(ctx.getApplicationContext(), dbName);
     }
 
+    /** Reopen an existing database (self-test of crash recovery). */
+    public static Backend reopen(Context ctx, String dbName) {
+        return new Backend(ctx.getApplicationContext(), dbName);
+    }
+
     Backend(Context ctx, String dbName) {
         core = new Core(ctx, dbName);
         bots = new Bots(this);

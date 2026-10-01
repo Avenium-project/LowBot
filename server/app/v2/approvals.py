@@ -62,8 +62,8 @@ class ApprovalService:
         return aid
 
     def decide(self, approval_id: str, *, user_id: str, decision: str, args_hash_seen: str) -> Dict[str, Any]:
-        if decision not in ("approve", "deny"):
-            raise ApprovalError("decision must be approve or deny")
+        if decision not in ("approve", "always", "deny"):
+            raise ApprovalError("decision must be approve, always or deny")
         with self.db.tx():
             a = self.get(approval_id)
             if not a:
@@ -82,6 +82,12 @@ class ApprovalService:
                                {"status": status, "decided_by": user_id, "decided_at": now_iso()})
             if n != 1:
                 raise ApprovalError("Approval was decided concurrently.")
+            if decision == "always":  # Grok-style "Always allow": a rule for this bot + tool
+                rule_id = new_id("pol")
+                self.db.insert("policy_rules", {"id": rule_id, "bot_id": a["bot_id"], "tool_pattern": a["tool"],
+                                                "effect": "allow", "created_at": now_iso()})
+                self.core.audit("policy.add", actor_type="user", actor_id=user_id, rule_id=rule_id, tool=a["tool"],
+                                effect="allow", source="always_allow")
             self._requeue(a["run_id"])
             self.core.emit(f"approval.{status}", conversation_id=a["conversation_id"], task_id=a["task_id"],
                            run_id=a["run_id"], bot_id=a["bot_id"], approval_id=approval_id)

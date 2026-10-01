@@ -205,6 +205,10 @@ public final class Providers {
             Model.Response resp = a.complete(r);
             J.put(checks, "text", J.obj("ok", true, "sample", J.truncate(resp.text, 60), "usage", new JSONArray().put(resp.inputTokens).put(resp.outputTokens)));
             J.put(caps, "text", true);
+            if (p.optString("default_model").isEmpty()) {
+                final String chosen = model;
+                db.tx(new Runnable() { public void run() { db.exec("UPDATE provider_profiles SET default_model = ? WHERE id = ?", chosen, id); } });
+            }
         } catch (Model.ProviderError e) {
             J.put(checks, "text", J.obj("ok", false, "kind", e.kind, "error", e.getMessage()));
             J.put(caps, "text", false);

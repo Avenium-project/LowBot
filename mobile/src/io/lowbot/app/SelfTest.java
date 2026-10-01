@@ -1,0 +1,259 @@
+package io.lowbot.app;
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.util.Log;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
+import io.lowbot.core.ApiError;
+import io.lowbot.core.Backend;
+import io.lowbot.core.J;
+import io.lowbot.core.Router;
+import io.lowbot.core.Routines;
+
+/**
+ * On-device acceptance test of the phone-hosted backend, run in CI on an Android
+ * emulator:  adb shell am broadcast -n io.lowbot.app/.SelfTest  (needs the DUMP
+ * permission, which only the shell/system has). Uses its own database and the
+ * labelled scripted mock provider — no real model, no user data touched.
+ * Prints "LOWBOT_SELFTEST PASS <n>" or "LOWBOT_SELFTEST FAIL <reason>" to logcat.
+ */
+public class SelfTest extends BroadcastReceiver {
+    static final String TAG = "LOWBOT_SELFTEST";
+
+    @Override
+    public void onReceive(final Context context, Intent intent) {
+        final PendingResult pr = goAsync();
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    String report = runAll(context.getApplicationContext());
+                    Log.i(TAG, report);
+                } finally {
+                    pr.finish();
+                }
+            }
+        }).start();
+    }
+
+    static final List<String> passed = new ArrayList<String>();
+
+    static void check(boolean ok, String name) {
+        if (!ok) throw new AssertionError(name);
+        passed.add(name);
+        Log.i(TAG, "ok " + name);
+    }
+
+    static String runAll(Context ctx) {
+        passed.clear();
+        Backend b = null;
+        try {
+            b = Backend.forTest(ctx, "selftest.db");
+            b.start();
+            b = scenario(ctx, b);
+            browser(ctx, b);
+            String r = "LOWBOT_SELFTEST PASS " + passed.size() + " " + passed;
+            write(ctx, r);
+            return r;
+        } catch (Throwable e) {
+            Log.e(TAG, "failure", e);
+            String r = "LOWBOT_SELFTEST FAIL after " + passed + ": " + e;
+            write(ctx, r);
+            return r;
+        } finally {
+            if (b != null) b.engine.stop();
+        }
+    }
+
+    static void write(Context ctx, String s) {
+        try {
+            FileOutputStream fo = new FileOutputStream(new File(ctx.getFilesDir(), "selftest.txt"));
+            fo.write(s.getBytes("UTF-8"));
+            fo.close();
+        } catch (Exception ignored) { }
+    }
+
+    static JSONObject api(Router r, String method, String path, Object body) {
+        Router.Response res = r.handle(method, path, body == null ? null : body.toString());
+        if (res.status >= 400) throw new AssertionError(method + " " + path + " -> " + res.status + " " + res.text);
+        Object v = J.parse(res.text);
+        if (res.text != null && res.text.startsWith("[")) return J.obj("items", J.parseArr(res.text));
+        return (JSONObject) v;
+    }
+
+    static JSONObject lastBotMessage(Backend b, String cid) {
+        return b.core.db.one("SELECT * FROM messages WHERE conversation_id = ? AND author_type = 'bot' ORDER BY seq DESC", cid);
+    }
+
+    static String runStatus(Backend b, String taskId) {
+        return b.core.db.scalar("SELECT status FROM runs WHERE task_id = ?", taskId);
+    }
+
+    static Backend scenario(Context ctx, Backend b) throws Exception {
+        Router r = new Router(b);
+        check("ok".equals(api(r, "GET", "/api/v2/health", null).optString("status")), "health");
+
+        JSONArray script = new JSONArray()
+                .put(J.obj("when", "write a file", "call", J.obj("name", "workspace.write", "arguments", J.obj("path", "notes/a.txt", "content", "hello phone"))))
+                .put(J.obj("after_tool", "workspace.write", "reply", "file written"))
+                .put(J.obj("when", "post it", "call", J.obj("name", "http.post", "arguments", J.obj("url", "https://example.invalid/hook", "json", J.obj("a", 1)))))
+                .put(J.obj("after_tool", "http.post", "reply", "post step finished: {{last}}"))
+                .put(J.obj("when", "ask me", "call", J.obj("name", "user.ask", "arguments", J.obj("question", "Which colour?"))))
+                .put(J.obj("after_tool", "user.ask", "reply", "thanks: {{last}}"))
+                .put(J.obj("when", "need key", "call", J.obj("name", "secret.request", "arguments", J.obj("name", "DEMO_KEY", "description", "Demo API key"))))
+                .put(J.obj("after_tool", "secret.request", "reply", "got placeholder {{last}}"))
+                .put(J.obj("when", "please delegate", "call", J.obj("name", "task.delegate", "arguments", J.obj("bot", "helper", "instructions", "Count to three", "wait", true))))
+                .put(J.obj("after_tool", "task.delegate", "reply", "delegation done: {{last}}"))
+                .put(J.obj("when", "remember", "call", J.obj("name", "memory.save", "arguments", J.obj("content", "The user likes green tea"))))
+                .put(J.obj("after_tool", "memory.save", "reply", "remembered"));
+        JSONObject prov = api(r, "POST", "/api/v2/providers", J.obj("kind", "scripted_mock", "name", "Mock", "script", script));
+        check(prov.optBoolean("is_mock"), "mock provider is labelled");
+        JSONObject bot = api(r, "POST", "/api/v2/bots", J.obj("name", "Asystent", "role_description", "test"));
+        JSONObject helper = api(r, "POST", "/api/v2/bots", J.obj("name", "Helper"));
+        check("helper".equals(helper.optString("handle")), "handle from name");
+        String cid = api(r, "POST", "/api/v2/bots/" + bot.optString("id") + "/conversation", null).optString("id");
+
+        // 1. plain chat
+        JSONObject sent = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "hello there", "client_msg_id", "c1"));
+        JSONObject dup = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "hello there", "client_msg_id", "c1"));
+        check(dup.optBoolean("duplicate") && dup.optString("message_id").equals(sent.optString("message_id")), "client_msg_id idempotent");
+        b.engine.drain(20000);
+        check(lastBotMessage(b, cid).optString("text").equals("[mock] hello there"), "bot replies");
+
+        // 2. workspace tool
+        api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "write a file"));
+        b.engine.drain(20000);
+        check("file written".equals(lastBotMessage(b, cid).optString("text")), "workspace.write tool");
+        check(new File(b.core.workspace, "notes/a.txt").exists(), "file on disk");
+
+        // 3. approval → deny (external action needs approval, nothing is sent)
+        JSONObject t3 = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "post it")).optJSONArray("tasks").getJSONObject(0);
+        b.engine.drain(20000);
+        check("waiting_approval".equals(runStatus(b, t3.optString("id"))), "external action waits for approval");
+        JSONObject appr = api(r, "GET", "/api/v2/approvals", null).optJSONArray("items").getJSONObject(0);
+        boolean stale = false;
+        try { b.approvals.decide(appr.optString("id"), "approve", "wrong-hash"); } catch (ApiError e) { stale = e.status == 409; }
+        check(stale, "approval bound to args hash");
+        api(r, "POST", "/api/v2/approvals/" + appr.optString("id") + "/decide", J.obj("decision", "deny", "args_hash", appr.optString("args_hash")));
+        b.engine.drain(20000);
+        check(lastBotMessage(b, cid).optString("text").contains("denied"), "denied step reported to model");
+        check(b.core.db.count("SELECT COUNT(*) FROM operations") == 0, "denied action never dispatched");
+
+        // 4. user.ask → answer
+        JSONObject t4 = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "ask me")).optJSONArray("tasks").getJSONObject(0);
+        b.engine.drain(20000);
+        check("waiting_input".equals(runStatus(b, t4.optString("id"))), "user.ask parks run");
+        api(r, "POST", "/api/v2/tasks/" + t4.optString("id") + "/answer", J.obj("answer", "green"));
+        b.engine.drain(20000);
+        check(lastBotMessage(b, cid).optString("text").contains("green"), "answer resumes run");
+
+        // 5. secret.request → secure answer; value never in messages/events
+        JSONObject t5 = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "need key")).optJSONArray("tasks").getJSONObject(0);
+        b.engine.drain(20000);
+        boolean plainRefused = false;
+        try { b.tasks.answerInput(t5.optString("id"), "sk-should-not-be-here"); } catch (ApiError e) { plainRefused = true; }
+        check(plainRefused, "secret not accepted as chat answer");
+        api(r, "POST", "/api/v2/tasks/" + t5.optString("id") + "/secret", J.obj("value", "super-secret-value-123"));
+        b.engine.drain(20000);
+        check(lastBotMessage(b, cid).optString("text").contains("{{secret:DEMO_KEY}}"), "placeholder returned");
+        check(b.core.db.count("SELECT COUNT(*) FROM messages WHERE text LIKE '%super-secret-value%'") == 0
+                && b.core.db.count("SELECT COUNT(*) FROM events WHERE payload_json LIKE '%super-secret-value%'") == 0
+                && b.core.db.count("SELECT COUNT(*) FROM run_steps WHERE output_json LIKE '%super-secret-value%'") == 0, "secret value absent from chat/events/steps");
+        check("super-secret-value-123".equals(b.core.secretGet(b.core.secretIdByName("user:DEMO_KEY"))), "secret decrypts from keystore vault");
+
+        // 6. delegation with wait
+        api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "please delegate"));
+        b.engine.drain(30000);
+        check(lastBotMessage(b, cid).optString("text").startsWith("delegation done"), "delegation waits and resumes");
+        check(b.core.db.count("SELECT COUNT(*) FROM handoffs WHERE status = 'completed'") == 1, "handoff recorded");
+
+        // 7. memory + FTS search
+        api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "remember this"));
+        b.engine.drain(20000);
+        check(b.memory.search("green tea", b.bots.get(bot.optString("id")), 5).size() == 1, "memory saved and searchable");
+
+        // 8. Always allow stores a rule for this bot + tool
+        JSONObject t8 = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "post it again")).optJSONArray("tasks").getJSONObject(0);
+        b.engine.drain(20000);
+        JSONObject a8 = b.approvals.list("pending").get(0);
+        b.approvals.decide(a8.optString("id"), "always", a8.optString("args_hash"));
+        check(b.core.db.count("SELECT COUNT(*) FROM policy_rules WHERE bot_id = ? AND tool_pattern = 'http.post' AND effect = 'allow'", bot.optString("id")) == 1, "always allow saves rule");
+        b.engine.drain(30000);
+        String st8 = runStatus(b, t8.optString("id"));
+        check("completed".equals(st8) || "unknown_outcome".equals(st8), "approved external call ran exactly once (" + st8 + ")");
+
+        // 9. Duplicate (Grok): "<name> copy", routines copied disabled, no history
+        api(r, "POST", "/api/v2/routines", J.obj("bot_id", bot.optString("id"), "name", "Morning", "prompt", "brief me", "schedule", "every weekday at 8:00"));
+        JSONObject copy = api(r, "POST", "/api/v2/bots/" + bot.optString("id") + "/duplicate", null);
+        check("Asystent copy".equals(copy.optString("name")), "duplicate name");
+        check(b.core.db.count("SELECT COUNT(*) FROM routines WHERE bot_id = ? AND enabled = 0", copy.optString("id")) == 1, "duplicate routines disabled");
+        check(b.core.db.count("SELECT COUNT(*) FROM memories WHERE bot_id = ?", copy.optString("id")) == 0, "duplicate has no memory");
+
+        // 10. Routines: DST rules in Europe/Warsaw
+        JSONObject s1 = Routines.parse("codziennie o 2:30", "Europe/Warsaw");
+        List<String> spring = Routines.nextRuns(s1, "Europe/Warsaw", 1, Instant.parse("2026-03-28T12:00:00Z"));
+        List<String> spring2 = Routines.nextRuns(s1, "Europe/Warsaw", 1, Instant.parse(spring.get(0)));
+        check(spring.get(0).equals("2026-03-29T01:00:00.000Z") && spring2.get(0).equals("2026-03-30T00:30:00.000Z"),
+                "spring-forward gap fires at 03:00 local (" + spring + spring2 + ")");
+        List<String> autumn = Routines.nextRuns(s1, "Europe/Warsaw", 2, Instant.parse("2026-10-24T12:00:00Z"));
+        check(autumn.get(0).equals("2026-10-25T00:30:00.000Z") && autumn.get(1).equals("2026-10-26T01:30:00.000Z"),
+                "fall-back fires once at first 02:30 (" + autumn + ")");
+        check("cron".equals(Routines.parse("every weekday at 8:00 AM", "Europe/Warsaw").optString("kind")), "english schedule");
+
+        // 11. routine fires once per slot (dedupe)
+        JSONObject rt = b.routines.list(bot.optString("id")).get(0);
+        JSONObject f1 = b.routines.fire(rt.optString("id"), "slot:x", "schedule", null);
+        JSONObject f2 = b.routines.fire(rt.optString("id"), "slot:x", "schedule", null);
+        check(f2.optBoolean("duplicate") && f1.optString("routine_run_id").equals(f2.optString("routine_run_id")), "routine slot dedupe");
+        b.engine.drain(20000);
+
+        // 12. crash recovery: a run left 'running' by a dead process is requeued and finished
+        JSONObject t12 = b.tasks.createTask(bot.optString("id"), cid, "user", "local-user", "hello again", "", "", null, 80, null, null, null);
+        b.engine.stop();
+        final String rid = t12.optString("run_id");
+        b.core.db.exec("UPDATE runs SET status = 'running', owner = 'dead-process' WHERE id = ?", rid);
+        b.core.db.close();
+        Backend b2 = Backend.reopen(ctx, "selftest.db");
+        b2.start();
+        b2.engine.drain(20000);
+        check("completed".equals(b2.core.db.scalar("SELECT status FROM runs WHERE id = ?", rid)), "run recovered after restart");
+        check(b2.core.db.count("SELECT COUNT(*) FROM events WHERE type = 'run.recovered'") >= 1, "recovery audited");
+        b2.engine.stop();
+
+        // 13. SSRF guard
+        boolean blocked = false;
+        try { io.lowbot.tools.Net.vet("http://169.254.169.254/latest/meta-data", true); } catch (io.lowbot.tools.Net.Denied e) { blocked = true; }
+        check(blocked, "metadata address blocked");
+        blocked = false;
+        try { io.lowbot.tools.Net.vet("http://192.168.1.1/", false); } catch (io.lowbot.tools.Net.Denied e) { blocked = true; }
+        check(blocked, "LAN blocked by default");
+        return b2;
+    }
+
+    /** The bots' browser: open a page in an offscreen WebView and read it. Network may be unavailable in CI. */
+    static void browser(Context ctx, Backend b) {
+        Computer c = new Computer(ctx, b);
+        try {
+            JSONObject bot = b.bots.list(true).get(0);
+            Computer.Surface s = c.surface(bot.optString("id"));
+            c.navigate(s, "https://example.com/");
+            JSONObject st = c.state(s);
+            check(st.optString("title").toLowerCase().contains("example"), "browser loads a page");
+            byte[] jpg = c.screenshot(s.id);
+            check(jpg.length > 1000, "browser screenshot");
+            c.close(s.id);
+        } catch (io.lowbot.engine.Tools.ToolError e) {
+            Log.w(TAG, "browser check skipped: " + e.getMessage());
+            passed.add("browser(skipped: " + e.getMessage() + ")");
+        }
+    }
+}

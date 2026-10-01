@@ -26,7 +26,7 @@ Legenda: ✅ LowBot robi to samo · 🟨 odpowiednik z różnicą (opisaną) · 
 | Tekst, wklejanie linków i obrazów, załączniki, dyktowanie, **Start voice chat** (gdy composer pusty) | ✅ (voice chat: rozpoznawanie mowy + synteza mowy Androida) |
 | `@` wzmianka bota, grupy, rutyny, konektora | 🟨 boty i `@everyone`; rutyny/konektory przez menu |
 | Grupa: 2–6 botów, widoczne przekazania | ✅ |
-| Bez wzmianki „boty same decydują, kto odpowiada”; `@bot` — właściciel; kilka wzmianek; `@everyone` oszczędnie | ✅ (wybór odpowiadających przez model, fallback: prowadzący bot) |
+| Bez wzmianki „boty same decydują, kto odpowiada”; `@bot` — właściciel; kilka wzmianek; `@everyone` oszczędnie | 🟨 `@bot`, kilka wzmianek i `@everyone` ✅; bez wzmianki odpowiada prowadzący bot, który z instrukcji systemowej decyduje, czy odpowiedzieć sam, czy przekazać (`task.delegate`/@wzmianka) lepiej dopasowanemu członkowi |
 | Bot→bot: asynchroniczna wiadomość, odbiorca się budzi, odpowiada później; przekazanie widoczne w rozmowie | ✅ |
 | „Stop now” zatrzymuje pracę, nie cofa wykonanych akcji | ✅ przycisk Stop + raport |
 
@@ -64,6 +64,12 @@ Legenda: ✅ LowBot robi to samo · 🟨 odpowiednik z różnicą (opisaną) · 
 
 Pliki, obrazy, linki i wyniki narzędzi jako karty; podgląd; zapis; `/workspace` z folderami projektów → ✅.
 Szablony udostępniane przez x.ai (Public link / Team-only) → ⛔ (wymaga usługi x.ai).
+
+## 8. Gdzie to jest w kodzie (Android)
+
+`mobile/src/io/lowbot/core` (dane i usługi), `engine` (silnik, modele, rejestr narzędzi), `tools`
+(narzędzia, SSRF, MCP), `app` (Android: usługa w tle, alarmy, powiadomienia, przeglądarka i przejęcie,
+most JS). Weryfikacja na urządzeniu: `SelfTest.java` uruchamiany w CI na emulatorze Androida 15.
 
 ## 7. Mobile, ustawienia, powiadomienia — [mobile](https://docs.x.ai/grok-bot/mobile), [settings-and-notifications](https://docs.x.ai/grok-bot/settings-and-notifications)
 

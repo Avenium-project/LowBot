@@ -114,7 +114,7 @@ def test_M_phone_flow(server):
         expect(page.get_by_text("Prośba o zgodę")).to_be_visible(timeout=15000)
         assert no_horizontal_scroll(page)
         page.screenshot(path=SHOTS / "05-approval-inline.png")
-        page.get_by_role("button", name="Zatwierdź").click()
+        page.get_by_role("button", name="Zezwól raz").click()
         expect(page.get_by_text("Zapisane.")).to_be_visible(timeout=15000)
         expect(page.get_by_text("Zatwierdzono")).to_be_visible(timeout=15000)
         page.screenshot(path=SHOTS / "06-approved.png")

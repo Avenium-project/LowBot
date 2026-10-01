@@ -1,7 +1,7 @@
 'use client';
 // ChatGPT (via the official Codex CLI sign-in) and OpenCode Go.
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '../../lib/v2/api';
+import { api, isLocal } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Card, Field, Section, inputCls } from './ui';
 
@@ -85,6 +85,14 @@ export default function Integrations({ ws }) {
 
   return (
     <Section title={pl ? 'Integracje' : 'Integrations'}>
+      {isLocal() ? (
+        <Card className="mb-3 space-y-2">
+          <div className="font-semibold">ChatGPT · Codex</div>
+          <div className="text-sm text-zinc-400">{pl
+            ? 'Logowanie kontem ChatGPT działa tylko przez program Codex na komputerze — nie da się go uruchomić w aplikacji na telefonie. Na telefonie użyj klucza API: xAI (modele Grok), OpenAI, OpenCode Go albo OpenRouter.'
+            : 'ChatGPT sign-in only works through the Codex program on a computer and cannot run inside a phone app. On the phone use an API key: xAI (Grok models), OpenAI, OpenCode Go or OpenRouter.'}</div>
+        </Card>
+      ) : (
       <Card className="mb-3 space-y-3">
         <div className="font-semibold">ChatGPT · Codex</div>
         {status && <CodexConnect status={status} onChanged={load} />}
@@ -94,12 +102,12 @@ export default function Integrations({ ws }) {
         <div className="text-xs text-zinc-500">{pl
           ? 'Bot z profilem ChatGPT odpowiada przez Codex (jego własny sandbox, bez narzędzi LowBot). Każdy bot może też dostać narzędzie codex.run — zadanie programistyczne w swoim workspace, zawsze po Twojej zgodzie.'
           : 'A bot on the ChatGPT profile answers through Codex (its own sandbox, no LowBot tools). Any bot can also use codex.run for coding tasks in its workspace, always after your approval.'}</div>
-      </Card>
+      </Card>)}
       <Card className="space-y-3">
         <div className="font-semibold">OpenCode Go</div>
         <div className="text-sm text-zinc-400">{pl
-          ? 'Subskrypcja OpenCode Go (otwarte modele do programowania). Klucz API znajdziesz w panelu opencode.ai. Klucz jest szyfrowany na serwerze.'
-          : 'OpenCode Go subscription (open coding models). Get the API key from the opencode.ai console. Stored encrypted on the server.'}</div>
+          ? 'Subskrypcja OpenCode Go (otwarte modele do programowania). Klucz API znajdziesz w panelu opencode.ai. Klucz jest szyfrowany.'
+          : 'OpenCode Go subscription (open coding models). Get the API key from the opencode.ai console. Stored encrypted.'}</div>
         <div className="text-sm">{status?.opencode?.go_key_configured ? <span className="text-emerald-400">● {pl ? 'Klucz zapisany' : 'Key saved'}</span> : <span className="text-zinc-500">○ {pl ? 'Brak klucza' : 'No key'}</span>}</div>
         <Field label={pl ? 'Klucz API OpenCode Go' : 'OpenCode Go API key'}><input type="password" autoComplete="off" className={inputCls} value={key} onChange={(e) => setKey(e.target.value)} /></Field>
         <Field label={pl ? 'Model (id z OpenCode Go)' : 'Model (OpenCode Go id)'} hint={pl ? 'np. kimi-k2.6 — dokładny identyfikator z listy modeli OpenCode Go; „Testuj połączenie” pokaże dostępne.' : 'Exact id from the OpenCode Go model list; Test connection lists them.'}>
