@@ -245,3 +245,43 @@ def backups(request: Request):
     return {"backups": list_backups(r.settings.data_dir / "backups"),
             "restore": "Stop the server, then run: python -m app.v2.backup restore <archive>",
             "note": "Back up APP_ENCRYPTION_KEY / .encryption.key separately."}
+
+
+# ------------------------------------------------------------------ voice ---
+@router.get("/voice/settings")
+def voice_settings(request: Request):
+    from app.v2.voice import VoiceService
+    return {**VoiceService(rt(request)).settings(), "realtime_voice": "not available"}
+
+
+@router.post("/voice/settings")
+def save_voice_settings(body: Dict[str, Any], request: Request):
+    from app.v2.voice import VoiceService
+    return VoiceService(rt(request)).save(body)
+
+
+@router.post("/voice/transcribe")
+async def transcribe(body: Dict[str, Any], request: Request):
+    from app.v2.voice import VoiceService
+    r = rt(request)
+    meta, path = r.services["artifacts"].get(body.get("artifact_id", "")), r.services["artifacts"].path(body.get("artifact_id", ""))
+    if not meta or not path:
+        raise HTTPException(404, "Unknown audio artifact")
+    try:
+        text = await VoiceService(r).transcribe(path.read_bytes(), meta["name"], meta["mime"], body.get("language"))
+    except ProviderError as exc:
+        raise bad(exc, 422)
+    return {"text": text}
+
+
+@router.post("/voice/speak")
+async def speak(body: Dict[str, Any], request: Request):
+    from app.v2.voice import VoiceService
+    r = rt(request)
+    try:
+        audio = await VoiceService(r).speak(body.get("text", ""))
+    except ProviderError as exc:
+        raise bad(exc, 422)
+    art = r.services["artifacts"].create(name="speech.mp3", data=audio, mime="audio/mpeg",
+                                         conversation_id=body.get("conversation_id"))
+    return art

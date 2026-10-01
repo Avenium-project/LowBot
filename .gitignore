@@ -41,3 +41,5 @@ __pycache__/
 *.pyc
 .pytest_cache/
 server/.venv/
+client/out/
+client/.next/

@@ -1,0 +1,109 @@
+'use client';
+// First-run wizard: instance -> pairing / sign-in -> model -> test -> first bot.
+import { useEffect, useState } from 'react';
+import { api, getConfig, isNative, pairDevice, setConfig, webLogin } from '../../lib/v2/api';
+import { useT } from '../../lib/v2/i18n';
+import { Button, Card, Field, inputCls } from './ui';
+
+export default function SetupWizard({ onReady, startAt = 0 }) {
+  const { t, lang, setLang } = useT();
+  const cfg = getConfig();
+  const [step, setStep] = useState(startAt);
+  const [server, setServer] = useState(cfg.server);
+  const [code, setCode] = useState('');
+  const [token, setToken] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [prov, setProv] = useState({ kind: 'openai_responses', base_url: '', api_key: '', default_model: '' });
+  const [presets, setPresets] = useState([]);
+  const [profile, setProfile] = useState(null);
+  const [test, setTest] = useState(null);
+  const [botName, setBotName] = useState(lang === 'pl' ? 'Asystent' : 'Assistant');
+  const native = isNative();
+
+  useEffect(() => {
+    // Deep link opendots://pair?server=...&code=... (scanned QR) pre-fills the form.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('server')) setServer(params.get('server'));
+    if (params.get('code')) setCode(params.get('code'));
+  }, []);
+
+  const run = async (fn) => { setBusy(true); setErr(''); try { await fn(); } catch (e) { setErr(e.message); } finally { setBusy(false); } };
+
+  const checkServer = () => run(async () => {
+    const res = await fetch(`${server.replace(/\/+$/, '')}/api/v2/health`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const h = await res.json();
+    if (h.api !== 'v2') throw new Error('Not an Open Dots v2 server');
+    setConfig({ server, mode: native ? 'device' : 'web' });
+    setStep(1);
+  });
+
+  const authenticate = () => run(async () => {
+    if (native || code) await pairDevice(server, code, native ? 'Open Dots app' : 'Browser');
+    else await webLogin(token);
+    const d = await api('/providers');
+    setPresets(await api('/providers/presets'));
+    if (d.profiles.length) { setProfile(d.profiles[0]); setStep(4); } else setStep(2);
+  });
+
+  const saveProvider = () => run(async () => {
+    const p = await api('/providers', { method: 'POST', body: { ...prov, base_url: prov.base_url || undefined, api_key: prov.api_key || undefined } });
+    setProfile(p); setStep(3);
+  });
+
+  const runTest = () => run(async () => { setTest(await api(`/providers/${profile.id}/test`, { method: 'POST', body: {} })); });
+
+  const createBot = () => run(async () => {
+    const bots = await api('/bots');
+    if (!bots.length) await api('/bots', { method: 'POST', body: { name: botName, provider_profile_id: profile?.id } });
+    onReady();
+  });
+
+  const steps = [t('serverUrl'), native ? t('pairDevice') : t('signIn'), t('models'), t('testConnection'), t('firstBot')];
+  return (
+    <div className="min-h-[100dvh] flex items-center justify-center p-4 bg-zinc-950 text-zinc-100 select-text">
+      <Card className="w-full max-w-md space-y-3">
+        <div className="flex justify-between items-center">
+          <h1 className="text-lg font-semibold">{t('setupTitle')}</h1>
+          <button className="text-xs text-zinc-400" onClick={() => setLang(lang === 'pl' ? 'en' : 'pl')}>{lang === 'pl' ? 'EN' : 'PL'}</button>
+        </div>
+        <ol className="flex gap-1 text-[11px] text-zinc-500 flex-wrap">{steps.map((s, i) => <li key={s} className={i === step ? 'text-sky-300' : ''}>{i + 1}. {s}{i < steps.length - 1 ? ' ›' : ''}</li>)}</ol>
+        {step === 0 && <>
+          <Field label={t('serverUrl')} hint={lang === 'pl' ? 'Adres Twojego serwera Open Dots (HTTPS poza siecią lokalną).' : 'Your Open Dots server (use HTTPS outside your LAN).'}>
+            <input className={inputCls} value={server} onChange={(e) => setServer(e.target.value)} placeholder="https://dots.example.com" inputMode="url" /></Field>
+          <Button kind="primary" disabled={busy || !server} onClick={checkServer}>{t('next')}</Button>
+        </>}
+        {step === 1 && <>
+          {native || !token ? <Field label={t('pairingCode')} hint={lang === 'pl' ? 'Wygeneruj kod w Ustawienia → Urządzenia na zalogowanym urządzeniu. Kod jest jednorazowy i wygasa.' : 'Create a code in Settings → Devices on a signed-in device. One-time, expires.'}>
+            <input className={`${inputCls} font-mono tracking-widest`} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="ABCD-EFGH" /></Field> : null}
+          {!native && <Field label={t('ownerToken')} hint={lang === 'pl' ? 'Albo: token właściciela z serwera (DATA_DIR/.auth-token) — tylko przeglądarka; zostaje wymieniony na sesję HttpOnly.' : 'Or the owner token (browser only; exchanged for an HttpOnly session).'}>
+            <input className={inputCls} type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} /></Field>}
+          <div className="flex gap-2"><Button onClick={() => setStep(0)}>{t('back')}</Button><Button kind="primary" disabled={busy || (!code && !token)} onClick={authenticate}>{t('next')}</Button></div>
+        </>}
+        {step === 2 && <>
+          <Field label={t('provider')}><select className={inputCls} value={prov.kind} onChange={(e) => setProv({ ...prov, kind: e.target.value })}>
+            {presets.map((p) => <option key={p.kind} value={p.kind}>{p.label}</option>)}</select></Field>
+          {prov.kind !== 'scripted_mock' && <>
+            <Field label="Base URL"><input className={inputCls} value={prov.base_url} placeholder={presets.find((p) => p.kind === prov.kind)?.base_url} onChange={(e) => setProv({ ...prov, base_url: e.target.value })} /></Field>
+            <Field label="API key"><input className={inputCls} type="password" autoComplete="off" value={prov.api_key} onChange={(e) => setProv({ ...prov, api_key: e.target.value })} /></Field>
+          </>}
+          <Field label={t('model')} hint={lang === 'pl' ? 'Dokładny identyfikator modelu u dostawcy.' : 'Exact model id at your provider.'}><input className={inputCls} value={prov.default_model} onChange={(e) => setProv({ ...prov, default_model: e.target.value })} /></Field>
+          {prov.kind === 'scripted_mock' && <div className="text-xs text-amber-300">{t('mockWarning')}</div>}
+          <Button kind="primary" disabled={busy} onClick={saveProvider}>{t('next')}</Button>
+        </>}
+        {step === 3 && <>
+          <Button disabled={busy} onClick={runTest}>{t('testConnection')}</Button>
+          {test && <div className="text-xs space-y-1">{Object.entries(test.checks).map(([k, v]) => <div key={k}>{v.ok ? '✅' : '⚠️'} {k}: {v.error || v.detail || v.sample || ''}</div>)}
+            {test.is_mock && <div className="text-amber-300">{t('mockWarning')}</div>}</div>}
+          <div className="flex gap-2"><Button onClick={() => setStep(2)}>{t('back')}</Button><Button kind="primary" onClick={() => setStep(4)}>{t('next')}</Button></div>
+        </>}
+        {step === 4 && <>
+          <Field label={t('firstBot')}><input className={inputCls} value={botName} onChange={(e) => setBotName(e.target.value)} /></Field>
+          <Button kind="primary" disabled={busy} onClick={createBot}>{t('done')}</Button>
+        </>}
+        {err && <div className="text-sm text-rose-300 break-words">{err}</div>}
+      </Card>
+    </div>
+  );
+}

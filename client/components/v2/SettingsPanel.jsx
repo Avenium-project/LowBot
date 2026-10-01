@@ -1,0 +1,195 @@
+'use client';
+import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
+import { api, fetchBlobUrl } from '../../lib/v2/api';
+import { useT } from '../../lib/v2/i18n';
+import { Button, Card, Empty, Field, Section, fmtTime, inputCls } from './ui';
+
+function Providers({ ws }) {
+  const { t } = useT();
+  const [data, setData] = useState({ profiles: [] });
+  const [presets, setPresets] = useState([]);
+  const [form, setForm] = useState({ kind: 'openai_responses', name: '', base_url: '', api_key: '', default_model: '', models: '' });
+  const [tests, setTests] = useState({});
+  const [err, setErr] = useState('');
+  const load = () => api('/providers').then(setData);
+  useEffect(() => { load(); api('/providers/presets').then(setPresets); }, []);
+  const preset = presets.find((p) => p.kind === form.kind);
+  const save = async () => {
+    setErr('');
+    try {
+      await api('/providers', { method: 'POST', body: { ...form, base_url: form.base_url || undefined,
+        models: form.models.split(/[\s,]+/).filter(Boolean), api_key: form.api_key || undefined } });
+      setForm({ ...form, api_key: '' }); load();
+    } catch (e) { setErr(e.message); }
+  };
+  const test = async (id) => {
+    setTests({ ...tests, [id]: { running: true } });
+    try { setTests({ ...tests, [id]: await api(`/providers/${id}/test`, { method: 'POST', body: {} }) }); load(); }
+    catch (e) { setTests({ ...tests, [id]: { error: e.message } }); }
+  };
+  return (
+    <Section title={t('models')}>
+      <Card className="space-y-2 mb-3">
+        <Field label={t('provider')}><select className={inputCls} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
+          {presets.map((p) => <option key={p.kind} value={p.kind}>{p.label}</option>)}</select></Field>
+        <Field label={t('name')}><input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+        {form.kind !== 'scripted_mock' && <>
+          <Field label="Base URL" hint={preset?.base_url ? `default: ${preset.base_url}` : 'e.g. https://host/v1'}>
+            <input className={inputCls} value={form.base_url} onChange={(e) => setForm({ ...form, base_url: e.target.value })} placeholder={preset?.base_url} /></Field>
+          <Field label="API key" hint="Stored encrypted on the server; never shown again."><input type="password" autoComplete="off" className={inputCls} value={form.api_key} onChange={(e) => setForm({ ...form, api_key: e.target.value })} /></Field>
+        </>}
+        <Field label={t('model')} hint="Exact model id from your provider (use Test connection to list models)."><input className={inputCls} value={form.default_model} onChange={(e) => setForm({ ...form, default_model: e.target.value })} /></Field>
+        {form.kind === 'scripted_mock' && <div className="text-xs text-amber-300">{t('mockWarning')}</div>}
+        <Button kind="primary" onClick={save}>{t('save')}</Button>
+        {err && <div className="text-xs text-rose-300">{err}</div>}
+      </Card>
+      {data.profiles.map((p) => (
+        <Card key={p.id} className="mb-2">
+          <div className="flex justify-between flex-wrap gap-2">
+            <div><b>{p.name}</b> {data.default_profile_id === p.id && <span className="text-xs text-emerald-300">default</span>}
+              <div className="text-xs text-zinc-400">{p.kind} · {p.base_url || '—'} · {p.default_model || '—'} · key {p.api_key_configured ? '✓' : '✗'}</div>
+              {p.is_mock && <div className="text-xs text-amber-300">{t('mockWarning')}</div>}
+              <div className="text-xs text-zinc-500">tools: {String(p.capabilities?.tools ?? '?')} · vision: {String(p.capabilities?.vision ?? '?')} · streaming: {String(p.capabilities?.streaming ?? '?')}</div>
+            </div>
+            <div className="flex gap-1 flex-wrap">
+              <Button small onClick={() => test(p.id)}>{t('testConnection')}</Button>
+              <Button small onClick={() => api(`/providers/${p.id}/default`, { method: 'POST' }).then(load)}>default</Button>
+              <Button small kind="danger" onClick={() => confirm('Delete?') && api(`/providers/${p.id}`, { method: 'DELETE' }).then(load)}>{t('delete')}</Button>
+            </div>
+          </div>
+          {tests[p.id] && <pre className="text-[11px] text-zinc-300 whitespace-pre-wrap mt-2 max-h-48 overflow-y-auto">{tests[p.id].running ? '…' : JSON.stringify(tests[p.id], null, 1)}</pre>}
+        </Card>
+      ))}
+    </Section>
+  );
+}
+
+function Mcp() {
+  const { t } = useT();
+  const [rows, setRows] = useState([]);
+  const [form, setForm] = useState({ name: '', transport: 'http', url: '', command: '', args: '', auth_token: '' });
+  const [err, setErr] = useState('');
+  const load = () => api('/mcp/connections').then(setRows).catch((e) => setErr(e.message));
+  useEffect(() => { load(); }, []);
+  const save = async () => {
+    setErr('');
+    try {
+      await api('/mcp/connections', { method: 'POST', body: { ...form, args: form.args.split(' ').filter(Boolean), auth_token: form.auth_token || undefined } });
+      load();
+    } catch (e) { setErr(e.message); }
+  };
+  return (
+    <Section title={t('mcp')}>
+      <Card className="space-y-2 mb-3">
+        <div className="flex gap-2"><input className={inputCls} placeholder={t('name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <select className={inputCls} value={form.transport} onChange={(e) => setForm({ ...form, transport: e.target.value })}><option value="http">Streamable HTTP</option><option value="stdio">stdio</option></select></div>
+        {form.transport === 'http'
+          ? <><input className={inputCls} placeholder="https://server/mcp" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
+            <input className={inputCls} type="password" placeholder="Bearer token (optional, stored encrypted)" value={form.auth_token} onChange={(e) => setForm({ ...form, auth_token: e.target.value })} /></>
+          : <><input className={inputCls} placeholder="command (e.g. npx)" value={form.command} onChange={(e) => setForm({ ...form, command: e.target.value })} />
+            <input className={inputCls} placeholder="args" value={form.args} onChange={(e) => setForm({ ...form, args: e.target.value })} /></>}
+        <Button kind="primary" onClick={save}>{t('save')}</Button>
+        {err && <div className="text-xs text-rose-300">{err}</div>}
+      </Card>
+      {rows.map((c) => (
+        <Card key={c.id} className="mb-2">
+          <div className="flex justify-between gap-2 flex-wrap"><div><b>{c.name}</b> · {c.transport} · {c.last_status || 'not tested'}
+            <div className="text-xs text-zinc-400 break-all">{c.url || `${c.command} ${c.args.join(' ')}`}</div>
+            <div className="text-xs text-zinc-500">{c.tools.map((x) => x.name).join(', ')}</div></div>
+            <div className="flex gap-1"><Button small onClick={() => api(`/mcp/connections/${c.id}/test`, { method: 'POST' }).then(load)}>{t('testConnection')}</Button>
+              <Button small kind="danger" onClick={() => api(`/mcp/connections/${c.id}`, { method: 'DELETE' }).then(load)}>{t('delete')}</Button></div></div>
+          {c.logs.length > 0 && <details><summary className="text-xs text-zinc-500 cursor-pointer">logs</summary><pre className="text-[11px] whitespace-pre-wrap">{c.logs.join('\n')}</pre></details>}
+        </Card>
+      ))}
+    </Section>
+  );
+}
+
+function Devices() {
+  const { t } = useT();
+  const [rows, setRows] = useState([]);
+  const [code, setCode] = useState(null);
+  const [qr, setQr] = useState('');
+  const load = () => api('/devices').then(setRows);
+  useEffect(() => { load(); }, []);
+  const pair = async () => {
+    const c = await api('/pair/code', { method: 'POST' });
+    setCode(c);
+    setQr(await QRCode.toDataURL(c.qr_payload, { margin: 1, width: 220 }));
+  };
+  return (
+    <Section title={t('devices')} actions={<Button small kind="primary" onClick={pair}>{t('pairDevice')}</Button>}>
+      {code && <Card className="mb-2 text-center">
+        <div className="text-xs text-zinc-400">{t('pairingCode')} · {t('expires')} {fmtTime(code.expires_at)}</div>
+        <div className="text-2xl font-mono tracking-widest my-1 select-text">{code.code}</div>
+        <div className="text-xs text-zinc-400 break-all select-text">{code.server_url}</div>
+        {qr && <img src={qr} alt="QR" className="mx-auto mt-2 rounded bg-white p-1" />}
+        <div className="text-[11px] text-zinc-500 mt-1">One-time code. It does not contain the owner token.</div>
+      </Card>}
+      {rows.length ? rows.map((d) => (
+        <div key={d.id} className="flex justify-between items-center py-2 border-b border-white/5 text-sm gap-2">
+          <span>{d.platform === 'android' ? '📱' : d.platform === 'windows' ? '💻' : '🔌'} {d.name} <span className="text-xs text-zinc-500">· {fmtTime(d.last_seen_at)}</span>{d.revoked_at && <span className="text-xs text-rose-300"> revoked</span>}</span>
+          {!d.revoked_at && <Button small kind="danger" onClick={() => api(`/devices/${d.id}`, { method: 'DELETE' }).then(load)}>{t('revoke')}</Button>}
+        </div>)) : <Empty />}
+    </Section>
+  );
+}
+
+function Policies({ ws }) {
+  const { t } = useT();
+  const [data, setData] = useState(null);
+  const [rule, setRule] = useState({ tool: '', effect: 'ask', bot_id: '' });
+  const load = () => api('/policies').then(setData);
+  useEffect(() => { load(); }, []);
+  if (!data) return null;
+  return (
+    <Section title={t('policies')}>
+      <label className="flex items-center gap-2 text-sm mb-2"><input type="checkbox" checked={data.hierarchy_enforced}
+        onChange={(e) => api('/settings/hierarchy', { method: 'POST', body: { enforced: e.target.checked } }).then(load)} /> {t('hierarchy')}</label>
+      <Card className="mb-2 flex gap-2 flex-wrap">
+        <input className={inputCls} placeholder="tool pattern, e.g. http.* or mcp.github.*" value={rule.tool} onChange={(e) => setRule({ ...rule, tool: e.target.value })} />
+        <select className={inputCls} value={rule.effect} onChange={(e) => setRule({ ...rule, effect: e.target.value })}><option>allow</option><option>ask</option><option>deny</option></select>
+        <select className={inputCls} value={rule.bot_id} onChange={(e) => setRule({ ...rule, bot_id: e.target.value })}><option value="">all bots</option>{ws.bots.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
+        <Button kind="primary" onClick={() => api('/policies', { method: 'POST', body: { ...rule, bot_id: rule.bot_id || null } }).then(load)}>{t('save')}</Button>
+      </Card>
+      {data.rules.map((r) => <div key={r.id} className="text-sm flex justify-between py-1"><span><code>{r.tool_pattern}</code> → <b>{r.effect}</b> {r.bot_id ? `(${ws.bots.find((b) => b.id === r.bot_id)?.name})` : ''}</span>
+        <Button small kind="ghost" onClick={() => api(`/policies/${r.id}`, { method: 'DELETE' }).then(load)}>✕</Button></div>)}
+      <details className="mt-2"><summary className="text-xs text-zinc-400 cursor-pointer">Tool defaults</summary>
+        <div className="text-xs">{data.tools.map((x) => <div key={x.name}><code>{x.name}</code> · {x.effect_kind} · default <b>{x.default}</b>{x.hard_ask ? ' · always ask' : ''}</div>)}</div></details>
+    </Section>
+  );
+}
+
+function Admin() {
+  const { t } = useT();
+  const [b, setB] = useState(null);
+  const [usage, setUsage] = useState(null);
+  const load = () => { api('/admin/backups').then(setB); api('/usage').then(setUsage); };
+  useEffect(() => { load(); }, []);
+  const exportAudit = async () => { const u = await fetchBlobUrl('/audit/export'); const a = document.createElement('a'); a.href = u; a.download = 'opendots-audit.jsonl'; a.click(); };
+  return (
+    <Section title={t('backup')} actions={<><Button small onClick={() => api('/admin/backup', { method: 'POST' }).then(load)}>{t('create')}</Button><Button small onClick={exportAudit}>Audit export</Button></>}>
+      {b && <div className="text-xs text-zinc-400 space-y-1">{b.backups.map((x) => <div key={x.name}>{x.name} · {(x.size / 1024).toFixed(0)} KB</div>)}<div>{b.restore}</div><div className="text-amber-300">{b.note}</div></div>}
+      {usage && <details className="mt-2"><summary className="text-xs text-zinc-400 cursor-pointer">Usage</summary><pre className="text-[11px] whitespace-pre-wrap">{JSON.stringify(usage, null, 1)}</pre></details>}
+    </Section>
+  );
+}
+
+export default function SettingsPanel({ ws }) {
+  const { t, lang, setLang } = useT();
+  return (
+    <div>
+      <Section title={t('language')}>
+        <div className="flex gap-2"><Button kind={lang === 'pl' ? 'primary' : 'default'} onClick={() => setLang('pl')}>Polski</Button>
+          <Button kind={lang === 'en' ? 'primary' : 'default'} onClick={() => setLang('en')}>English</Button></div>
+        {ws.health && <div className="text-xs text-zinc-500 mt-2">schema v{ws.health.schema_version} · {ws.health.timezone} · {ws.health.capabilities.join(', ')} · runs ≤ {ws.health.limits.max_active_runs}, screens ≤ {ws.health.limits.max_active_surfaces}</div>}
+      </Section>
+      <Providers ws={ws} />
+      <Devices />
+      <Mcp />
+      <Policies ws={ws} />
+      <Admin />
+    </div>
+  );
+}

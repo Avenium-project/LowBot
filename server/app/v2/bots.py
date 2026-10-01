@@ -12,6 +12,7 @@ from app.v2.util import new_id, now_iso, slugify
 DEFAULT_TOOLS = [
     "workspace.*", "web.fetch", "memory.*", "user.ask",
     "task.delegate", "task.get_status", "task.complete", "bot.message", "artifact.share",
+    "browser.*", "routine.create",
 ]
 ORG_ROLES = ("ceo", "head", "manager", "worker")
 EDITABLE = {

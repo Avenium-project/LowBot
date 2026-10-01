@@ -142,3 +142,12 @@ async def health_check():
         "computer_provider": computer_provider.provider_name,
         "default_model": storage_service.get_settings().get("default_model") or settings.DEFAULT_MODEL
     }
+
+
+# Optional: serve the statically exported web UI (client/out) from the API
+# origin so browsers use a same-site session cookie. API routes above win.
+_ui_dist = os.getenv("UI_DIST", "")
+if _ui_dist and os.path.isdir(_ui_dist):
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=_ui_dist, html=True), name="ui")
+
