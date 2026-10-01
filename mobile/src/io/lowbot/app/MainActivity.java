@@ -25,7 +25,17 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.speech.tts.TextToSpeech;
+import android.view.Gravity;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import io.lowbot.core.Core;
 
 import org.json.JSONObject;
 
@@ -36,16 +46,16 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * LowBot Android shell.
+ * LowBot for Android.
  *
  * The UI is the same static web app as the browser version, served from the
  * APK's assets on the reserved origin https://appassets.androidplatform.net.
  * Only that origin is loaded inside the WebView; every other link opens in the
- * system browser. The app talks to YOUR LowBot server (HTTPS) with a per-device
- * token kept in the Android Keystore. Closing the app does not stop work on
- * the server.
+ * system browser. The backend (database, engine, routines, tools, the bots'
+ * browser) runs inside this app — see LowBotApp — and the UI reaches it through
+ * the window.LowBotNative bridge, not the network.
  */
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements Computer.Host {
     static final String APP_HOST = "appassets.androidplatform.net";
     static final String APP_ORIGIN = "https://" + APP_HOST;
     private static final int REQ_FILE = 11;
@@ -58,6 +68,15 @@ public class MainActivity extends Activity {
     private PermissionRequest pendingPermission;
     private String pendingDictationLang;
     private SpeechRecognizer recognizer;
+    private FrameLayout parking, takeoverContent;
+    private LinearLayout takeover;
+    private TextView takeoverTitle;
+    private CheckBox recordBox;
+    private android.widget.EditText urlField;
+    private Computer.Surface takeoverSurface;
+    private TextToSpeech tts;
+    private volatile String shareText;
+    private Core.EventListener eventListener;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -68,9 +87,13 @@ public class MainActivity extends Activity {
 
         final FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.rgb(20, 20, 20));
+        // The bots' browser tabs live here, laid out behind the app UI so pages render.
+        parking = new FrameLayout(this);
+        root.addView(parking, new FrameLayout.LayoutParams(-1, -1));
         web = new WebView(this);
         web.setBackgroundColor(Color.rgb(20, 20, 20));
         root.addView(web, new FrameLayout.LayoutParams(-1, -1));
+        root.addView(buildTakeover(), new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
         // Keep content clear of the status/navigation bars and the keyboard
         // (Android 15 draws edge-to-edge).
@@ -107,7 +130,164 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new NativeBridge(this), "LowBotNative");
         web.setWebViewClient(new ShellClient());
         web.setWebChromeClient(new ShellChrome());
+        handleIntent(getIntent());
         web.loadUrl(startUrl(getIntent()));
+        LowBotApp.of(this).computer.attachHost(this);
+    }
+
+    // ----------------------------------------------------------- takeover --
+    private View buildTakeover() {
+        takeover = new LinearLayout(this);
+        takeover.setOrientation(LinearLayout.VERTICAL);
+        takeover.setBackgroundColor(Color.rgb(20, 20, 20));
+        takeover.setVisibility(View.GONE);
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        int pad = (int) (8 * getResources().getDisplayMetrics().density);
+        bar.setPadding(pad * 2, pad, pad, pad);
+        takeoverTitle = new TextView(this);
+        takeoverTitle.setTextColor(Color.rgb(251, 191, 36));
+        takeoverTitle.setTextSize(13);
+        bar.addView(takeoverTitle, new LinearLayout.LayoutParams(0, -2, 1f));
+        recordBox = new CheckBox(this);
+        recordBox.setText(getString(R.string.record_teach));
+        recordBox.setTextColor(Color.WHITE);
+        recordBox.setTextSize(12);
+        recordBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(CompoundButton b, boolean on) {
+                if (takeoverSurface != null) LowBotApp.of(MainActivity.this).computer.setRecording(takeoverSurface.id, on);
+            }
+        });
+        bar.addView(recordBox);
+        Button back = new Button(this);
+        back.setText(getString(R.string.give_back));
+        back.setAllCaps(false);
+        back.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                final Computer.Surface s = takeoverSurface;
+                if (s == null) { hideTakeover(); return; }
+                new Thread(new Runnable() { public void run() { LowBotApp.of(MainActivity.this).computer.resume(s.id); } }).start();
+            }
+        });
+        bar.addView(back);
+        takeover.addView(bar, new LinearLayout.LayoutParams(-1, -2));
+        urlField = new android.widget.EditText(this);
+        urlField.setSingleLine(true);
+        urlField.setTextSize(13);
+        urlField.setTextColor(Color.WHITE);
+        urlField.setHintTextColor(Color.GRAY);
+        urlField.setHint("https://…");
+        urlField.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_GO);
+        urlField.setInputType(android.text.InputType.TYPE_TEXT_VARIATION_URI | android.text.InputType.TYPE_CLASS_TEXT);
+        urlField.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override public boolean onEditorAction(TextView v, int actionId, android.view.KeyEvent event) {
+                String u = v.getText().toString().trim();
+                if (takeoverSurface != null && !u.isEmpty()) {
+                    if (!u.startsWith("http://") && !u.startsWith("https://")) u = "https://" + u;
+                    takeoverSurface.web.loadUrl(u);
+                }
+                return true;
+            }
+        });
+        takeover.addView(urlField, new LinearLayout.LayoutParams(-1, -2));
+        takeoverContent = new FrameLayout(this);
+        takeover.addView(takeoverContent, new LinearLayout.LayoutParams(-1, 0, 1f));
+        return takeover;
+    }
+
+    @Override public ViewGroup surfaceParking() { return parking; }
+
+    @Override public void showTakeover(Computer.Surface s) {
+        takeoverSurface = s;
+        if (s.web.getParent() instanceof ViewGroup) ((ViewGroup) s.web.getParent()).removeView(s.web);
+        ((android.content.MutableContextWrapper) s.web.getContext()).setBaseContext(this);
+        takeoverContent.addView(s.web, new FrameLayout.LayoutParams(-1, -1));
+        takeoverTitle.setText(getString(R.string.you_control, s.botName()));
+        recordBox.setChecked(s.isRecording());
+        takeover.setVisibility(View.VISIBLE);
+        takeover.bringToFront();
+        urlField.setText(s.web.getUrl() == null ? "" : s.web.getUrl());
+        s.web.requestFocus();
+    }
+
+    @Override public void hideTakeover() {
+        takeover.setVisibility(View.GONE);
+        takeoverSurface = null;
+        web.requestFocus();
+    }
+
+    // ------------------------------------------------------- events/share --
+    void runJs(final String js) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() { if (web != null) web.evaluateJavascript(js, null); }
+        });
+    }
+
+    void subscribeEvents() {
+        if (eventListener != null) return;
+        eventListener = new Core.EventListener() {
+            @Override public void onEvent(JSONObject e) { runJs("window.__lowbotEvent&&window.__lowbotEvent(" + e + ")"); }
+        };
+        LowBotApp.of(this).uiListeners.add(eventListener);
+    }
+
+    String consumeShare() {
+        String t = shareText;
+        shareText = null;
+        return t;
+    }
+
+    private void handleIntent(Intent intent) {
+        if (intent == null) return;
+        if (Intent.ACTION_SEND.equals(intent.getAction())) {
+            String t = intent.getStringExtra(Intent.EXTRA_TEXT);
+            String sub = intent.getStringExtra(Intent.EXTRA_SUBJECT);
+            if (t != null) {
+                shareText = (sub != null && !t.contains(sub) ? sub + "\n" : "") + t;
+                runJs("window.dispatchEvent(new Event('lowbot:share'))");
+            }
+        }
+        String conv = intent.getStringExtra("open_conversation");
+        if (conv != null) {
+            try {
+                runJs("window.dispatchEvent(new CustomEvent('lowbot:open',{detail:" + new JSONObject().put("conversation_id", conv) + "}))");
+            } catch (Exception ignored) { }
+        }
+    }
+
+    void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED)
+            requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 14);
+    }
+
+    void speak(final String text, final String lang) {
+        if (tts == null) {
+            tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+                @Override public void onInit(int status) {
+                    if (status == TextToSpeech.SUCCESS) speak(text, lang);
+                }
+            });
+            return;
+        }
+        tts.setLanguage("en".equals(lang) ? java.util.Locale.US : new java.util.Locale("pl", "PL"));
+        tts.speak(text == null ? "" : text, TextToSpeech.QUEUE_FLUSH, null, "lowbot");
+    }
+
+    void stopSpeaking() {
+        if (tts != null) tts.stop();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        LowBotApp.uiVisible = true;
+    }
+
+    @Override
+    protected void onPause() {
+        LowBotApp.uiVisible = false;
+        super.onPause();
     }
 
     boolean isOnAppOrigin() {
@@ -129,11 +309,16 @@ public class MainActivity extends Activity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        handleIntent(intent);
         if (intent.getData() != null) web.loadUrl(startUrl(intent));
     }
 
     @Override
     public void onBackPressed() {
+        if (takeover.getVisibility() == View.VISIBLE) {
+            if (takeoverSurface != null && takeoverSurface.web.canGoBack()) takeoverSurface.web.goBack();
+            return;
+        }
         web.evaluateJavascript("(window.__lowbotBack && window.__lowbotBack()) ? 'handled' : 'no'",
                 new ValueCallback<String>() {
                     @Override
@@ -309,6 +494,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         if (recognizer != null) recognizer.destroy();
+        if (tts != null) tts.shutdown();
+        if (eventListener != null) LowBotApp.of(this).uiListeners.remove(eventListener);
+        if (takeoverSurface != null) takeoverContent.removeView(takeoverSurface.web);
+        LowBotApp.of(this).computer.detachHost(this);
         web.destroy();
         super.onDestroy();
     }

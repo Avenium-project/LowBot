@@ -10,9 +10,15 @@ import android.util.Base64;
 import android.webkit.JavascriptInterface;
 import android.widget.Toast;
 
+import org.json.JSONObject;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import io.lowbot.core.Router;
 
 /**
  * The only native API visible to the web UI ({@code window.LowBotNative}).
@@ -23,6 +29,7 @@ final class NativeBridge {
     private static final String[] ALLOWED_KEYS = {"device_token"};
     private final MainActivity activity;
     private final SecureStore store;
+    private static final ExecutorService API = Executors.newFixedThreadPool(4);
 
     NativeBridge(MainActivity activity) {
         this.activity = activity;
@@ -123,6 +130,69 @@ final class NativeBridge {
         if (!trusted()) return;
         activity.runOnUiThread(new Runnable() {
             @Override public void run() { activity.startDictation(lang); }
+        });
+    }
+
+    /** The backend runs inside this app: the UI talks to it through this bridge (no network). */
+    @JavascriptInterface
+    public boolean isLocal() {
+        return true;
+    }
+
+    /**
+     * Local API call. The answer arrives as window.__lowbotResolve(id, status, type, body, isBase64, filename).
+     * Body/answers never leave the phone except to the model providers you configured.
+     */
+    @JavascriptInterface
+    public void request(final String id, final String method, final String path, final String body) {
+        if (!trusted() || id == null || method == null || path == null) return;
+        final Router router = LowBotApp.of(activity).router;
+        API.submit(new Runnable() {
+            @Override public void run() {
+                Router.Response r = router.handle(method, path, body);
+                boolean b64 = r.bytes != null;
+                String payload = b64 ? Base64.encodeToString(r.bytes, Base64.NO_WRAP) : r.text;
+                final String js = "window.__lowbotResolve&&window.__lowbotResolve(" + JSONObject.quote(id) + "," + r.status + ","
+                        + JSONObject.quote(r.type) + "," + JSONObject.quote(payload == null ? "" : payload) + "," + b64 + ","
+                        + JSONObject.quote(r.filename == null ? "" : r.filename) + ")";
+                activity.runJs(js);
+            }
+        });
+    }
+
+    /** Start pushing backend events to window.__lowbotEvent (replaces the server's SSE stream). */
+    @JavascriptInterface
+    public void subscribe() {
+        if (trusted()) activity.subscribeEvents();
+    }
+
+    /** Voice chat: speak a bot's reply with Android text-to-speech. */
+    @JavascriptInterface
+    public void speak(final String text, final String lang) {
+        if (!trusted()) return;
+        activity.runOnUiThread(new Runnable() {
+            @Override public void run() { activity.speak(text, lang); }
+        });
+    }
+
+    @JavascriptInterface
+    public void stopSpeaking() {
+        activity.runOnUiThread(new Runnable() {
+            @Override public void run() { activity.stopSpeaking(); }
+        });
+    }
+
+    /** Text shared into LowBot from another app (Android share sheet), consumed once. */
+    @JavascriptInterface
+    public String consumeShare() {
+        return trusted() ? activity.consumeShare() : null;
+    }
+
+    @JavascriptInterface
+    public void requestNotifications() {
+        if (!trusted()) return;
+        activity.runOnUiThread(new Runnable() {
+            @Override public void run() { activity.requestNotificationPermission(); }
         });
     }
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- LowBot for Android: a thin, framework-only shell around the bundled web UI.
-     No AndroidX/Google libraries; all work happens on your LowBot server. -->
+<!-- LowBot for Android: framework-only (no AndroidX/Google libraries). The whole backend
+     (database, engine, routines, tools, the bots' browser) runs inside this app. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.lowbot.app">
 
@@ -8,14 +8,24 @@
     <!-- Requested at runtime only when you tap dictation / voice note. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Keep working after you leave the app; notify when a bot finishes or needs you. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Routines: wake at the scheduled time and after a reboot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
+        android:name=".LowBotApp"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:supportsRtl="true"
         android:usesCleartextTraffic="false"
+        android:hardwareAccelerated="true"
         android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
@@ -42,6 +52,26 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="opendots" android:host="pair" />
             </intent-filter>
+            <!-- Android share sheet: send text/links to a bot. -->
+            <intent-filter android:label="@string/share_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
+
+        <service
+            android:name=".WorkService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <receiver android:name=".AlarmReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="io.lowbot.app.TICK" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name=".ActionReceiver" android:exported="false" />
     </application>
 </manifest>

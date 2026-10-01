@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">LowBot</string>
+    <string name="ch_work">Bots working</string>
+    <string name="ch_attention">Needs you (approvals, questions)</string>
+    <string name="ch_done">Finished tasks</string>
+    <string name="allow_once">Allow once</string>
+    <string name="deny">Deny</string>
+    <string name="working_title">LowBot is working</string>
+    <string name="working_text">%1$d task(s) in progress</string>
+    <string name="give_back">Give back control</string>
+    <string name="record_teach">Record (teach)</string>
+    <string name="you_control">You control %1$s\'s browser</string>
+    <string name="share_label">Send to a bot</string>
 </resources>
