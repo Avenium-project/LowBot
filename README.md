@@ -1,4 +1,62 @@
-# Open Dots: Open-Source Personal AI Agent Workspace
+# LowBot — Open Dots v2: trwali współpracownicy AI
+
+Samodzielnie hostowany system wielu **trwałych botów**: piszesz do nich jak w komunikatorze, a one
+naprawdę pracują — używają narzędzi i przeglądarki, delegują sobie zadania, pamiętają, działają według
+harmonogramu i pytają Cię o zgodę, gdy trzeba. Praca dzieje się na serwerze: zamknięcie telefonu nie
+zatrzymuje zadania.
+
+> Bazuje na [Anil-matcha/open-dots](https://github.com/Anil-matcha/open-dots) (MIT) — zob.
+> [`NOTICE.md`](NOTICE.md). Projekt niezależny; nie jest powiązany z xAI ani nie kopiuje Grok Bota.
+> **Status: prototyp dla jednego właściciela.** Szczegóły zgodności i braków:
+> [`docs/parity-matrix.md`](docs/parity-matrix.md).
+
+**Co działa (przetestowane):** dowolna liczba botów (np. 50) śpiących bez kosztów · rozmowy prywatne i
+grupowe z @wzmiankami · trwały silnik zadań (dzierżawy, checkpointy, retry, Stop/Pauza) odporny na
+restart · zgody trwałe, jednorazowe i związane z argumentami · delegowanie bot→bot z ochroną przed
+pętlami · prawdziwa przeglądarka (Chromium) z przejęciem sterowania · MCP (stdio + HTTP) z elicitation ·
+pamięć z wyszukiwaniem · skille · rutyny w strefie Europe/Warsaw (z obsługą zmiany czasu i webhookami) ·
+adaptery OpenAI Responses / Chat Completions / xAI / OpenRouter / lokalny · UI po polsku i angielsku,
+dopasowane do telefonu · parowanie urządzeń kodem/QR.
+
+**Czego jeszcze nie ma:** pełny pulpit (tylko przeglądarka), Team Bots dla wielu ludzi, Slack, push,
+real-time voice, lokalny backend w kliencie Windows, PostgreSQL. APK i EXE są budowane w CI
+(nie mogły zostać zbudowane w środowisku, w którym powstał kod) — zob. [`BUILD.md`](BUILD.md).
+
+## Szybki start
+
+```bash
+# serwer
+cd server && pip install -r requirements.txt -r requirements-browser.txt && python -m playwright install chromium
+export APP_AUTH_TOKEN=$(python -c 'import secrets;print(secrets.token_urlsafe(32))')
+# interfejs (statyczny) serwowany przez API pod /bots/
+(cd ../client && npm ci && npm run build:export)
+UI_DIST=../client/out python -m uvicorn app.main:app --port 8000
+```
+
+Otwórz `http://127.0.0.1:8000/bots/`, w kreatorze wklej token właściciela, dodaj dostawcę modelu
+(**Testuj połączenie** sprawdzi tekst, narzędzia i streaming) i utwórz pierwszego bota. Telefon lub
+Windows: *Menu → Ustawienia → Urządzenia → Sparuj urządzenie* i wpisz/zeskanuj jednorazowy kod.
+Self-hosting z HTTPS: [`deploy/`](deploy/docker-compose.yml).
+
+| Dokument | Zawartość |
+|---|---|
+| [`docs/architecture.md`](docs/architecture.md) | komponenty, maszyna stanów, decyzje |
+| [`docs/parity-matrix.md`](docs/parity-matrix.md) | funkcja · źródło · implementacja · luka · test · status |
+| [`docs/test-report.md`](docs/test-report.md) | uruchomione komendy, wyniki, pomiary |
+| [`BUILD.md`](BUILD.md) | serwer, WWW, Docker, APK, EXE, testy |
+| [`SECURITY.md`](SECURITY.md) | egzekwowane zabezpieczenia i ich granice |
+| [`docs/sources.md`](docs/sources.md) | źródła, daty weryfikacji, audyt upstream |
+
+**Serwer wyłączony = brak pracy.** Klient (telefon/Windows) nie jest właścicielem zadań; jeśli wyłączysz
+maszynę z serwerem, obliczenia stoją, a po starcie przebiegi są bezpiecznie wznawiane od checkpointu
+(niepewne efekty zewnętrzne czekają na Twoją decyzję).
+
+---
+
+# Upstream: Open Dots (v1 prototype)
+
+The original upstream README follows. Its `/api/v1` routes and `/app` UI are kept for compatibility.
+
 
 
 <p align="center">
