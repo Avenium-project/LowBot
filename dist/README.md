@@ -2,10 +2,12 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **2.8.1** — bot.create works for bots made before 2.8 (a new bot gets the part of the default tools its
+- Version **2.8.2** — search on the home screen finds message text and files (not only chat names), includes hidden
+  chats, highlights the match and says when nothing was found.
+  SHA-256: `fbd9be1b046d83299319f237fd6b0be2abe8b4692087b190bcb46b9c81d8c6d3`
+- 2.8.1 — bot.create works for bots made before 2.8 (a new bot gets the part of the default tools its
   creator has, instead of failing); bots see the tools they really called in earlier replies (no more invented or denied
   errors); long code in replies wraps inside the bubble; Grok-style "<bot> is working" line with a shimmering text.
-  SHA-256: `aa30c582d3625d9ae55bd42a904a183b9b5c400e1ab8f515a7999144070fa986`
 - 2.8.0 — bots manage the team: they can list, create, change and delete other bots (creating, changing
   and deleting always needs your approval) and write to each other; shared **Workspaces** (Menu → Workspaces): a folder
   with shared files, one AGENTS.md of rules for every member bot, members and a team chat. Fixed browser takeover:

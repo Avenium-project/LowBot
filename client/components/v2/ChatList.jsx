@@ -2,9 +2,9 @@
 // Home screen. Pinned chats as big characters on top, then your sections, then the rest.
 // Long-press (or right-click) a chat: Mark as unread · Pin · New section · Hide · More.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FiChevronLeft, FiChevronRight, FiEye, FiEyeOff, FiFolderPlus, FiMessageSquare, FiMoreHorizontal, FiPlus, FiSearch, FiX } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiEye, FiEyeOff, FiFileText, FiFolderPlus, FiMessageSquare, FiMoreHorizontal, FiPlus, FiSearch, FiX } from 'react-icons/fi';
 import { BsPin, BsPinAngle } from 'react-icons/bs';
-import { api } from '../../lib/v2/api';
+import { api, downloadPath } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { BotBlob, RoundButton, cls, shortTime } from './ui';
 
@@ -106,6 +106,57 @@ function Tile({ r, i, compact, menuKey, onLong, onOpen }) {
   );
 }
 
+function Highlight({ text, q }) {
+  const i = text.toLowerCase().indexOf(q);
+  if (i < 0) return text;
+  return <>{text.slice(0, i)}<mark className="bg-transparent text-white font-semibold">{text.slice(i, i + q.length)}</mark>{text.slice(i + q.length)}</>;
+}
+
+// Snippet around the first match so the hit is visible even in long messages.
+function snippet(text, q) {
+  const flat = String(text || '').replace(/[*_`#>~]+/g, '').replace(/\s+/g, ' ');
+  const i = flat.toLowerCase().indexOf(q);
+  return i > 40 ? `…${flat.slice(i - 30)}` : flat;
+}
+
+function SearchResults({ ws, q, found, onOpen, nameHits }) {
+  const convs = Object.fromEntries(ws.conversations.map((c) => [c.id, c]));
+  const msgs = (found?.messages || []).filter((m) => convs[m.conversation_id]);
+  const files = found?.artifacts || [];
+  const who = (m) => (m.author_type === 'user' ? 'You' : ws.bots.find((b) => b.id === m.author_id)?.name || 'System');
+  const titleOf = (c) => (c.kind === 'group' ? c.title || 'Group' : ws.bots.find((b) => b.id === c.default_bot_id)?.name || 'Chat');
+  return (
+    <div className="lb-rise pb-6">
+      {msgs.length > 0 && <div className="px-5 pt-4 pb-1 text-[14px] text-zinc-500">Messages</div>}
+      {msgs.map((m) => {
+        const c = convs[m.conversation_id];
+        const bot = ws.bots.find((b) => b.id === c.default_bot_id);
+        return (
+          <button key={m.id} type="button" onClick={() => onOpen(c.id)} className="lb-press w-full flex items-start gap-3 px-4 py-2.5 text-left">
+            <BotBlob bot={c.kind === 'group' ? undefined : bot} group={c.kind === 'group'} size={40} still />
+            <span className="flex-1 min-w-0">
+              <span className="flex items-baseline gap-2"><span className="flex-1 truncate text-[16px] font-medium">{titleOf(c)}</span>
+                <span className="text-[12px] text-zinc-500 shrink-0">{shortTime(m.created_at)}</span></span>
+              <span className="block text-[14px] text-zinc-400 line-clamp-2">{who(m)}: <Highlight text={snippet(m.text, q)} q={q} /></span>
+            </span>
+          </button>);
+      })}
+      {files.length > 0 && <div className="px-5 pt-4 pb-1 text-[14px] text-zinc-500">Files</div>}
+      {files.map((a) => (
+        <button key={a.id} type="button" onClick={() => downloadPath(`/artifacts/${a.id}/download`, a.name)} className="lb-press w-full flex items-center gap-3 px-5 py-3 text-left">
+          <FiFileText className="text-zinc-400 text-xl shrink-0" />
+          <span className="flex-1 min-w-0 truncate text-[15px]"><Highlight text={a.name} q={q} /></span>
+          <span className="text-[12px] text-zinc-500">{(a.size / 1024).toFixed(1)} KB</span>
+        </button>))}
+      {found?.loading && !msgs.length && <div className="text-center text-zinc-500 text-[14px] mt-6">Searching…</div>}
+      {found?.error && <div className="text-center text-rose-400 text-[14px] mt-6 px-8">{found.error}</div>}
+      {found && !found.loading && !found.error && !msgs.length && !files.length && !nameHits && (
+        <div className="text-center text-zinc-500 text-[15px] mt-16 px-8">No results for “{q}”</div>)}
+      {q.length < 2 && !nameHits && <div className="text-center text-zinc-500 text-[15px] mt-16 px-8">Type at least 2 characters to search messages.</div>}
+    </div>
+  );
+}
+
 export default function ChatList({ ws, activeId, onOpen, onProfile, onNew, attention, compact, onOpenBot }) {
   const { t } = useT();
   const [q, setQ] = useState('');
@@ -130,7 +181,18 @@ export default function ChatList({ ws, activeId, onOpen, onProfile, onNew, atten
     return out.sort((a, b) => at(b).localeCompare(at(a)));
   }, [ws.bots, ws.conversations, prefs]);
 
-  const visible = rows.filter((r) => !r.hidden && (!q || r.name.toLowerCase().includes(q.toLowerCase())));
+  // Search: chat names (hidden ones too) instantly, plus message text and files from the backend.
+  const needle = q.trim().toLowerCase();
+  const visible = rows.filter((r) => (needle ? r.name.toLowerCase().includes(needle) || (r.bot?.handle || '').toLowerCase().includes(needle) : !r.hidden));
+  const [found, setFound] = useState(null);
+  useEffect(() => {
+    if (needle.length < 2) { setFound(null); return undefined; }
+    setFound((f) => (f ? { ...f, loading: true } : { loading: true, messages: [], artifacts: [] }));
+    const h = setTimeout(() => api(`/search?q=${encodeURIComponent(needle)}`)
+      .then((r) => setFound({ messages: r.messages || [], artifacts: r.artifacts || [] }))
+      .catch((e) => setFound({ messages: [], artifacts: [], error: e.message })), 250);
+    return () => clearTimeout(h);
+  }, [needle]);
   const hidden = rows.filter((r) => r.hidden);
   const pinned = q ? [] : visible.filter((r) => r.pinned);
   const sectionOf = (key) => prefs.sections.find((s) => s.keys.includes(key));
@@ -216,7 +278,8 @@ export default function ChatList({ ws, activeId, onOpen, onProfile, onNew, atten
           {!q && hidden.length > 0 && (
             <button onClick={() => setShowHidden(true)} className="lb-press flex items-center gap-2 px-5 py-5 text-[17px] text-zinc-400">
               Hidden chats <span className="text-zinc-600">{hidden.length}</span> <FiChevronRight className="text-zinc-500" /></button>)}
-          {!visible.length && !hidden.length && <div className="text-center text-zinc-500 text-sm mt-16 px-8">{q ? t('empty') : t('emptyBots')}</div>}
+          {needle && <SearchResults ws={ws} q={needle} found={found} onOpen={onOpen} nameHits={visible.length} />}
+          {!needle && !visible.length && !hidden.length && <div className="text-center text-zinc-500 text-sm mt-16 px-8">{t('emptyBots')}</div>}
         </>}
       </div>
 
