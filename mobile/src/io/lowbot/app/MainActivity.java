@@ -70,8 +70,6 @@ public class MainActivity extends Activity implements Computer.Host {
     private SpeechRecognizer recognizer;
     private FrameLayout parking, takeoverContent;
     private LinearLayout takeover;
-    private TextView takeoverTitle;
-    private CheckBox recordBox;
     private android.widget.EditText urlField;
     private Computer.Surface takeoverSurface;
     private TextToSpeech tts;
@@ -136,83 +134,189 @@ public class MainActivity extends Activity implements Computer.Host {
     }
 
     // ----------------------------------------------------------- takeover --
+    // ------------------------------------------------- takeover (browser control) --
+    private TextView navBack, navFwd, navReload, recordPill, takeoverStatus;
+    private android.widget.ProgressBar loadBar;
+    private boolean recording;
+
+    private int dp(float v) { return (int) (v * getResources().getDisplayMetrics().density); }
+
+    private static android.graphics.drawable.GradientDrawable shape(int color, float radiusPx) {
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(radiusPx);
+        return g;
+    }
+
+    private TextView roundIcon(String glyph, View.OnClickListener l) {
+        TextView t = new TextView(this);
+        t.setText(glyph);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(20);
+        t.setGravity(Gravity.CENTER);
+        t.setBackground(shape(Color.rgb(42, 42, 42), dp(22)));
+        t.setOnClickListener(l);
+        return t;
+    }
+
+    private TextView pill(String text, int bg, int fg, View.OnClickListener l) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextColor(fg);
+        t.setTextSize(15);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(dp(18), 0, dp(18), 0);
+        t.setBackground(shape(bg, dp(24)));
+        t.setOnClickListener(l);
+        return t;
+    }
+
     private View buildTakeover() {
         takeover = new LinearLayout(this);
         takeover.setOrientation(LinearLayout.VERTICAL);
         takeover.setBackgroundColor(Color.rgb(20, 20, 20));
         takeover.setVisibility(View.GONE);
+        takeover.setClickable(true);
+
+        // Status line: who is in control.
+        takeoverStatus = new TextView(this);
+        takeoverStatus.setTextColor(Color.rgb(251, 191, 36));
+        takeoverStatus.setTextSize(13);
+        takeoverStatus.setGravity(Gravity.CENTER);
+        takeoverStatus.setPadding(dp(16), dp(8), dp(16), dp(4));
+        takeover.addView(takeoverStatus, new LinearLayout.LayoutParams(-1, -2));
+
+        // Toolbar: back, forward, address pill, reload.
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        int pad = (int) (8 * getResources().getDisplayMetrics().density);
-        bar.setPadding(pad * 2, pad, pad, pad);
-        takeoverTitle = new TextView(this);
-        takeoverTitle.setTextColor(Color.rgb(251, 191, 36));
-        takeoverTitle.setTextSize(13);
-        bar.addView(takeoverTitle, new LinearLayout.LayoutParams(0, -2, 1f));
-        recordBox = new CheckBox(this);
-        recordBox.setText(getString(R.string.record_teach));
-        recordBox.setTextColor(Color.WHITE);
-        recordBox.setTextSize(12);
-        recordBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override public void onCheckedChanged(CompoundButton b, boolean on) {
-                if (takeoverSurface != null) LowBotApp.of(MainActivity.this).computer.setRecording(takeoverSurface.id, on);
-            }
+        bar.setPadding(dp(12), dp(6), dp(12), dp(8));
+        navBack = roundIcon("‹", new View.OnClickListener() {
+            @Override public void onClick(View v) { if (takeoverSurface != null && takeoverSurface.web.canGoBack()) takeoverSurface.web.goBack(); }
         });
-        bar.addView(recordBox);
-        Button back = new Button(this);
-        back.setText(getString(R.string.give_back));
-        back.setAllCaps(false);
-        back.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                final Computer.Surface s = takeoverSurface;
-                if (s == null) { hideTakeover(); return; }
-                new Thread(new Runnable() { public void run() { LowBotApp.of(MainActivity.this).computer.resume(s.id); } }).start();
-            }
+        navFwd = roundIcon("›", new View.OnClickListener() {
+            @Override public void onClick(View v) { if (takeoverSurface != null && takeoverSurface.web.canGoForward()) takeoverSurface.web.goForward(); }
         });
-        bar.addView(back);
-        takeover.addView(bar, new LinearLayout.LayoutParams(-1, -2));
+        navReload = roundIcon("⟳", new View.OnClickListener() {
+            @Override public void onClick(View v) { if (takeoverSurface != null) takeoverSurface.web.reload(); }
+        });
+        LinearLayout.LayoutParams icon = new LinearLayout.LayoutParams(dp(44), dp(44));
+        icon.setMargins(0, 0, dp(8), 0);
+        bar.addView(navBack, icon);
+        bar.addView(navFwd, icon);
         urlField = new android.widget.EditText(this);
         urlField.setSingleLine(true);
-        urlField.setTextSize(13);
+        urlField.setTextSize(15);
         urlField.setTextColor(Color.WHITE);
         urlField.setHintTextColor(Color.GRAY);
-        urlField.setHint("https://…");
+        urlField.setHint("Search or type a URL");
+        urlField.setBackground(shape(Color.rgb(42, 42, 42), dp(22)));
+        urlField.setPadding(dp(16), 0, dp(16), 0);
+        urlField.setSelectAllOnFocus(true);
         urlField.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_GO);
         urlField.setInputType(android.text.InputType.TYPE_TEXT_VARIATION_URI | android.text.InputType.TYPE_CLASS_TEXT);
         urlField.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override public boolean onEditorAction(TextView v, int actionId, android.view.KeyEvent event) {
                 String u = v.getText().toString().trim();
                 if (takeoverSurface != null && !u.isEmpty()) {
-                    if (!u.startsWith("http://") && !u.startsWith("https://")) u = "https://" + u;
+                    if (!u.contains(".") || u.contains(" ")) u = "https://duckduckgo.com/?q=" + Uri.encode(u);
+                    else if (!u.startsWith("http://") && !u.startsWith("https://")) u = "https://" + u;
                     takeoverSurface.web.loadUrl(u);
+                    takeoverSurface.web.requestFocus();
+                    ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(v.getWindowToken(), 0);
                 }
                 return true;
             }
         });
-        takeover.addView(urlField, new LinearLayout.LayoutParams(-1, -2));
+        bar.addView(urlField, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        LinearLayout.LayoutParams last = new LinearLayout.LayoutParams(dp(44), dp(44));
+        last.setMargins(dp(8), 0, 0, 0);
+        bar.addView(navReload, last);
+        takeover.addView(bar, new LinearLayout.LayoutParams(-1, -2));
+
+        loadBar = new android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        loadBar.setMax(100);
+        loadBar.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
+        loadBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(20, 20, 20)));
+        takeover.addView(loadBar, new LinearLayout.LayoutParams(-1, dp(3)));
+
+        // The real page, with rounded top corners like a card.
         takeoverContent = new FrameLayout(this);
-        takeover.addView(takeoverContent, new LinearLayout.LayoutParams(-1, 0, 1f));
+        takeoverContent.setBackground(shape(Color.WHITE, dp(18)));
+        takeoverContent.setClipToOutline(true);
+        LinearLayout.LayoutParams page = new LinearLayout.LayoutParams(-1, 0, 1f);
+        page.setMargins(dp(8), dp(4), dp(8), 0);
+        takeover.addView(takeoverContent, page);
+
+        // Bottom dock: record to teach + give back control.
+        LinearLayout dock = new LinearLayout(this);
+        dock.setOrientation(LinearLayout.HORIZONTAL);
+        dock.setGravity(Gravity.CENTER_VERTICAL);
+        dock.setPadding(dp(12), dp(10), dp(12), dp(10));
+        recordPill = pill("● Record", Color.rgb(42, 42, 42), Color.WHITE, new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (takeoverSurface == null) return;
+                setRecording(!recording);
+                LowBotApp.of(MainActivity.this).computer.setRecording(takeoverSurface.id, recording);
+            }
+        });
+        dock.addView(recordPill, new LinearLayout.LayoutParams(-2, dp(48)));
+        View spacer = new View(this);
+        dock.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
+        TextView give = pill(getString(R.string.give_back), Color.WHITE, Color.BLACK, new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                final Computer.Surface s = takeoverSurface;
+                if (s == null) { hideTakeover(); return; }
+                new Thread(new Runnable() { public void run() { LowBotApp.of(MainActivity.this).computer.resume(s.id); } }).start();
+            }
+        });
+        give.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        dock.addView(give, new LinearLayout.LayoutParams(-2, dp(48)));
+        takeover.addView(dock, new LinearLayout.LayoutParams(-1, -2));
         return takeover;
     }
 
+    private void setRecording(boolean on) {
+        recording = on;
+        recordPill.setText(on ? "● Recording…" : "● Record");
+        recordPill.setTextColor(on ? Color.rgb(251, 113, 133) : Color.WHITE);
+        recordPill.setBackground(shape(on ? Color.rgb(76, 5, 25) : Color.rgb(42, 42, 42), dp(24)));
+    }
+
     @Override public ViewGroup surfaceParking() { return parking; }
+
+    @Override public void pageChanged(Computer.Surface s, String url, int progress) {
+        if (s != takeoverSurface) return;
+        if (url != null && !urlField.hasFocus()) urlField.setText(url.startsWith("about:") ? "" : url);
+        loadBar.setProgress(progress);
+        loadBar.setVisibility(progress >= 100 ? View.INVISIBLE : View.VISIBLE);
+        navBack.setAlpha(s.web.canGoBack() ? 1f : 0.35f);
+        navFwd.setAlpha(s.web.canGoForward() ? 1f : 0.35f);
+    }
 
     @Override public void showTakeover(Computer.Surface s) {
         takeoverSurface = s;
         if (s.web.getParent() instanceof ViewGroup) ((ViewGroup) s.web.getParent()).removeView(s.web);
         ((android.content.MutableContextWrapper) s.web.getContext()).setBaseContext(this);
         takeoverContent.addView(s.web, new FrameLayout.LayoutParams(-1, -1));
-        takeoverTitle.setText(getString(R.string.you_control, s.botName()));
-        recordBox.setChecked(s.isRecording());
+        takeoverStatus.setText("● " + getString(R.string.you_control, s.botName().trim()) + " — sign in or finish the step, then give it back");
+        setRecording(s.isRecording());
+        pageChanged(s, s.web.getUrl(), 100);
         takeover.setVisibility(View.VISIBLE);
         takeover.bringToFront();
-        urlField.setText(s.web.getUrl() == null ? "" : s.web.getUrl());
-        s.web.requestFocus();
+        takeover.setTranslationY(dp(40));
+        takeover.setAlpha(0f);
+        takeover.animate().translationY(0).alpha(1f).setDuration(220).start();
+        if (s.web.getUrl() == null || s.web.getUrl().startsWith("about:")) {
+            urlField.requestFocus();
+            ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).showSoftInput(urlField, 0);
+        } else s.web.requestFocus();
     }
 
     @Override public void hideTakeover() {
-        takeover.setVisibility(View.GONE);
+        takeover.animate().translationY(dp(40)).alpha(0f).setDuration(160).withEndAction(new Runnable() {
+            @Override public void run() { takeover.setVisibility(View.GONE); }
+        }).start();
         takeoverSurface = null;
         web.requestFocus();
     }

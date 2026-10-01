@@ -63,6 +63,13 @@ public final class Computer {
         ViewGroup surfaceParking();
         void showTakeover(Surface s);
         void hideTakeover();
+        /** Page/URL/progress of a surface changed (main thread). */
+        void pageChanged(Surface s, String url, int progress);
+    }
+
+    void notifyPage(Surface s, String url, int progress) {
+        Host h = host;
+        if (h != null) h.pageChanged(s, url, progress);
     }
 
     public final class Surface {
@@ -178,6 +185,10 @@ public final class Computer {
                 if (existing != null) return existing;
                 Surface ns = new Surface(sid, botId, newWebView());
                 ns.web.setWebViewClient(new SurfaceClient(ns));
+                final Surface fs = ns;
+                ns.web.setWebChromeClient(new android.webkit.WebChromeClient() {
+                    @Override public void onProgressChanged(WebView v, int p) { notifyPage(fs, v.getUrl(), p); }
+                });
                 ns.web.addJavascriptInterface(new Recorder(ns), "LowBotRec");
                 park(ns);
                 surfaces.put(sid, ns);
@@ -261,7 +272,12 @@ public final class Computer {
             return false;
         }
 
+        @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) {
+            notifyPage(s, url, 5);
+        }
+
         @Override public void onPageFinished(WebView view, String url) {
+            notifyPage(s, url, 100);
             CountDownLatch l = s.loading;
             if (l != null) l.countDown();
             if (s.recording) view.evaluateJavascript(RECORD_JS, null);
