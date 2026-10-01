@@ -7,10 +7,14 @@ adb install -r "$APK"
 adb shell pm grant io.lowbot.app android.permission.POST_NOTIFICATIONS || true
 adb logcat -c || true
 adb shell am start -W -n io.lowbot.app/.MainActivity
-sleep 15
+# Cold WebView start on a CI emulator varies a lot: wait up to ~90 s for the first screen.
+for i in $(seq 1 18); do
+  sleep 5
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 && adb pull /sdcard/ui.xml ui.xml >/dev/null 2>&1 || true
+  grep -qE "Set up LowBot|Konfiguracja LowBot" ui.xml 2>/dev/null && break
+done
 adb shell pidof io.lowbot.app
 adb exec-out screencap -p > lowbot-launch.png
-adb shell uiautomator dump /sdcard/ui.xml >/dev/null && adb pull /sdcard/ui.xml ui.xml >/dev/null
 grep -oE 'text="[^"]{2,120}"' ui.xml | head -40 || true
 grep -qE "Set up LowBot|Konfiguracja LowBot" ui.xml
 # The wizard text comes from the local backend path (no server step).
