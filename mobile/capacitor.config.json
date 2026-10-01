@@ -1,6 +1,6 @@
 {
   "appId": "io.lowbot.opendots",
-  "appName": "Open Dots",
+  "appName": "LowBot",
   "webDir": "../client/out",
   "server": {
     "androidScheme": "https",

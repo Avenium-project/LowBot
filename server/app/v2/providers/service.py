@@ -175,7 +175,7 @@ class ProviderService:
             raise ProviderError("config", f"API key missing for provider '{profile['name']}'.")
         headers = {}
         if profile["kind"] == "openrouter":
-            headers = {"X-Title": "Open Dots"}
+            headers = {"X-Title": "LowBot"}
         cls = ResponsesAdapter if preset["adapter"] == "responses" else ChatCompletionsAdapter
         return cls(profile["base_url"], key, headers, transport=self.transports.get(profile["id"]))
 

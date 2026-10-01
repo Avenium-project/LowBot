@@ -1,4 +1,4 @@
-//! Open Dots desktop shell (LowBot extension).
+//! LowBot desktop shell.
 //!
 //! The window only loads the bundled static UI. The only native surface
 //! exposed to it is a tiny secret store for the per-device token, backed by
@@ -6,7 +6,7 @@
 //! No shell, filesystem or arbitrary-URL access is granted to the webview.
 //! Local computer access is NOT provided by installing this client.
 
-const SERVICE: &str = "open-dots";
+const SERVICE: &str = "lowbot";
 // Only these keys may be stored; the UI cannot use this as a generic vault.
 const ALLOWED_KEYS: &[&str] = &["device_token"];
 
@@ -48,5 +48,5 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![secret_get, secret_set, secret_delete])
         .run(tauri::generate_context!())
-        .expect("error while running Open Dots");
+        .expect("error while running LowBot");
 }

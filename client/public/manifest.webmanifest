@@ -1,6 +1,6 @@
 {
-  "name": "Open Dots",
-  "short_name": "Open Dots",
+  "name": "LowBot",
+  "short_name": "LowBot",
   "start_url": "/bots/",
   "scope": "/",
   "display": "standalone",

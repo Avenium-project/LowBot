@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Open Dots",
+  "productName": "LowBot",
   "version": "2.0.0",
-  "identifier": "io.lowbot.opendots",
+  "identifier": "io.lowbot.app",
   "build": {
     "beforeBuildCommand": "npm --prefix ../client run build:export",
     "frontendDist": "../../client/out"
@@ -10,7 +10,7 @@
   "app": {
     "windows": [
       {
-        "title": "Open Dots",
+        "title": "LowBot",
         "url": "bots/index.html",
         "width": 1280,
         "height": 820,

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api, getConfig, isNative, pairDevice, setConfig, webLogin } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Card, Field, inputCls } from './ui';
+import { CodexConnect } from './Integrations';
 
 export default function SetupWizard({ onReady, startAt = 0 }) {
   const { t, lang, setLang } = useT();
@@ -14,11 +15,14 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [prov, setProv] = useState({ kind: 'openai_responses', base_url: '', api_key: '', default_model: '' });
+  const [prov, setProv] = useState({ kind: 'codex_cli', base_url: '', api_key: '', default_model: '' });
   const [presets, setPresets] = useState([]);
   const [profile, setProfile] = useState(null);
   const [test, setTest] = useState(null);
   const [botName, setBotName] = useState(lang === 'pl' ? 'Asystent' : 'Assistant');
+  const [integ, setInteg] = useState(null);
+  const loadInteg = () => api('/integrations').then(setInteg).catch(() => {});
+  useEffect(() => { if (step === 2) loadInteg(); }, [step]);
   const native = isNative();
 
   useEffect(() => {
@@ -34,13 +38,13 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
     const res = await fetch(`${server.replace(/\/+$/, '')}/api/v2/health`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const h = await res.json();
-    if (h.api !== 'v2') throw new Error('Not an Open Dots v2 server');
+    if (h.api !== 'v2') throw new Error('Not an LowBot server');
     setConfig({ server, mode: native ? 'device' : 'web' });
     setStep(1);
   });
 
   const authenticate = () => run(async () => {
-    if (native || code) await pairDevice(server, code, native ? 'Open Dots app' : 'Browser');
+    if (native || code) await pairDevice(server, code, native ? 'LowBot (Android)' : 'Browser');
     else await webLogin(token);
     const [d, bots] = await Promise.all([api('/providers'), api('/bots')]);
     if (bots.length) { onReady(); return; } // existing install: straight to the chats
@@ -71,7 +75,7 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
         </div>
         <ol className="flex gap-1 text-[11px] text-zinc-500 flex-wrap">{steps.map((s, i) => <li key={s} className={i === step ? 'text-sky-300' : ''}>{i + 1}. {s}{i < steps.length - 1 ? ' ›' : ''}</li>)}</ol>
         {step === 0 && <>
-          <Field label={t('serverUrl')} hint={lang === 'pl' ? 'Adres Twojego serwera Open Dots (HTTPS poza siecią lokalną).' : 'Your Open Dots server (use HTTPS outside your LAN).'}>
+          <Field label={t('serverUrl')} hint={lang === 'pl' ? 'Adres Twojego serwera LowBot (HTTPS poza siecią lokalną).' : 'Your LowBot server (use HTTPS outside your LAN).'}>
             <input className={inputCls} value={server} onChange={(e) => setServer(e.target.value)} placeholder="https://dots.example.com" inputMode="url" /></Field>
           <Button kind="primary" disabled={busy || !server} onClick={checkServer}>{t('next')}</Button>
         </>}
@@ -85,13 +89,14 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
         {step === 2 && <>
           <Field label={t('provider')}><select className={inputCls} value={prov.kind} onChange={(e) => setProv({ ...prov, kind: e.target.value })}>
             {presets.map((p) => <option key={p.kind} value={p.kind}>{p.label}</option>)}</select></Field>
-          {prov.kind !== 'scripted_mock' && <>
+          {prov.kind === 'codex_cli' && integ && <CodexConnect status={integ} onChanged={loadInteg} compact />}
+          {!['scripted_mock', 'codex_cli', 'opencode_cli'].includes(prov.kind) && <>
             <Field label="Base URL"><input className={inputCls} value={prov.base_url} placeholder={presets.find((p) => p.kind === prov.kind)?.base_url} onChange={(e) => setProv({ ...prov, base_url: e.target.value })} /></Field>
             <Field label="API key"><input className={inputCls} type="password" autoComplete="off" value={prov.api_key} onChange={(e) => setProv({ ...prov, api_key: e.target.value })} /></Field>
           </>}
-          <Field label={t('model')} hint={lang === 'pl' ? 'Dokładny identyfikator modelu u dostawcy.' : 'Exact model id at your provider.'}><input className={inputCls} value={prov.default_model} onChange={(e) => setProv({ ...prov, default_model: e.target.value })} /></Field>
+          <Field label={t('model')} hint={prov.kind === 'codex_cli' ? (lang === 'pl' ? 'Opcjonalnie — puste = domyślny model Twojego planu ChatGPT.' : 'Optional — empty = your ChatGPT plan default.') : (lang === 'pl' ? 'Dokładny identyfikator modelu u dostawcy.' : 'Exact model id at your provider.')}><input className={inputCls} value={prov.default_model} onChange={(e) => setProv({ ...prov, default_model: e.target.value })} /></Field>
           {prov.kind === 'scripted_mock' && <div className="text-xs text-amber-300">{t('mockWarning')}</div>}
-          <Button kind="primary" disabled={busy} onClick={saveProvider}>{t('next')}</Button>
+          <Button kind="primary" disabled={busy || (prov.kind === 'codex_cli' && !integ?.codex?.logged_in)} onClick={saveProvider}>{t('next')}</Button>
         </>}
         {step === 3 && <>
           <Button disabled={busy} onClick={runTest}>{t('testConnection')}</Button>

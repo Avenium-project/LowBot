@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { api, fetchBlobUrl } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Card, Empty, Field, Section, fmtTime, inputCls } from './ui';
+import Integrations from './Integrations';
 
 function Providers({ ws }) {
   const { t } = useT();
@@ -188,6 +189,7 @@ export default function SettingsPanel({ ws }) {
           onChange={(e) => window.localStorage.setItem('opendots.name', e.target.value)} />
         {ws.health && <div className="text-xs text-zinc-500 mt-2">schema v{ws.health.schema_version} · {ws.health.timezone} · {ws.health.capabilities.join(', ')} · runs ≤ {ws.health.limits.max_active_runs}, screens ≤ {ws.health.limits.max_active_surfaces}</div>}
       </Section>
+      <Integrations ws={ws} />
       <Providers ws={ws} />
       <Devices />
       <Mcp />

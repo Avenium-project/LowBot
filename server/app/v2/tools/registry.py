@@ -20,8 +20,8 @@ EffectKind = str  # "read" | "workspace" | "internal" | "external"
 EFFECT_TEXT = {
     "read": "read-only",
     "workspace": "changes files in the workspace",
-    "internal": "changes data inside Open Dots",
-    "external": "has an effect outside Open Dots",
+    "internal": "changes data inside LowBot",
+    "external": "has an effect outside LowBot",
 }
 
 

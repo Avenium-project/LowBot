@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Open Dots — Bots',
+  title: 'LowBot',
   description: 'Persistent AI collaborators: chat, tasks, approvals, computer and routines.',
   robots: { index: false, follow: false },
   manifest: '/manifest.webmanifest',

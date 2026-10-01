@@ -76,7 +76,7 @@ def test_M_phone_flow(server):
         page = ctx.new_page()
         page.goto(f"{server}/bots/")
         # Wizard: server -> sign in -> model -> test -> first bot
-        expect(page.get_by_text("Konfiguracja Open Dots")).to_be_visible()
+        expect(page.get_by_text("Konfiguracja LowBot")).to_be_visible()
         page.get_by_role("button", name="Dalej").click()
         page.get_by_role("textbox", name="Token właściciela").fill(TOKEN)
         page.get_by_role("button", name="Dalej").click()

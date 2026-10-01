@@ -750,7 +750,7 @@ class Engine:
         team = [b for b in self.services["bots"].list() if b["id"] != bot["id"] and not b["paused"]][:40]
         roster = "\n".join(f"- @{b['handle']}: {b['name']} — {truncate(b['role_description'], 80)}" for b in team)
         parts = [
-            f"You are {bot['name']} (@{bot['handle']}), a persistent AI collaborator in Open Dots.",
+            f"You are {bot['name']} (@{bot['handle']}), a persistent AI collaborator in LowBot.",
             f"Role: {bot['role_description']}" if bot["role_description"] else "",
             bot["instructions"],
             f"Current time: {now_local} (timezone {self.s.default_timezone}).",
