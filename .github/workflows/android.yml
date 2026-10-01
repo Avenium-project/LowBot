@@ -62,7 +62,10 @@ jobs:
             sleep 15
             adb shell pidof io.lowbot.app
             adb exec-out screencap -p > lowbot-launch.png
+            adb shell uiautomator dump /sdcard/ui.xml && adb pull /sdcard/ui.xml ui.xml
+            grep -oE 'text="[^"]{2,80}"' ui.xml | head -40
+            grep -qE "Set up LowBot|Konfiguracja LowBot" ui.xml
             adb logcat -d | grep -iE "chromium|lowbot|AndroidRuntime" | tail -50 || true
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: LowBot-emulator-screenshot, path: lowbot-launch.png }
+        with: { name: LowBot-emulator-screenshot, path: "lowbot-launch.png\nui.xml" }
