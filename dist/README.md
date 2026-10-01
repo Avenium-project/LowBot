@@ -2,9 +2,11 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **2.8.2** — search on the home screen finds message text and files (not only chat names), includes hidden
+- Version **2.8.3** — every bot is a character: new bots (also ones created by other bots) get a random shape in a
+  random colour, never an emoji; existing emoji bots are switched once to a random character.
+  SHA-256: `5b15066af2a10bda2cf95361bf62ee62b9c511414e58109450a0046927a30608`
+- 2.8.2 — search on the home screen finds message text and files (not only chat names), includes hidden
   chats, highlights the match and says when nothing was found.
-  SHA-256: `fbd9be1b046d83299319f237fd6b0be2abe8b4692087b190bcb46b9c81d8c6d3`
 - 2.8.1 — bot.create works for bots made before 2.8 (a new bot gets the part of the default tools its
   creator has, instead of failing); bots see the tools they really called in earlier replies (no more invented or denied
   errors); long code in replies wraps inside the bubble; Grok-style "<bot> is working" line with a shimmering text.

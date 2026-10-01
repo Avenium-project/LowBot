@@ -20,6 +20,17 @@ public final class Bots {
         "browser.*", "routine.create",
     };
     public static final int MAX_BOTS = 50;
+    // Same shapes and colours as the app's character picker (client/components/v2/ui.jsx).
+    static final String[] SHAPES = {"circle", "blob", "square", "pill", "triangle", "hexagon", "cloud", "drop"};
+    static final String[] COLORS = {"#8d6e4f", "#ef2b3c", "#ff6a00", "#ff9f0a", "#22c55e", "#14b8a6", "#1e88ff", "#9b5cf6", "#ff2d95"};
+
+    /** Every bot is a character sprite: a random shape in a random colour (never an emoji). */
+    public static String randomAvatar() {
+        java.util.Random r = new java.security.SecureRandom();
+        return "shape:" + SHAPES[r.nextInt(SHAPES.length)] + ":" + COLORS[r.nextInt(COLORS.length)];
+    }
+
+    static boolean isSprite(String a) { return a != null && a.matches("shape:(circle|blob|square|pill|triangle|hexagon|cloud|drop):#[0-9a-fA-F]{6}"); }
     static final List<String> ORG_ROLES = Arrays.asList("ceo", "head", "manager", "worker");
     static final Set<String> EDITABLE = new HashSet<String>(Arrays.asList(
         "name", "label", "avatar", "role_description", "instructions", "provider_profile_id", "model",
@@ -97,6 +108,8 @@ public final class Bots {
     }
 
     private void validate(JSONObject d) {
+        if (d.has("avatar") && !d.isNull("avatar") && !d.optString("avatar").isEmpty() && !isSprite(d.optString("avatar")))
+            J.put(d, "avatar", randomAvatar()); // emoji or anything else becomes a character sprite
         if (d.has("name") && d.optString("name").trim().isEmpty()) throw new ApiError(422, "Bot name is required.");
         String role = J.str(d, "org_role", null);
         if (role != null && !role.isEmpty() && !ORG_ROLES.contains(role)) throw new ApiError(422, "org_role must be one of ceo, head, manager, worker.");
@@ -158,7 +171,7 @@ public final class Bots {
         if (db.one("SELECT 1 FROM bots WHERE handle = ?", handle) != null) handle = uniqueHandle(handle);
         final String now = J.nowIso();
         final JSONObject row = J.obj("id", id, "name", J.str(d, "name", "New bot"), "handle", handle,
-                "label", J.str(d, "label", ""), "avatar", J.str(d, "avatar", "🤖"),
+                "label", J.str(d, "label", ""), "avatar", isSprite(J.str(d, "avatar", null)) ? J.str(d, "avatar", null) : randomAvatar(),
                 "role_description", J.str(d, "role_description", ""), "instructions", J.str(d, "instructions", ""),
                 "provider_profile_id", emptyNull(J.str(d, "provider_profile_id", null)), "model", emptyNull(J.str(d, "model", null)),
                 "tools_json", J.arr(tools).toString(), "policy_json", policy.toString(),
@@ -332,6 +345,14 @@ public final class Bots {
             } else db.exec("UPDATE bots SET can_create_bots = 1 WHERE id = ?", r.optString("id"));
         }
         b.core.kvSet("upgrade:team_tools", "1");
+    }
+
+    /** One-time upgrade: bots with an emoji avatar get a random character sprite. */
+    void upgradeSprites() {
+        if (b.core.kvGet("upgrade:sprites") != null) return;
+        for (JSONObject r : db.all("SELECT id, avatar FROM bots"))
+            if (!isSprite(r.optString("avatar"))) db.exec("UPDATE bots SET avatar = ? WHERE id = ?", randomAvatar(), r.optString("id"));
+        b.core.kvSet("upgrade:sprites", "1");
     }
 
     public boolean isSubordinate(String managerId, String botId) {

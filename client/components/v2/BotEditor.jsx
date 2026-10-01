@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FiChevronLeft, FiChevronRight, FiFileText, FiMoreHorizontal, FiPlus, FiShare, FiCpu } from 'react-icons/fi';
 import { api, downloadPath, isLocal, saveBlob } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
-import { Ghost, Toggle, AVATAR_COLORS, BotBlob, Button, Field, SHAPES, Section, ShapeIcon, botLabel, cls, colorFor, inputCls, parseAvatar, shortTime } from './ui';
+import { Ghost, Toggle, AVATAR_COLORS, BotBlob, Button, Field, SHAPES, Section, ShapeIcon, botLabel, cls, colorFor, inputCls, parseAvatar, randomAvatar, shortTime } from './ui';
 
 const card = 'rounded-[22px] bg-[#1f1f1f]';
 
@@ -262,7 +262,7 @@ export function BotEditor({ ws, bot: initial, onDone }) {
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
 
   const body = (v) => {
-    const out = { name: v.name, avatar: v.avatar || '🤖', role_description: v.role_description, instructions: v.instructions,
+    const out = { name: v.name, avatar: v.avatar || randomAvatar(), role_description: v.role_description, instructions: v.instructions,
       provider_profile_id: v.provider_profile_id || null, model: v.model || null,
       tools: v.tools.split(',').map((x) => x.trim()).filter(Boolean), org_role: v.org_role || null, reports_to: v.reports_to || null,
       computer_mode: v.computer_mode, can_create_bots: v.can_create_bots, team_memory_access: v.team_memory_access,
@@ -353,7 +353,7 @@ export function BotEditor({ ws, bot: initial, onDone }) {
                     className={cls('lb-press h-11 w-11 rounded-full transition', av.color.toLowerCase() === c ? 'ring-2 ring-offset-2 ring-offset-[#1f1f1f] ring-zinc-300' : '')} style={{ background: c }} />))}
               </div>
               <div className="border-t border-white/10 mt-5 pt-4">
-                <button onClick={() => update({ avatar: '🤖' })} className="text-sky-400 text-[17px]">{'Reset to default'}</button></div>
+                <button onClick={() => update({ avatar: randomAvatar() })} className="text-sky-400 text-[17px]">{'Random character'}</button></div>
             </div>
             <Caption>{'How this Bot looks everywhere'}</Caption>
 

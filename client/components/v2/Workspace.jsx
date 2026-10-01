@@ -13,7 +13,7 @@ import SettingsPanel from './SettingsPanel';
 import SetupWizard from './SetupWizard';
 import TasksPanel, { TaskDetail } from './TasksPanel';
 import { MemoryPanel, RoutinesPanel, SkillsPanel } from './AutomationPanels';
-import { Empty, Section, botLabel, cls, fmtTime, inputCls } from './ui';
+import { BotBlob, Empty, Section, botLabel, cls, fmtTime, inputCls } from './ui';
 import { useWorkspace } from './useWorkspace';
 
 function FilesPanel({ ws, conversationId }) {
@@ -241,7 +241,7 @@ function Shell() {
       <div className="px-4 pb-2 text-[13px] text-zinc-400 line-clamp-3">{t('send')}: {share}</div>
       {ws.conversations.filter((c) => c.kind === 'group').map((c) => (
         <SheetItem key={c.id} icon={<FiUsers />} label={c.title || c.bot_ids.map((id) => ws.bots.find((b) => b.id === id)?.name).join(', ')} onClick={() => sendShareTo(null, c)} />))}
-      {ws.bots.filter((b) => !b.hidden).map((b) => <SheetItem key={b.id} icon={b.avatar || '🤖'} label={b.name} onClick={() => sendShareTo(b, null)} />)}
+      {ws.bots.filter((b) => !b.hidden).map((b) => <SheetItem key={b.id} icon={<BotBlob bot={b} size={28} still />} label={b.name} onClick={() => sendShareTo(b, null)} />)}
     </Sheet>
   );
 

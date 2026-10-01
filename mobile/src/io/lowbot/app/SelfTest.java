@@ -229,6 +229,10 @@ public class SelfTest extends BroadcastReceiver {
         JSONObject researcher = b.bots.byHandle("researcher");
         check(researcher != null && lastBotMessage(b, cid).optString("text").startsWith("hired"), "bot created another bot");
         check(b.engine.toolLog(tHire.optString("id"), "other").contains("bot.create"), "earlier tool calls stay visible to the bot");
+        check(researcher.optString("avatar").matches("shape:[a-z]+:#[0-9a-fA-F]{6}"), "created bot gets a random character sprite");
+        JSONObject emoji = api(r, "POST", "/api/v2/bots", J.obj("name", "Emoji", "avatar", "\uD83D\uDCCA"));
+        check(emoji.optString("avatar").startsWith("shape:"), "emoji avatar replaced by a sprite");
+        b.bots.delete(emoji.optString("id"));
         JSONObject limited = api(r, "POST", "/api/v2/bots", J.obj("name", "Limited", "tools", new JSONArray().put("workspace.*").put("bot.*")));
         JSONObject sub = b.bots.create(J.obj("name", "Sub"), b.bots.get(limited.optString("id")));
         check(sub.optJSONArray("tools").length() == 2, "default tools narrowed to the creator's (" + sub.optJSONArray("tools") + ")");

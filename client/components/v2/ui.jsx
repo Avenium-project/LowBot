@@ -106,6 +106,12 @@ export const SHAPES = {
   drop: { d: 'M50 6c14 20 36 38 36 58c0 18-16 30-36 30S14 82 14 64C14 44 36 26 50 6z', eyes: [56, 50] },
 };
 
+export function randomAvatar() {
+  const shapes = Object.keys(SHAPES);
+  const colors = AVATAR_COLORS.filter((c) => c !== '#ffffff' && c !== '#7a7a7a');
+  return `shape:${shapes[Math.floor(Math.random() * shapes.length)]}:${colors[Math.floor(Math.random() * colors.length)]}`;
+}
+
 export function parseAvatar(avatar) {
   const m = /^shape:([a-z]+):(#[0-9a-fA-F]{6})$/.exec(avatar || '');
   return m && SHAPES[m[1]] ? { shape: m[1], color: m[2] } : null;

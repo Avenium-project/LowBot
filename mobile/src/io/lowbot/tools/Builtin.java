@@ -441,12 +441,12 @@ public final class Builtin {
 
         reg.register(new Spec("bot.create", "Create a new persistent bot (the user approves). It gets your provider and model unless given, and cannot get more tools "
                 + "than you have. soul describes its purpose and behaviour (soul.md); workspace adds it to a shared workspace.",
-                Tools.obj(props("name", S, "role_description", S, "soul", S, "instructions", S, "avatar", S, "model", S, "workspace", S,
+                Tools.obj(props("name", S, "role_description", S, "soul", S, "instructions", S, "model", S, "workspace", S,
                         "tools", J.obj("type", "array", "items", S)), "name"),
                 Tools.INTERNAL, "ask", new Tools.Executor() {
             public Object run(Ctx ctx, JSONObject a) throws Exception {
                 JSONObject d = new JSONObject();
-                for (String k : new String[]{"name", "role_description", "instructions", "tools", "avatar", "model"}) if (a.has(k)) J.put(d, k, a.opt(k));
+                for (String k : new String[]{"name", "role_description", "instructions", "tools", "model"}) if (a.has(k)) J.put(d, k, a.opt(k));
                 if (!a.has("model") && !ctx.bot.isNull("model")) J.put(d, "model", ctx.bot.opt("model"));
                 if (!ctx.bot.isNull("provider_profile_id")) J.put(d, "provider_profile_id", ctx.bot.opt("provider_profile_id"));
                 JSONObject bot;
@@ -475,12 +475,12 @@ public final class Builtin {
             }
         }));
 
-        reg.register(new Spec("bot.update", "Change another bot's profile (the user approves): name, role, avatar, model or its soul.md. Tools and permissions cannot be changed by bots.",
-                Tools.obj(props("bot", S, "name", S, "role_description", S, "avatar", S, "model", S, "soul", S), "bot"), Tools.INTERNAL, "ask", new Tools.Executor() {
+        reg.register(new Spec("bot.update", "Change another bot's profile (the user approves): name, role, model or its soul.md. (Its character sprite is chosen at random.) Tools and permissions cannot be changed by bots.",
+                Tools.obj(props("bot", S, "name", S, "role_description", S, "model", S, "soul", S), "bot"), Tools.INTERNAL, "ask", new Tools.Executor() {
             public Object run(Ctx ctx, JSONObject a) throws Exception {
                 JSONObject target = resolveBot(ctx, a.optString("bot"));
                 JSONObject d = new JSONObject();
-                for (String k : new String[]{"name", "role_description", "avatar", "model"}) if (a.has(k)) J.put(d, k, a.opt(k));
+                for (String k : new String[]{"name", "role_description", "model"}) if (a.has(k)) J.put(d, k, a.opt(k));
                 try {
                     if (d.length() > 0) ctx.b.bots.update(target.optString("id"), d);
                     if (a.has("soul")) ctx.b.mind.setSoul(target.optString("id"), a.optString("soul"));
@@ -490,7 +490,7 @@ public final class Builtin {
         }).card(new Tools.Summarize() {
             public JSONObject card(JSONObject a) {
                 StringBuilder f = new StringBuilder();
-                for (String k : new String[]{"name", "role_description", "avatar", "model", "soul"}) if (a.has(k)) f.append(f.length() > 0 ? ", " : "").append(k);
+                for (String k : new String[]{"name", "role_description", "model", "soul"}) if (a.has(k)) f.append(f.length() > 0 ? ", " : "").append(k);
                 return Builtin.card("Change bot " + a.optString("bot") + " (" + f + ")", "changes another bot's profile", a.optString("bot"));
             }
         }));
