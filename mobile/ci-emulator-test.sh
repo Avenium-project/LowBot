@@ -23,7 +23,7 @@ grep -qE "xAI API|OpenCode Go" ui.xml && echo "provider presets loaded through t
 
 adb shell am broadcast -n io.lowbot.app/.SelfTest
 result=""
-for i in $(seq 1 120); do
+for i in $(seq 1 240); do
   result=$(adb logcat -d -s LOWBOT_SELFTEST:I | grep -oE "LOWBOT_SELFTEST (PASS|FAIL).*" | tail -1 || true)
   [ -n "$result" ] && break
   sleep 2

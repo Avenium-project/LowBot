@@ -149,6 +149,71 @@ function LiveSurface({ s, ws, reload }) {
   );
 }
 
+// A bot's Linux shell: live log, and the owner can type commands into the same shell.
+function TerminalCard({ ws, botId }) {
+  const [t, setT] = useState(null);
+  const [cmd, setCmd] = useState('');
+  const [running, setRunning] = useState(false);
+  const [err, setErr] = useState('');
+  const ref = useRef(null);
+  const bot = ws.bots.find((b) => b.id === botId);
+  const load = useCallback(() => api(`/linux/sessions/${botId}`).then(setT).catch(() => {}), [botId]);
+  useEffect(() => {
+    load();
+    const h = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 1500);
+    return () => clearInterval(h);
+  }, [load]);
+  useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [t?.log]);
+  const run = async (e) => {
+    e.preventDefault();
+    if (!cmd.trim() || running) return;
+    setRunning(true); setErr('');
+    const c = cmd;
+    setCmd('');
+    try { await api(`/linux/sessions/${botId}/run`, { method: 'POST', body: { command: c } }); } catch (x) { setErr(x.message); }
+    setRunning(false); load();
+  };
+  if (!t) return null;
+  const busy = t.busy || running;
+  return (
+    <div className="lb-rise rounded-[22px] bg-[#1f1f1f] p-3">
+      <div className="flex items-center gap-3 px-1 pb-3">
+        <BotBlob bot={bot} size={36} busy={busy} />
+        <div className="flex-1 min-w-0">
+          <div className="text-[16px] font-medium truncate">{bot?.name || 'Bot'} · terminal</div>
+          <div className={cls('text-[12px]', busy ? 'text-emerald-400' : 'text-zinc-500')}>{busy ? 'running a command…' : t.alive ? `idle · ${t.cwd}` : 'not started'}</div>
+        </div>
+        <Button small onClick={() => api(`/linux/sessions/${botId}/reset`, { method: 'POST' }).then(setT)}>Restart</Button>
+      </div>
+      <pre ref={ref} className="lb-selectable max-h-[45vh] min-h-[120px] overflow-auto rounded-t-[16px] bg-black p-3 text-[12px] leading-[1.45] text-zinc-200 whitespace-pre-wrap break-words font-mono">
+        {t.log || 'No commands yet.'}
+      </pre>
+      <form onSubmit={run} className="flex items-center gap-2 rounded-b-[16px] bg-black border-t border-white/10 px-3 py-2 font-mono text-[13px]">
+        <span className="text-emerald-400">$</span>
+        <input value={cmd} onChange={(e) => setCmd(e.target.value)} disabled={busy} placeholder={busy ? 'wait for the current command…' : 'type a command (you, not the bot)'}
+          autoCapitalize="off" autoCorrect="off" spellCheck={false} className="flex-1 min-w-0 bg-transparent outline-none text-zinc-100 placeholder:text-zinc-600" />
+        <button type="submit" disabled={busy || !cmd.trim()} className="text-zinc-300 disabled:opacity-30"><FiArrowRight /></button>
+      </form>
+      {err && <div className="text-[12px] text-rose-400 px-1 pt-2">{err}</div>}
+      <div className="text-[11px] text-zinc-600 px-1 pt-2">Commands you type run in the bot&apos;s shell right away and are recorded in the audit log. The bot&apos;s own commands still ask for approval.</div>
+    </div>
+  );
+}
+
+function Terminals({ ws, botId }) {
+  const [st, setSt] = useState(null);
+  useEffect(() => { api('/linux').then(setSt).catch(() => setSt(null)); }, [ws.tick]);
+  if (!st?.installed) return null;
+  const withShell = (st.sessions || []).map((s) => s.bot_id);
+  const ids = botId ? [botId] : withShell;
+  if (!ids.length) return null;
+  return (
+    <Section title="Terminals">
+      <div className="space-y-4">{ids.map((id) => <TerminalCard key={id} ws={ws} botId={id} />)}</div>
+    </Section>
+  );
+}
+
 export default function ComputerView({ ws, botId }) {
   const local = isLocal();
   const [data, setData] = useState(null);
@@ -166,6 +231,7 @@ export default function ComputerView({ ws, botId }) {
       <div className="text-[14px] text-zinc-500 px-2 mb-4 leading-snug">{local
         ? 'Each bot has its own tab in a browser on this phone (cookies are shared). Take over to sign in or finish a step yourself, then give control back.'
         : `Live view of the bots' browsers · up to ${data.max_active_surfaces} open at once.`}</div>
+      {local && <Terminals ws={ws} botId={botId} />}
       {list.length > 0 && <div className="space-y-4 mb-6">{list.map((s) => <LiveSurface key={s.id} s={s} ws={ws} reload={load} />)}</div>}
       {local && withoutBrowser.length > 0 && (
         <Section title={list.length ? 'Other bots' : 'Open a browser'}>

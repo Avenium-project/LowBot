@@ -32,17 +32,11 @@ public class SelfTest extends BroadcastReceiver {
 
     @Override
     public void onReceive(final Context context, Intent intent) {
-        final PendingResult pr = goAsync();
+        // The run (with the Linux download) can outlast a broadcast's time limit, so it continues on its own
+        // thread in the app process, which stays alive because the app is on screen during the test.
         new Thread(new Runnable() {
-            public void run() {
-                try {
-                    String report = runAll(context.getApplicationContext());
-                    Log.i(TAG, report);
-                } finally {
-                    pr.finish();
-                }
-            }
-        }).start();
+            public void run() { Log.i(TAG, runAll(context.getApplicationContext())); }
+        }, "selftest").start();
     }
 
     static final List<String> passed = new ArrayList<String>();
@@ -61,6 +55,7 @@ public class SelfTest extends BroadcastReceiver {
             b.start();
             b = scenario(ctx, b);
             browser(ctx, b);
+            linux(ctx, b);
             String r = "LOWBOT_SELFTEST PASS " + passed.size() + " " + passed;
             write(ctx, r);
             return r;
@@ -320,6 +315,34 @@ public class SelfTest extends BroadcastReceiver {
         try { io.lowbot.tools.Net.vet("http://192.168.1.1/", false); } catch (io.lowbot.tools.Net.Denied e) { blocked = true; }
         check(blocked, "LAN blocked by default");
         return b2;
+    }
+
+    /** The bots' Linux: install the pinned Alpine through proot, run commands in a persistent shell. */
+    static void linux(Context ctx, Backend b) throws Exception {
+        Linux l = new Linux(ctx, b);
+        if (!l.available()) { passed.add("linux(skipped: runtime not in this build)"); return; }
+        try {
+            if (!l.installed()) { l.doInstall(); }
+        } catch (Exception e) {
+            Log.w(TAG, "linux install skipped: " + e);
+            passed.add("linux(skipped: install " + e.getMessage() + ")");
+            return;
+        }
+        check(l.installed(), "linux installed (Alpine " + l.installedVersion + ")");
+        JSONObject bot = b.bots.list(true).get(0);
+        File ws = io.lowbot.tools.Builtin.rootFor(b, bot);
+        new File(ws, "linux-test.txt").createNewFile();
+        JSONObject r1 = l.run(bot.optString("id"), ws, "cat /etc/alpine-release && ls /workspace && cd /tmp && export LB=42", 60, "bot", null);
+        check(r1.optInt("exit_code") == 0 && r1.optString("output").contains("linux-test.txt"), "linux runs commands with /workspace (" + J.truncate(r1.optString("output"), 120) + ")");
+        JSONObject r2 = l.run(bot.optString("id"), ws, "pwd; echo $LB", 30, "bot", null);
+        check(r2.optString("output").contains("/tmp") && r2.optString("output").contains("42"), "linux shell persists cd and variables");
+        JSONObject r3 = l.run(bot.optString("id"), ws, "false", 30, "bot", null);
+        check(r3.optInt("exit_code") == 1, "linux exit code reported");
+        boolean timedOut = false;
+        try { l.run(bot.optString("id"), ws, "sleep 30", 2, "bot", null); } catch (io.lowbot.engine.Tools.ToolError e) { timedOut = e.getMessage().contains("timed out"); }
+        check(timedOut, "linux command timeout kills the shell");
+        check(l.run(bot.optString("id"), ws, "echo back", 30, "bot", null).optString("output").contains("back"), "linux shell restarts after a timeout");
+        l.closeAll();
     }
 
     /** The bots' browser: open a page in an offscreen WebView and read it. Network may be unavailable in CI. */

@@ -39,9 +39,11 @@ public final class Builtin {
     static JSONObject props(Object... kv) { return J.obj(kv); }
 
     // ---------------------------------------------------------------- workspace
-    public static File root(Ctx ctx) throws ToolError {
-        Core c = ctx.b.core;
-        File r = "isolated".equals(ctx.bot.optString("computer_mode")) ? new File(c.filesDir, "workspace-isolated/" + ctx.bot.optString("id")) : c.workspace;
+    public static File root(Ctx ctx) throws ToolError { return rootFor(ctx.b, ctx.bot); }
+
+    public static File rootFor(Backend b, JSONObject bot) throws ToolError {
+        Core c = b.core;
+        File r = "isolated".equals(bot.optString("computer_mode")) ? new File(c.filesDir, "workspace-isolated/" + bot.optString("id")) : c.workspace;
         if (!r.exists() && !r.mkdirs()) throw new ToolError("Cannot create the workspace.");
         try { return r.getCanonicalFile(); } catch (Exception e) { throw new ToolError("Workspace unavailable."); }
     }

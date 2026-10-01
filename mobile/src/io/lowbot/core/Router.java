@@ -38,6 +38,7 @@ public final class Router {
         void remove();
         JSONObject log(String botId);
         void reset(String botId);
+        JSONObject run(String botId, String command, int timeoutS) throws Exception;
     }
 
     public static final class Response {
@@ -432,11 +433,24 @@ public final class Router {
             if ("install".equals(id) && post) return Response.json(l.install());
             if (id == null && del) { l.remove(); return Response.json(l.status()); }
             if ("sessions".equals(id) && sub != null) {
-                // Read-only view of a bot's terminal, plus restart. Commands only run through the bots' approved tool calls.
+                // The owner's view of a bot's terminal. Commands typed here by the owner (the person holding the
+                // phone, like any terminal app) run directly and are recorded in the audit log; bots' commands
+                // still go through the approval gateway.
                 String[] rest = p.length > 3 ? new String[]{sub, p[3]} : new String[]{sub};
                 b.bots.require(rest[0]);
                 if (rest.length == 1 && get) return Response.json(l.log(rest[0]));
                 if (rest.length == 2 && "reset".equals(rest[1]) && post) { l.reset(rest[0]); return Response.json(l.log(rest[0])); }
+                if (rest.length == 2 && "run".equals(rest[1]) && post) {
+                    String cmd = body.optString("command").trim();
+                    if (cmd.isEmpty()) throw new ApiError(422, "Type a command.");
+                    final String bot = rest[0], audited = J.truncate(cmd, 500);
+                    b.core.db.tx(new Runnable() { public void run() {
+                        b.core.audit("linux.user_command", "user", null, null, null, null, null, null, J.obj("bot_id", bot, "command", J.redact(audited)));
+                    } });
+                    try { return Response.json(l.run(bot, cmd, Math.max(1, Math.min(900, body.optInt("timeout_s", 120))))); }
+                    catch (ApiError e) { throw e; }
+                    catch (Exception e) { throw new ApiError(422, e.getMessage()); }
+                }
             }
         }
 

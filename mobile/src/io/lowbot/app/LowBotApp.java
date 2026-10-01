@@ -14,6 +14,8 @@ import android.os.Looper;
 
 import org.json.JSONObject;
 
+import io.lowbot.tools.Builtin;
+
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -57,6 +59,9 @@ public class LowBotApp extends Application {
             public void remove() { linux.remove(); }
             public JSONObject log(String botId) { return linux.log(botId); }
             public void reset(String botId) { linux.reset(botId); }
+            public JSONObject run(String botId, String command, int timeoutS) throws Exception {
+                return linux.run(botId, Builtin.rootFor(backend, backend.bots.require(botId)), command, timeoutS, "user", null);
+            }
         };
         final Mcp mcp = new Mcp(backend);
         backend.tools.addProvider(new Tools.DynamicProvider() {

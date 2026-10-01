@@ -1,0 +1,29 @@
+name: linux-runtime
+# Fetches proot (Termux build) and pins the Alpine minirootfs for the bots' Linux terminal,
+# then commits mobile/jniLibs + alpine.json to the same branch (authorised by the repo owner).
+# Runs on demand, or when fetch.sh / REQUEST change. Pushes made with GITHUB_TOKEN do not
+# trigger other workflows, so this cannot loop.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["**"]
+    paths: ["mobile/linux-runtime/REQUEST", "mobile/linux-runtime/fetch.sh", ".github/workflows/linux-runtime.yml"]
+permissions:
+  contents: read
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq patchelf
+      - run: bash mobile/linux-runtime/fetch.sh
+      - name: Commit runtime
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/jniLibs mobile/linux-runtime/alpine.json mobile/linux-runtime/runtime.lock
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "Linux runtime: proot (Termux) + pinned Alpine minirootfs"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
