@@ -98,6 +98,21 @@ def test_M_phone_flow(server):
         expect(page.get_by_text("[mock] cześć z telefonu")).to_be_visible(timeout=15000)
         assert no_horizontal_scroll(page)
         page.screenshot(path=SHOTS / "03-conversation.png")
+        # Bot profile (Grok-style): character, model/provider, instructions, routines
+        page.locator("header button").nth(1).click()
+        expect(page.get_by_text("Postać")).to_be_visible()
+        page.get_by_role("button", name="triangle").click()
+        expect(page.get_by_text("Zapisano")).to_be_visible(timeout=5000)
+        assert api(server, "/bots")[0]["avatar"].startswith("shape:triangle:")
+        expect(page.get_by_text("Dostawca")).to_be_visible()
+        assert no_horizontal_scroll(page)
+        page.wait_for_timeout(500)
+        page.screenshot(path=SHOTS / "04-bot-profile.png")
+        page.locator(".lb-page-in .overflow-y-auto").evaluate("el => el.scrollTo(0, 900)")
+        page.wait_for_timeout(300)
+        page.screenshot(path=SHOTS / "05-bot-profile-model.png")
+        page.locator(".lb-page-in").get_by_role("button", name="back").click()
+        expect(page.get_by_text("Postać")).to_have_count(0)
 
         # Approval inline in the conversation.
         prof = api(server, "/providers", {"kind": "scripted_mock", "name": "Approver", "default_model": "scripted-mock",

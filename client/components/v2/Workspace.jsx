@@ -79,7 +79,13 @@ export default function Workspace() {
 
   return (
     <LangContext.Provider value={ctx}>
-      {authed === null ? <div className="h-[100dvh] bg-zinc-950" />
+      {authed === null ? (
+        <div className="h-[100dvh] bg-[#141414] flex flex-col items-center justify-center gap-4 lb-backdrop-in">
+          <span className="lb-blob-busy inline-flex"><svg viewBox="0 0 100 64" width="96" height="62" aria-hidden="true"><rect x="2" y="2" width="96" height="60" rx="30" fill="#3b82f6" />
+            <g transform="rotate(-12 54 20)"><rect className="lb-blob-eye" x="52" y="14" width="5" height="12" rx="2.5" fill="#1c1917" /></g>
+            <g transform="rotate(12 66 20)"><rect className="lb-blob-eye" x="64" y="14" width="5" height="12" rx="2.5" fill="#1c1917" /></g></svg></span>
+          <span className="text-zinc-500 text-sm tracking-wide">LowBot</span>
+        </div>)
         : authed === 'ok' ? <Shell /> : <SetupWizard startAt={authed === 'empty' ? 2 : 0} onReady={() => { setAuthed('ok'); }} />}
     </LangContext.Provider>
   );
@@ -98,22 +104,32 @@ function useWide() {
 }
 
 // Full-screen page used on phones (and as a side sheet on desktop).
+// Plays an exit animation before the parent removes the layer.
+function useClosing(onClose, ms = 200) {
+  const [closing, setClosing] = useState(false);
+  const close = useCallback(() => { if (closing) return; setClosing(true); setTimeout(onClose, ms); }, [closing, onClose, ms]);
+  return [closing, close];
+}
+
 function Page({ title, onBack, children, wide }) {
+  const [closing, close] = useClosing(onBack);
   return (
-    <div className={cls('fixed z-40 bg-[#141414] flex flex-col', wide ? 'inset-y-0 right-0 w-[520px] border-l border-white/10 shadow-2xl' : 'inset-0')}>
+    <div className={cls('fixed z-40 bg-[#141414] flex flex-col', wide ? 'inset-y-0 right-0 w-[520px] border-l border-white/10 shadow-2xl' : 'inset-0',
+      closing ? 'lb-page-out' : (wide ? 'lb-side-in' : 'lb-page-in'))}>
       <header className="flex items-center gap-3 px-4 pb-3 shrink-0" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
-        <button aria-label="back" onClick={onBack} className="h-12 w-12 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center text-2xl"><FiChevronLeft /></button>
+        <button aria-label="back" onClick={close} className="h-12 w-12 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center text-2xl"><FiChevronLeft /></button>
         <h2 className="text-[19px] font-semibold truncate">{title}</h2>
       </header>
-      <div className="flex-1 overflow-y-auto px-4 pb-8 min-h-0" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>{children}</div>
+      <div className="lb-rise flex-1 overflow-y-auto px-4 pb-8 min-h-0" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>{children}</div>
     </div>
   );
 }
 
 function Sheet({ onClose, children }) {
+  const [closing, close] = useClosing(onClose, 180);
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div className="w-full md:w-[420px] rounded-t-[28px] md:rounded-[28px] bg-[#1f1f1f] p-3 pb-6" onClick={(e) => e.stopPropagation()}
+    <div className={cls('fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center', closing ? 'lb-backdrop-out' : 'lb-backdrop-in')} onClick={close}>
+      <div className={cls('lb-stagger w-full md:w-[420px] rounded-t-[28px] md:rounded-[28px] bg-[#1f1f1f] p-3 pb-6', closing ? 'lb-sheet-out' : 'lb-sheet-in')} onClick={(e) => e.stopPropagation()}
         style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-white/20 md:hidden" />
         {children}
@@ -124,7 +140,7 @@ function Sheet({ onClose, children }) {
 
 function SheetItem({ icon, label, badge, onClick }) {
   return (
-    <button onClick={onClick} className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl hover:bg-white/5 active:bg-white/10 text-[16px] text-left">
+    <button onClick={onClick} className="lb-press w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl hover:bg-white/5 active:bg-white/10 text-[16px] text-left">
       <span className="text-xl w-6 text-zinc-300 flex justify-center">{icon}</span>
       <span className="flex-1">{label}</span>
       {badge > 0 && <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-rose-600 text-[12px] leading-[22px] text-center text-white">{badge}</span>}
@@ -185,12 +201,11 @@ function Shell() {
   const titles = { tasks: t('tasks'), inbox: t('inbox'), computer: t('computer'), files: t('files'), routines: t('routines'),
     memory: t('memory'), skills: t('skills'), settings: t('settings'), search: t('search') };
 
-  const pageView = page && (
+  const pageView = page && page.kind === 'bot' ? <BotEditor ws={ws} bot={page.data} onDone={() => setPage(null)} /> : page && (
     <Page wide={wide} onBack={() => setPage(null)} title={
       page.kind === 'task' ? t('tasks') : page.kind === 'bot' ? (page.data?.name || t('newBot')) : page.kind === 'group' ? t('newGroup')
         : page.kind === 'computer' ? `${t('computer')}${page.data ? ` · ${page.data.name}` : ''}` : titles[page.kind]}>
       {page.kind === 'task' && <TaskDetail taskId={page.data} ws={ws} />}
-      {page.kind === 'bot' && <BotEditor ws={ws} bot={page.data} onDone={() => setPage(null)} />}
       {page.kind === 'group' && <GroupCreator ws={ws} onDone={(c) => { setPage(null); if (c) openConv(c.id); }} />}
       {page.kind === 'computer' && panels.computer(page.data?.id)}
       {panels[page.kind] && page.kind !== 'computer' && panels[page.kind]()}

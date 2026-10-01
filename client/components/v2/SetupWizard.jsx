@@ -83,7 +83,7 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
     : [t('serverUrl'), native ? t('pairDevice') : t('signIn'), t('models'), t('testConnection'), t('firstBot')];
   return (
     <div className="min-h-[100dvh] flex items-center justify-center p-4 bg-zinc-950 text-zinc-100 select-text">
-      <Card className="w-full max-w-md space-y-3">
+      <Card className="lb-rise w-full max-w-md space-y-3">
         <div className="flex justify-between items-center">
           <h1 className="text-lg font-semibold">{t('setupTitle')}</h1>
           <button className="text-xs text-zinc-400" onClick={() => setLang(lang === 'pl' ? 'en' : 'pl')}>{lang === 'pl' ? 'EN' : 'PL'}</button>

@@ -50,7 +50,7 @@ export default function ChatList({ ws, activeId, onOpen, onProfile, onNew, atten
           <span className="h-12 w-12 rounded-full bg-[#8d6e63] flex items-center justify-center text-lg font-semibold ring-2 ring-[#2a2a2a]">{initial}</span>
         </RoundButton>
         {searching
-          ? <div className="flex-1 mx-3 flex items-center rounded-full bg-[#2a2a2a] px-4 h-12">
+          ? <div className="lb-rise flex-1 mx-3 flex items-center rounded-full bg-[#2a2a2a] px-4 h-12">
               <FiSearch className="text-zinc-400 mr-2" />
               <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('search')}
                 className="bg-transparent flex-1 outline-none text-[15px] text-zinc-100 min-w-0" />
@@ -61,13 +61,13 @@ export default function ChatList({ ws, activeId, onOpen, onProfile, onNew, atten
               <RoundButton label={t('newBot')} onClick={onNew}><FiPlus /></RoundButton>
             </div>}
       </header>
-      <div className="flex-1 overflow-y-auto min-h-0">
-        {rows.map((r) => {
+      <div className="flex-1 overflow-y-auto min-h-0 lb-stagger">
+        {rows.map((r, i) => {
           const p = preview(r);
           const unread = r.conv?.unread > 0;
           return (
-            <button key={r.key} onClick={() => open(r)}
-              className={cls('w-full flex items-center gap-4 px-4 text-left transition active:bg-white/5', compact ? 'py-2.5' : 'py-3',
+            <button key={r.key} onClick={() => open(r)} style={{ '--i': i }}
+              className={cls('lb-press w-full flex items-center gap-4 px-4 text-left transition active:bg-white/5', compact ? 'py-2.5' : 'py-3',
                 activeId && r.conv?.id === activeId ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]')}>
               <BotBlob bot={r.bot} group={r.group} size={compact ? 46 : 56} busy={BUSY.includes(r.bot?.status)} />
               <span className="flex-1 min-w-0">
@@ -77,7 +77,7 @@ export default function ChatList({ ws, activeId, onOpen, onProfile, onNew, atten
                 </span>
                 <span className="flex items-center justify-between gap-2 mt-0.5">
                   <span className={cls('text-[15px] truncate', p.tone)}>{p.text}</span>
-                  {(unread || ATTN.includes(r.bot?.status)) && <span className={cls('h-2.5 w-2.5 rounded-full shrink-0', ATTN.includes(r.bot?.status) ? 'bg-amber-400' : 'bg-blue-500')} />}
+                  {(unread || ATTN.includes(r.bot?.status)) && <span className={cls('lb-pop h-2.5 w-2.5 rounded-full shrink-0', ATTN.includes(r.bot?.status) ? 'bg-amber-400' : 'bg-blue-500')} />}
                 </span>
               </span>
             </button>

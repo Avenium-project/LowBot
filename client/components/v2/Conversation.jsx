@@ -39,7 +39,7 @@ function SecretCard({ m }) {
     catch (err) { setState(err.message); }
   };
   return (
-    <div className="my-2 rounded-[22px] bg-[#262626] px-4 py-4">
+    <div className="lb-rise my-2 rounded-[22px] bg-[#262626] px-4 py-4">
       <div className="flex items-center gap-2 text-[17px] font-semibold text-white"><FiLock /> {lang === 'pl' ? 'Bezpieczne podanie sekretu' : 'Secure secret request'}</div>
       <div className="text-[15px] text-zinc-300 mt-1">{req.description} <span className="text-zinc-500">({req.name})</span></div>
       {state === 'ok' ? <div className="mt-3 rounded-xl py-2.5 text-center bg-emerald-900/40 text-emerald-400">{lang === 'pl' ? 'Zapisano w sejfie telefonu' : 'Saved in the phone vault'}</div> : (
@@ -57,7 +57,7 @@ function SecretCard({ m }) {
 function TakeoverCard({ m, onOpenComputer }) {
   const { lang } = useT();
   return (
-    <div className="my-2 rounded-[22px] bg-[#262626] px-4 py-4">
+    <div className="lb-rise lb-attention my-2 rounded-[22px] bg-[#262626] px-4 py-4">
       <div className="flex items-center gap-2 text-[17px] font-semibold text-white"><FiMonitor /> {lang === 'pl' ? 'Bot potrzebuje Ciebie przy komputerze' : 'The bot needs you on the computer'}</div>
       <div className="text-[15px] text-zinc-300 mt-1 whitespace-pre-wrap">{m.text.replace(/^🖥️\s*/, '')}</div>
       <button onClick={() => onOpenComputer(m.meta.takeover_request)} className="mt-3 w-full rounded-xl bg-white text-black py-2.5 font-medium">
@@ -66,15 +66,15 @@ function TakeoverCard({ m, onOpenComputer }) {
   );
 }
 
-function Bubble({ m, bot, showName, onOpenComputer }) {
+function Bubble({ m, bot, showName, onOpenComputer, animate }) {
   if (m.meta?.secret_request && m.author_type === 'bot') return <SecretCard m={m} />;
   if (m.meta?.takeover_request && m.author_type === 'bot') return <TakeoverCard m={m} onOpenComputer={onOpenComputer} />;
   if (m.author_type === 'system') {
-    return <div className="text-center text-[13px] text-zinc-500 my-2 px-8 whitespace-pre-wrap">{m.text}</div>;
+    return <div className={cls('text-center text-[13px] text-zinc-500 my-2 px-8 whitespace-pre-wrap', animate && 'lb-rise')}>{m.text}</div>;
   }
   const mine = m.author_type === 'user';
   return (
-    <div className={cls('flex my-1.5', mine ? 'justify-end' : 'justify-start')}>
+    <div className={cls('flex my-1.5', mine ? 'justify-end' : 'justify-start', animate && (mine ? 'lb-msg-right' : 'lb-msg-left'))}>
       <div className={cls('max-w-[85%] px-4 py-3 text-[16px] leading-snug break-words select-text rounded-[22px]',
         mine ? 'bg-[#3a3a3c] text-white' : 'bg-[#262626] text-zinc-100')}>
         {showName && bot && <div className="flex items-center gap-1.5 mb-1 text-[13px] text-zinc-400"><BotBlob bot={bot} size={18} />{bot.name}</div>}
@@ -112,7 +112,7 @@ function ApprovalInline({ a, ws, onChanged }) {
   const Icon = done?.[2];
   const description = `${a.summary}${a.effect ? ` — ${a.effect}` : ''}${a.target ? ` (${a.target})` : ''}`;
   return (
-    <div className="my-2 rounded-[22px] bg-[#262626] px-4 py-4">
+    <div className={cls('lb-rise my-2 rounded-[22px] bg-[#262626] px-4 py-4', !done && 'lb-attention')}>
       <div className="text-[17px] font-semibold text-white">{lang === 'pl' ? 'Prośba o zgodę' : 'Approval request'}</div>
       <button onClick={() => setOpen(!open)} className={cls('text-left text-[15px] text-zinc-200 mt-1', !open && 'line-clamp-3')}>{description}</button>
       {a.review?.decision && <div className="mt-2 text-[13px] text-sky-300">Auto Review: {a.review.reason}</div>}
@@ -120,18 +120,18 @@ function ApprovalInline({ a, ws, onChanged }) {
       {editing && <textarea className="mt-2 w-full rounded-xl bg-black/40 p-3 font-mono text-xs h-32 text-zinc-100 outline-none" value={draft} onChange={(e) => setDraft(e.target.value)} />}
       {err && <div className="text-xs text-rose-300 mt-2">{err}</div>}
       {done ? (
-        <div className={cls('mt-3 flex items-center justify-center gap-2 rounded-xl py-2.5 text-[15px] font-medium', done[1])}><Icon /> {done[0]}</div>
+        <div className={cls('lb-pop mt-3 flex items-center justify-center gap-2 rounded-xl py-2.5 text-[15px] font-medium', done[1])}><Icon /> {done[0]}</div>
       ) : editing ? (
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button onClick={saveEdit} className="rounded-xl bg-white text-black py-2.5 font-medium">{t('save')}</button>
-          <button onClick={() => setEditing(false)} className="rounded-xl bg-[#3a3a3c] py-2.5">{t('cancel')}</button>
+          <button onClick={() => setEditing(false)} className="lb-press rounded-xl bg-[#3a3a3c] py-2.5">{t('cancel')}</button>
         </div>
       ) : (
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <button onClick={() => decide('approve')} className="rounded-xl bg-white text-black py-2.5 font-medium">{lang === 'pl' ? 'Zezwól raz' : 'Allow once'}</button>
-          <button onClick={() => decide('always')} className="rounded-xl bg-[#3a3a3c] py-2.5">{lang === 'pl' ? 'Zawsze zezwalaj' : 'Always allow'}</button>
-          <button onClick={() => decide('deny')} className="rounded-xl bg-[#3a3a3c] py-2.5">{t('deny')}</button>
-          <button onClick={() => { setOpen(true); setEditing(true); }} className="rounded-xl bg-[#3a3a3c] py-2.5">{t('edit')}</button>
+          <button onClick={() => decide('approve')} className="lb-press rounded-xl bg-white text-black py-2.5 font-medium">{lang === 'pl' ? 'Zezwól raz' : 'Allow once'}</button>
+          <button onClick={() => decide('always')} className="lb-press rounded-xl bg-[#3a3a3c] py-2.5">{lang === 'pl' ? 'Zawsze zezwalaj' : 'Always allow'}</button>
+          <button onClick={() => decide('deny')} className="lb-press rounded-xl bg-[#3a3a3c] py-2.5">{t('deny')}</button>
+          <button onClick={() => { setOpen(true); setEditing(true); }} className="lb-press rounded-xl bg-[#3a3a3c] py-2.5">{t('edit')}</button>
         </div>
       )}
     </div>
@@ -143,9 +143,11 @@ function WorkingStrip({ task, bot, onAnswer, special }) {
   const [answer, setAnswer] = useState('');
   const asking = task.run_status === 'waiting_input' && !special;
   return (
-    <div className="my-2 rounded-[18px] bg-[#1f1f1f] border border-white/5 px-4 py-2.5 text-[14px]">
+    <div className="lb-rise my-2 rounded-[18px] bg-[#1f1f1f] border border-white/5 px-4 py-2.5 text-[14px]">
       <div className="flex items-center gap-2">
-        <span className={cls('h-2 w-2 rounded-full', asking ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse')} />
+        {asking || task.run_status === 'waiting_approval'
+          ? <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+          : <span className="lb-typing inline-flex gap-1 text-emerald-400" aria-hidden="true"><span /><span /><span /></span>}
         <span className="flex-1 truncate text-zinc-300">{bot?.name}: {t(`status_${RUN_LABEL[task.run_status] || 'working'}`)}</span>
         <button aria-label={t('stop')} title={t('stop')} onClick={() => api(`/tasks/${task.id}/cancel`, { method: 'POST' })}
           className="text-zinc-400 hover:text-rose-300 h-8 w-8 flex items-center justify-center"><FiStopCircle /></button>
@@ -339,7 +341,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
   let lastAt = null;
   let dividerShown = false;
   return (
-    <div className="relative flex flex-col h-full min-h-0 bg-[#141414]">
+    <div className={cls('relative flex flex-col h-full min-h-0 bg-[#141414]', onBack && 'lb-side-in')}>
       <header className="absolute top-0 inset-x-0 z-10 flex items-center gap-3 px-4 pb-6 bg-gradient-to-b from-[#141414] via-[#141414]/90 to-transparent"
         style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
         {onBack && <button aria-label="back" onClick={onBack} className="h-12 w-12 shrink-0 rounded-full bg-[#2a2a2a]/95 border border-white/10 flex items-center justify-center text-2xl"><FiChevronLeft /></button>}
@@ -348,7 +350,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
           <span className="font-semibold text-[17px] truncate">{title}</span>
         </button>
         <span className="flex-1" />
-        {voiceChat && <button onClick={toggleVoiceChat} className="h-10 shrink-0 rounded-full bg-rose-600 px-4 text-[14px] flex items-center gap-2"><FiHeadphones /> {lang === 'pl' ? 'Zakończ' : 'End'}</button>}
+        {voiceChat && <button onClick={toggleVoiceChat} className="lb-pop lb-attention h-10 shrink-0 rounded-full bg-rose-600 px-4 text-[14px] flex items-center gap-2"><FiHeadphones /> {lang === 'pl' ? 'Zakończ' : 'End'}</button>}
         <button aria-label={t('computer')} title={t('computer')} onClick={() => onOpenComputer?.(conversation.kind === 'group' ? null : lead)}
           className="h-12 w-12 shrink-0 rounded-full bg-[#2a2a2a]/95 border border-white/10 flex items-center justify-center text-xl"><FiMonitor /></button>
       </header>
@@ -363,21 +365,21 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
           const prev = timeline[i - 1];
           return (
             <div key={it.kind === 'msg' ? it.m.id : it.a.id}>
-              {showDivider && <div className="flex items-center gap-3 my-4"><span className="flex-1 h-px bg-blue-500/50" /><span className="text-[13px] font-semibold tracking-wider text-blue-400">{lang === 'pl' ? 'NOWE' : 'NEW'}</span><span className="flex-1 h-px bg-blue-500/50" /></div>}
+              {showDivider && <div className="lb-rise flex items-center gap-3 my-4"><span className="flex-1 h-px bg-blue-500/50" /><span className="text-[13px] font-semibold tracking-wider text-blue-400">{lang === 'pl' ? 'NOWE' : 'NEW'}</span><span className="flex-1 h-px bg-blue-500/50" /></div>}
               {sep && <div className="text-center text-[14px] text-zinc-500 my-4">{dayLabel(it.at, lang)}</div>}
               {it.kind === 'msg'
-                ? <Bubble m={it.m} bot={botsById[it.m.author_id]} onOpenComputer={openComputer} showName={conversation.kind === 'group' && it.m.author_type === 'bot'
+                ? <Bubble m={it.m} bot={botsById[it.m.author_id]} onOpenComputer={openComputer} animate={i >= timeline.length - 6} showName={conversation.kind === 'group' && it.m.author_type === 'bot'
                     && !(prev?.kind === 'msg' && prev.m.author_id === it.m.author_id && !sep)} />
                 : <ApprovalInline a={it.a} ws={ws} onChanged={load} />}
             </div>
           );
         })}
         {elicitations.map((e) => <div key={e.id} className="my-2"><ElicitationCard e={e} ws={ws} /></div>)}
-        {pending.map((p) => <div key={p.client_msg_id} className="flex justify-end my-1.5"><div className="max-w-[85%] rounded-[22px] bg-[#3a3a3c]/60 px-4 py-3 text-[16px] text-zinc-300">⏳ {p.text}</div></div>)}
+        {pending.map((p) => <div key={p.client_msg_id} className="lb-msg-right flex justify-end my-1.5"><div className="max-w-[85%] rounded-[22px] bg-[#3a3a3c]/60 px-4 py-3 text-[16px] text-zinc-300">⏳ {p.text}</div></div>)}
         {activeTasks.map((task) => <WorkingStrip key={task.id} task={task} bot={botsById[task.bot_id]} special={specialTasks.has(task.id)}
           onAnswer={(id, a) => api(`/tasks/${id}/answer`, { method: 'POST', body: { answer: a } }).then(load)} />)}
         {!timeline.length && lead && (
-          <div className="flex flex-col items-center text-center mt-16 px-6 text-zinc-400">
+          <div className="lb-rise flex flex-col items-center text-center mt-16 px-6 text-zinc-400">
             <BotBlob bot={lead} size={88} />
             <div className="mt-3 text-[18px] font-semibold text-zinc-100">{lead.name}</div>
             {lead.role_description && <div className="mt-1 text-[15px]">{lead.role_description}</div>}
@@ -388,7 +390,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
 
       <form onSubmit={submit} className="px-4 pt-2 shrink-0 relative" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
         {suggestions.length > 0 && (
-          <div className="absolute bottom-full left-4 right-4 mb-2 rounded-2xl bg-[#262626] border border-white/10 max-h-56 overflow-y-auto">
+          <div className="lb-rise absolute bottom-full left-4 right-4 mb-2 rounded-2xl bg-[#262626] border border-white/10 max-h-56 overflow-y-auto">
             {suggestions.map((s) => (
               <button type="button" key={s.insert} className="block w-full text-left px-4 py-3 text-[15px] hover:bg-white/5"
                 onClick={() => setText(text.slice(0, text.length - token.length) + s.insert)}>{s.label}</button>
@@ -396,7 +398,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
           </div>
         )}
         {plusOpen && (
-          <div className="absolute bottom-full left-4 mb-2 rounded-2xl bg-[#262626] border border-white/10 overflow-hidden text-[15px] min-w-[220px]">
+          <div className="lb-rise lb-stagger absolute bottom-full left-4 mb-2 rounded-2xl bg-[#262626] border border-white/10 overflow-hidden text-[15px] min-w-[220px] shadow-2xl">
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); fileRef.current.click(); }}><FiPaperclip /> {t('attach')}</button>
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); setText('/'); }}>⚡ {t('skills')}</button>
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); onOpenComputer?.(lead); }}><FiMonitor /> {t('computer')}</button>
@@ -409,12 +411,12 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
         <div className="flex items-end gap-3">
           <button type="button" aria-label={t('more')} onClick={() => setPlusOpen(!plusOpen)}
             className={cls('h-14 w-14 shrink-0 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center text-2xl transition', plusOpen && 'rotate-45')}><FiPlus /></button>
-          <div className="flex-1 min-w-0 flex items-end rounded-[28px] bg-[#2a2a2a] border border-white/10 pl-5 pr-1.5 py-1.5 min-h-[56px]">
+          <div className="lb-composer flex-1 min-w-0 flex items-end rounded-[28px] bg-[#2a2a2a] border border-white/10 pl-5 pr-1.5 py-1.5 min-h-[56px]">
             <textarea rows={1} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} aria-label={t('typeMessage')}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !suggestions.length) submit(e); }}
               className="flex-1 bg-transparent resize-none outline-none text-[17px] text-zinc-100 placeholder:text-zinc-500 max-h-36 py-2.5 min-w-0" />
             {text.trim() || attachments.length ? (
-              <button type="submit" aria-label={t('send')} title={t('send')} className="h-11 w-11 rounded-full bg-white text-black flex items-center justify-center shrink-0 text-xl"><FiArrowUp /></button>
+              <button type="submit" aria-label={t('send')} title={t('send')} className="lb-pop lb-press h-11 w-11 rounded-full bg-white text-black flex items-center justify-center shrink-0 text-xl"><FiArrowUp /></button>
             ) : <>
               <button type="button" aria-label={t('dictate')} title={t('dictate')} onClick={dictate} className={cls('h-11 w-10 flex items-center justify-center shrink-0 text-xl', listening ? 'text-rose-400' : 'text-zinc-400')}><FiMic /></button>
               <button type="button" aria-label={local ? 'Voice chat' : t('voiceNote')} title={local ? (lang === 'pl' ? 'Rozpocznij rozmowę głosową' : 'Start voice chat') : t('voiceNote')} onClick={local ? toggleVoiceChat : toggleVoice}

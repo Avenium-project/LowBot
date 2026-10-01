@@ -85,3 +85,71 @@ body {
   animation: fadeIn 0.15s ease-out forwards;
 }
 
+
+/* ---------------------------------------------------------------- LowBot motion
+   Small, fast, interruptible animations. Everything is disabled when the system
+   asks for reduced motion. */
+:root {
+  --lb-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --lb-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes lbSlideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes lbSlideOutRight { from { transform: translateX(0); } to { transform: translateX(100%); } }
+@keyframes lbSlideInSoft { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes lbSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes lbSheetDown { from { transform: translateY(0); } to { transform: translateY(100%); } }
+@keyframes lbFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lbFadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes lbRise { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes lbMsgLeft { from { opacity: 0; transform: translate(-10px, 8px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes lbMsgRight { from { opacity: 0; transform: translate(10px, 8px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes lbPop { 0% { opacity: 0; transform: scale(0.6); } 70% { opacity: 1; transform: scale(1.08); } 100% { transform: scale(1); } }
+@keyframes lbTyping { 0%, 60%, 100% { transform: translateY(0); opacity: 0.35; } 30% { transform: translateY(-4px); opacity: 1; } }
+@keyframes lbBreathe { 0%, 100% { transform: translateY(0) scale(1, 1); } 50% { transform: translateY(-2px) scale(1.04, 0.97); } }
+@keyframes lbBlink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes lbShimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@keyframes lbGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.0); } 50% { box-shadow: 0 0 0 6px rgba(251, 191, 36, 0.18); } }
+@keyframes lbSpin { to { transform: rotate(360deg); } }
+
+.lb-page-in { animation: lbSlideInRight 0.32s var(--lb-ease-out) both; }
+.lb-page-out { animation: lbSlideOutRight 0.22s ease-in both; }
+.lb-side-in { animation: lbSlideInSoft 0.28s var(--lb-ease-out) both; }
+.lb-sheet-in { animation: lbSheetUp 0.32s var(--lb-ease-out) both; }
+.lb-sheet-out { animation: lbSheetDown 0.2s ease-in both; }
+.lb-backdrop-in { animation: lbFadeIn 0.24s ease-out both; }
+.lb-backdrop-out { animation: lbFadeOut 0.2s ease-in both; }
+.lb-rise { animation: lbRise 0.36s var(--lb-ease-out) both; }
+.lb-msg-left { animation: lbMsgLeft 0.32s var(--lb-ease-out) both; transform-origin: bottom left; }
+.lb-msg-right { animation: lbMsgRight 0.32s var(--lb-ease-out) both; transform-origin: bottom right; }
+.lb-pop { animation: lbPop 0.34s var(--lb-ease-spring) both; }
+.lb-attention { animation: lbGlow 1.8s ease-in-out infinite; }
+.lb-stagger > * { animation: lbRise 0.4s var(--lb-ease-out) both; animation-delay: calc(min(var(--i, 0), 12) * 35ms); }
+.lb-press { transition: transform 0.12s ease, background-color 0.15s ease; }
+.lb-press:active { transform: scale(0.97); }
+.lb-typing span { display: inline-block; width: 6px; height: 6px; border-radius: 9999px; background: currentColor; animation: lbTyping 1.1s infinite ease-in-out; }
+.lb-typing span:nth-child(2) { animation-delay: 0.15s; }
+.lb-typing span:nth-child(3) { animation-delay: 0.3s; }
+.lb-blob-busy svg { animation: lbBreathe 1.6s ease-in-out infinite; transform-origin: 50% 80%; }
+.lb-blob-eye { transform-box: fill-box; transform-origin: center; animation: lbBlink 5s infinite; }
+.lb-skeleton { background: linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%); background-size: 200% 100%; animation: lbShimmer 1.4s linear infinite; }
+.lb-spin { animation: lbSpin 0.9s linear infinite; }
+.lb-composer { transition: border-color 0.2s ease, box-shadow 0.25s ease; }
+.lb-composer:focus-within { border-color: rgba(255, 255, 255, 0.22); box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
+
+.lb-stagger > *:nth-child(2) { --i: 1; }
+.lb-stagger > *:nth-child(3) { --i: 2; }
+.lb-stagger > *:nth-child(4) { --i: 3; }
+.lb-stagger > *:nth-child(5) { --i: 4; }
+.lb-stagger > *:nth-child(6) { --i: 5; }
+.lb-stagger > *:nth-child(7) { --i: 6; }
+.lb-stagger > *:nth-child(8) { --i: 7; }
+.lb-stagger > *:nth-child(9) { --i: 8; }
+.lb-stagger > *:nth-child(10) { --i: 9; }
+.lb-stagger > *:nth-child(11) { --i: 10; }
+.lb-stagger > *:nth-child(12) { --i: 11; }
+.lb-stagger > *:nth-child(13) { --i: 12; }
