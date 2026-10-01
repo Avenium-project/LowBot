@@ -116,7 +116,15 @@ public class SelfTest extends BroadcastReceiver {
                 .put(J.obj("when", "please delegate", "call", J.obj("name", "task.delegate", "arguments", J.obj("bot", "helper", "instructions", "Count to three", "wait", true))))
                 .put(J.obj("after_tool", "task.delegate", "reply", "delegation done: {{last}}"))
                 .put(J.obj("when", "remember", "call", J.obj("name", "memory.save", "arguments", J.obj("content", "The user likes green tea"))))
-                .put(J.obj("after_tool", "memory.save", "reply", "remembered"));
+                .put(J.obj("after_tool", "memory.save", "reply", "remembered"))
+                .put(J.obj("when", "set up team space", "call", J.obj("name", "project.create", "arguments",
+                        J.obj("name", "team", "rules", "Write every report to report.md.", "members", new JSONArray().put("helper")))))
+                .put(J.obj("after_tool", "project.create", "reply", "workspace ready"))
+                .put(J.obj("when", "hire a researcher", "call", J.obj("name", "bot.create", "arguments",
+                        J.obj("name", "Researcher", "soul", "# Researcher\nFinds sources.", "workspace", "team"))))
+                .put(J.obj("after_tool", "bot.create", "reply", "hired: {{last}}"))
+                .put(J.obj("when", "fire the researcher", "call", J.obj("name", "bot.delete", "arguments", J.obj("bot", "researcher", "reason", "test"))))
+                .put(J.obj("after_tool", "bot.delete", "reply", "removed: {{last}}"));
         JSONObject prov = api(r, "POST", "/api/v2/providers", J.obj("kind", "scripted_mock", "name", "Mock", "script", script));
         check(prov.optBoolean("is_mock"), "mock provider is labelled");
         JSONObject bot = api(r, "POST", "/api/v2/bots", J.obj("name", "Asystent", "role_description", "test"));
@@ -203,6 +211,32 @@ public class SelfTest extends BroadcastReceiver {
         b.engine.drain(30000);
         check(b.core.db.count("SELECT COUNT(*) FROM messages WHERE text = '(no response)'") == 0
                 && b.core.db.count("SELECT COUNT(*) FROM messages WHERE author_type = 'system' AND text LIKE '%empty answer%'") == 1, "empty answer reported, not '(no response)'");
+
+        // 7d. Team: shared workspace, a bot creates and deletes another bot (with the user's approval)
+        api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "set up team space"));
+        b.engine.drain(20000);
+        check("workspace ready".equals(lastBotMessage(b, cid).optString("text")), "bot creates a shared workspace");
+        check(b.mind.members("team").contains(helper.optString("id")) && b.mind.members("team").contains(bot.optString("id")), "workspace members");
+        check(b.mind.promptSection(helper.optString("id"), "team").contains("report.md"), "shared rules reach other members");
+        new File(b.mind.projectDir("team"), "notes.md").createNewFile();
+        check(b.mind.promptSection(bot.optString("id"), "team").contains("team/notes.md"), "shared files listed for members");
+        JSONObject tHire = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "hire a researcher")).optJSONArray("tasks").getJSONObject(0);
+        b.engine.drain(20000);
+        check("waiting_approval".equals(runStatus(b, tHire.optString("id"))) && b.bots.byHandle("researcher") == null, "bot.create waits for the user");
+        JSONObject aHire = b.approvals.list("pending").get(0);
+        b.approvals.decide(aHire.optString("id"), "approve", aHire.optString("args_hash"));
+        b.engine.drain(20000);
+        JSONObject researcher = b.bots.byHandle("researcher");
+        check(researcher != null && lastBotMessage(b, cid).optString("text").startsWith("hired"), "bot created another bot");
+        check(b.mind.soul(researcher.optString("id")).contains("Finds sources") && b.mind.members("team").contains(researcher.optString("id")),
+                "new bot gets its soul and joins the workspace");
+        JSONObject tFire = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "fire the researcher")).optJSONArray("tasks").getJSONObject(0);
+        b.engine.drain(20000);
+        check("waiting_approval".equals(runStatus(b, tFire.optString("id"))), "bot.delete always asks");
+        JSONObject aFire = b.approvals.list("pending").get(0);
+        b.approvals.decide(aFire.optString("id"), "approve", aFire.optString("args_hash"));
+        b.engine.drain(20000);
+        check(b.bots.byHandle("researcher") == null && !b.mind.members("team").contains(researcher.optString("id")), "bot deleted another bot");
 
         // 8. Always allow stores a rule for this bot + tool
         JSONObject t8 = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "post it again")).optJSONArray("tasks").getJSONObject(0);

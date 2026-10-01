@@ -16,9 +16,10 @@ import java.util.Set;
 public final class Bots {
     public static final String[] DEFAULT_TOOLS = {
         "workspace.*", "web.fetch", "http.post", "memory.*", "handoff.write", "soul.update", "project.*", "user.ask", "secret.request",
-        "task.delegate", "task.get_status", "task.complete", "bot.message", "artifact.share",
+        "task.delegate", "task.get_status", "task.complete", "bot.*", "artifact.share",
         "browser.*", "routine.create",
     };
+    public static final int MAX_BOTS = 50;
     static final List<String> ORG_ROLES = Arrays.asList("ceo", "head", "manager", "worker");
     static final Set<String> EDITABLE = new HashSet<String>(Arrays.asList(
         "name", "label", "avatar", "role_description", "instructions", "provider_profile_id", "model",
@@ -126,7 +127,9 @@ public final class Bots {
         JSONArray toolsArr = d.optJSONArray("tools");
         List<String> tools = toolsArr != null && toolsArr.length() > 0 ? J.strings(toolsArr) : Arrays.asList(DEFAULT_TOOLS);
         JSONArray policy = d.optJSONArray("policy") == null ? new JSONArray() : d.optJSONArray("policy");
-        boolean canCreate = J.bool(d, "can_create_bots");
+        // Every bot may manage the team by default (creating/deleting still needs the user's approval).
+        boolean canCreate = !d.has("can_create_bots") || J.bool(d, "can_create_bots");
+        if (db.count("SELECT COUNT(*) FROM bots") >= MAX_BOTS) throw new ApiError(409, "Bot limit reached (" + MAX_BOTS + "). Delete a bot first.");
         if (createdBy != null) {
             if (!createdBy.optBoolean("can_create_bots")) throw new ApiError(403, "This bot is not allowed to create bots.");
             List<String> parent = J.strings(createdBy.optJSONArray("tools"));
@@ -141,7 +144,7 @@ public final class Bots {
                 if (r != null && !"allow".equals(r.optString("effect"))) merged.put(r);
             }
             policy = merged;
-            canCreate = false;
+            canCreate = createdBy.optBoolean("can_create_bots");
         }
         final String id = J.id("bot");
         String handle = J.str(d, "handle", null);
@@ -306,6 +309,23 @@ public final class Bots {
                 b.core.audit("bot.delete", "user", null, null, null, null, null, null, J.obj("bot_id", id));
             }
         });
+    }
+
+    /** One-time upgrade: bots made before team management get the bot.* tools and may create bots. */
+    void upgradeTeamTools() {
+        if (b.core.kvGet("upgrade:team_tools") != null) return;
+        for (JSONObject r : db.all("SELECT id, tools_json FROM bots")) {
+            JSONArray t = J.parseArr(r.optString("tools_json"));
+            boolean has = false;
+            for (int i = 0; i < t.length(); i++) if ("bot.*".equals(t.optString(i))) has = true;
+            if (!has) {
+                JSONArray n = new JSONArray();
+                for (int i = 0; i < t.length(); i++) if (!t.optString(i).startsWith("bot.")) n.put(t.optString(i));
+                n.put("bot.*");
+                db.exec("UPDATE bots SET tools_json = ?, can_create_bots = 1 WHERE id = ?", n.toString(), r.optString("id"));
+            } else db.exec("UPDATE bots SET can_create_bots = 1 WHERE id = ?", r.optString("id"));
+        }
+        b.core.kvSet("upgrade:team_tools", "1");
     }
 
     public boolean isSubordinate(String managerId, String botId) {

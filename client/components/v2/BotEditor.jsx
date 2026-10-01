@@ -187,15 +187,15 @@ function MemoryFiles({ bot, tick, open }) {
       </div>
       <Caption>{'Stored as memories/*.md in the bot\'s folder.'}</Caption>
 
-      <Label>Projects</Label>
+      <Label>Workspaces</Label>
       <div className={cls(card, 'overflow-hidden')}>
         {m.projects.length ? m.projects.map((p) => (
           <button key={p.name} onClick={() => open({ kind: 'project', name: p.name, value: p.agents_md, reload: load })} className="lb-press w-full flex items-center gap-4 px-5 py-3.5 text-left border-b border-white/5">
             <span className="text-xl">📁</span><span className="flex-1 min-w-0"><span className="block text-[16px]">{p.name}/AGENTS.md</span>
-              <span className="block text-[13px] text-zinc-500 truncate">{firstLine(p.agents_md) || 'no rules yet'}</span></span><FiChevronRight className="text-zinc-500" /></button>))
-          : <div className="px-5 py-4 text-zinc-500">No projects yet. Ask the bot to work on a project, or bind a chat to one.</div>}
+              <span className="block text-[13px] text-zinc-500 truncate">{p.members ? `${p.members.length} bot${p.members.length === 1 ? '' : 's'} · ${p.files_count} files · ` : ''}{firstLine(p.agents_md) || 'no rules yet'}</span></span><FiChevronRight className="text-zinc-500" /></button>))
+          : <div className="px-5 py-4 text-zinc-500">Not in a workspace yet. Add it from Menu → Workspaces, or ask it to create one.</div>}
       </div>
-      <Caption>Project AGENTS.md holds only how an agent should behave while working on that project.</Caption>
+      <Caption>{'A workspace\'s AGENTS.md is shared: every bot in it follows the same rules and sees the same files.'}</Caption>
     </>
   );
 }

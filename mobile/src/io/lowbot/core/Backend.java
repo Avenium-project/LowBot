@@ -85,6 +85,7 @@ public final class Backend {
     public synchronized void start() {
         if (started) return;
         started = true;
+        bots.upgradeTeamTools();
         engine.start();
         try {
             routines.tick();

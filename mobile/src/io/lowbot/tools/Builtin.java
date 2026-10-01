@@ -9,9 +9,11 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -120,6 +122,22 @@ public final class Builtin {
         if (bot == null) bot = ctx.b.bots.byHandle(ref);
         if (bot == null) throw new ToolError("No bot named '" + ref + "'.");
         return bot;
+    }
+
+    static JSONArray handles(Ctx ctx, List<String> ids) {
+        JSONArray out = new JSONArray();
+        for (String id : ids) { JSONObject o = ctx.b.bots.get(id); if (o != null) out.put("@" + o.optString("handle")); }
+        return out;
+    }
+
+    static String currentProject(Ctx ctx, String given) throws ToolError {
+        String p = given;
+        if (p == null || p.isEmpty()) {
+            String cid = J.str(ctx.task, "conversation_id", null);
+            p = cid == null ? null : ctx.b.core.db.scalar("SELECT project FROM conversations WHERE id = ?", cid);
+        }
+        if (p == null || p.isEmpty()) throw new ToolError("No current workspace. Pass project or call project.use first.");
+        return ctx.b.mind.projectDir(p).getName();
     }
 
     static JSONObject card(String summary, String effect, String target) {
@@ -275,14 +293,53 @@ public final class Builtin {
         }).card(new Tools.Summarize() {
             public JSONObject card(JSONObject a) { return Builtin.card("Rewrite soul.md (" + a.optString("content").length() + " chars)", "changes who this bot is and how it behaves", "soul.md"); }
         }));
-        reg.register(new Spec("project.use", "Work on a project: binds this conversation to workspace/<name>/ (created if needed) and returns its AGENTS.md rules.",
+        reg.register(new Spec("project.use", "Work in a shared workspace: binds this conversation to workspace/<name>/ (created if needed), "
+                + "makes you a member and returns its shared AGENTS.md rules, members and files.",
                 Tools.obj(props("name", S), "name"), Tools.WORKSPACE, "allow", new Tools.Executor() {
             public Object run(Ctx ctx, JSONObject a) throws Exception {
                 String cid = J.str(ctx.task, "conversation_id", null);
                 if (cid == null) throw new ToolError("This task has no conversation.");
                 JSONObject c = ctx.b.tasks.updateConversation(cid, J.obj("project", a.optString("name")));
                 String p = c.optString("project");
-                return J.obj("project", p, "folder", p + "/", "agents_md", ctx.b.mind.projectRules(p));
+                ctx.b.mind.addMember(p, ctx.bot.optString("id"));
+                return J.obj("project", p, "folder", p + "/", "agents_md", ctx.b.mind.projectRules(p),
+                        "members", handles(ctx, ctx.b.mind.members(p)), "files", ctx.b.mind.files(p, 50));
+            }
+        }));
+        reg.register(new Spec("project.create", "Create a shared workspace for a team of bots: a folder workspace/<name>/ with shared files and an AGENTS.md "
+                + "of rules every member follows. You become a member; add others by handle.",
+                Tools.obj(props("name", S, "rules", S, "members", J.obj("type", "array", "items", S)), "name"), Tools.WORKSPACE, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) throws Exception {
+                List<String> ids = new ArrayList<String>();
+                ids.add(ctx.bot.optString("id"));
+                JSONArray m = a.optJSONArray("members");
+                for (int i = 0; m != null && i < m.length(); i++) ids.add(resolveBot(ctx, m.optString(i)).optString("id"));
+                JSONObject w = ctx.b.mind.createWorkspace(a.optString("name"), a.optString("rules", ""), ids);
+                return J.obj("workspace", w.optString("name"), "folder", w.optString("folder"), "members", handles(ctx, ctx.b.mind.members(w.optString("name"))),
+                        "note", "Call project.use to work in it from this conversation.");
+            }
+        }));
+        reg.register(new Spec("project.add_member", "Add a bot (by handle) to a shared workspace so it sees the same rules and files.",
+                Tools.obj(props("bot", S, "project", S), "bot"), Tools.INTERNAL, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) throws Exception {
+                String p = currentProject(ctx, a.optString("project", ""));
+                JSONObject target = resolveBot(ctx, a.optString("bot"));
+                ctx.b.mind.addMember(p, target.optString("id"));
+                return J.obj("workspace", p, "members", handles(ctx, ctx.b.mind.members(p)));
+            }
+        }));
+        reg.register(new Spec("project.list", "List shared workspaces: name, members and the start of their rules.",
+                Tools.obj(props()), Tools.READ, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) throws Exception {
+                JSONArray out = new JSONArray();
+                for (JSONObject w : ctx.b.mind.projects()) {
+                    List<String> mem = new ArrayList<String>();
+                    JSONArray ma = w.optJSONArray("members");
+                    for (int i = 0; ma != null && i < ma.length(); i++) mem.add(ma.optString(i));
+                    out.put(J.obj("name", w.optString("name"), "members", handles(ctx, mem), "files", w.optInt("files_count"),
+                            "rules", J.truncate(w.optString("agents_md"), 300)));
+                }
+                return J.obj("workspaces", out);
             }
         }));
         reg.register(new Spec("project.update_rules", "Replace the current project's AGENTS.md: only how an agent should behave while working on this project "
@@ -294,7 +351,7 @@ public final class Builtin {
                     String cid = J.str(ctx.task, "conversation_id", null);
                     p = cid == null ? null : ctx.b.core.db.scalar("SELECT project FROM conversations WHERE id = ?", cid);
                 }
-                if (p == null || p.isEmpty()) throw new ToolError("No current project. Call project.use first.");
+                if (p == null || p.isEmpty()) throw new ToolError("No current workspace. Call project.use first.");
                 ctx.b.mind.setProjectRules(p, a.optString("content"));
                 return J.obj("written", p + "/AGENTS.md");
             }
@@ -367,20 +424,93 @@ public final class Builtin {
             }
         }));
 
-        reg.register(new Spec("bot.create", "Create a new bot (only if permitted). It cannot get more tools than its creator.",
-                Tools.obj(props("name", S, "role_description", S, "instructions", S, "avatar", S, "tools", J.obj("type", "array", "items", S)), "name"),
+        reg.register(new Spec("bot.list", "List the bots on this phone: handle, name, role, model, who created them and their workspaces.",
+                Tools.obj(props()), Tools.READ, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) throws Exception {
+                JSONArray out = new JSONArray();
+                for (JSONObject o : ctx.b.bots.list(true)) {
+                    JSONObject creator = ctx.b.bots.get(J.str(o, "created_by_bot_id", null));
+                    out.put(J.obj("handle", "@" + o.optString("handle"), "name", o.optString("name"), "role", J.truncate(o.optString("role_description"), 160),
+                            "model", o.opt("model"), "paused", o.optBoolean("paused"), "you", o.optString("id").equals(ctx.bot.optString("id")),
+                            "created_by", creator == null ? "user" : "@" + creator.optString("handle"),
+                            "workspaces", new JSONArray(ctx.b.mind.workspacesOf(o.optString("id")))));
+                }
+                return J.obj("bots", out, "limit", io.lowbot.core.Bots.MAX_BOTS);
+            }
+        }));
+
+        reg.register(new Spec("bot.create", "Create a new persistent bot (the user approves). It gets your provider and model unless given, and cannot get more tools "
+                + "than you have. soul describes its purpose and behaviour (soul.md); workspace adds it to a shared workspace.",
+                Tools.obj(props("name", S, "role_description", S, "soul", S, "instructions", S, "avatar", S, "model", S, "workspace", S,
+                        "tools", J.obj("type", "array", "items", S)), "name"),
                 Tools.INTERNAL, "ask", new Tools.Executor() {
             public Object run(Ctx ctx, JSONObject a) throws Exception {
                 JSONObject d = new JSONObject();
-                for (String k : new String[]{"name", "role_description", "instructions", "tools", "avatar"}) if (a.has(k)) J.put(d, k, a.opt(k));
-                JSONObject bot = ctx.b.bots.create(d, ctx.bot);
-                return J.obj("bot_id", bot.optString("id"), "handle", bot.optString("handle"), "tools", bot.optJSONArray("tools"));
+                for (String k : new String[]{"name", "role_description", "instructions", "tools", "avatar", "model"}) if (a.has(k)) J.put(d, k, a.opt(k));
+                if (!a.has("model") && !ctx.bot.isNull("model")) J.put(d, "model", ctx.bot.opt("model"));
+                if (!ctx.bot.isNull("provider_profile_id")) J.put(d, "provider_profile_id", ctx.bot.opt("provider_profile_id"));
+                JSONObject bot;
+                try { bot = ctx.b.bots.create(d, ctx.bot); } catch (io.lowbot.core.ApiError e) { throw new ToolError(e.getMessage()); }
+                if (!a.optString("soul").trim().isEmpty()) ctx.b.mind.setSoul(bot.optString("id"), a.optString("soul"));
+                String ws = a.optString("workspace", "");
+                if (!ws.isEmpty()) {
+                    ctx.b.mind.addMember(ws, bot.optString("id"));
+                    ctx.b.mind.addMember(ws, ctx.bot.optString("id"));
+                }
+                String cid = J.str(ctx.task, "conversation_id", null);
+                final String note = ctx.bot.optString("name") + " created a new bot: " + bot.optString("name") + " (@" + bot.optString("handle") + ")";
+                if (cid != null) {
+                    final Ctx c2 = ctx; final String conv = cid; final String bid = bot.optString("id");
+                    ctx.b.core.db.tx(new Runnable() { public void run() {
+                        c2.b.tasks.insertMessage(conv, "system", null, "✨ " + note, null, c2.task.optString("id"), null, null, null, J.obj("bot_created", bid));
+                    } });
+                }
+                return J.obj("bot_id", bot.optString("id"), "handle", "@" + bot.optString("handle"), "tools", bot.optJSONArray("tools"),
+                        "workspace", ws.isEmpty() ? null : ctx.b.mind.projectDir(ws).getName(), "note", "Talk to it with bot.message or task.delegate.");
             }
         }).card(new Tools.Summarize() {
-            public JSONObject card(JSONObject a) { return Builtin.card("Create bot " + a.optString("name"), "adds a new persistent bot", ""); }
+            public JSONObject card(JSONObject a) {
+                return Builtin.card("Create bot “" + a.optString("name") + "”" + (a.optString("role_description").isEmpty() ? "" : " — " + J.truncate(a.optString("role_description"), 100)),
+                        "adds a new persistent bot" + (a.optString("workspace").isEmpty() ? "" : " to workspace " + a.optString("workspace")), "");
+            }
         }));
 
-        reg.register(new Spec("bot.message", "Send an asynchronous message to another bot (by handle). The reply arrives later as a new task.",
+        reg.register(new Spec("bot.update", "Change another bot's profile (the user approves): name, role, avatar, model or its soul.md. Tools and permissions cannot be changed by bots.",
+                Tools.obj(props("bot", S, "name", S, "role_description", S, "avatar", S, "model", S, "soul", S), "bot"), Tools.INTERNAL, "ask", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) throws Exception {
+                JSONObject target = resolveBot(ctx, a.optString("bot"));
+                JSONObject d = new JSONObject();
+                for (String k : new String[]{"name", "role_description", "avatar", "model"}) if (a.has(k)) J.put(d, k, a.opt(k));
+                try {
+                    if (d.length() > 0) ctx.b.bots.update(target.optString("id"), d);
+                    if (a.has("soul")) ctx.b.mind.setSoul(target.optString("id"), a.optString("soul"));
+                } catch (io.lowbot.core.ApiError e) { throw new ToolError(e.getMessage()); }
+                return J.obj("updated", "@" + target.optString("handle"), "fields", d.names() == null ? new JSONArray() : d.names(), "soul", a.has("soul"));
+            }
+        }).card(new Tools.Summarize() {
+            public JSONObject card(JSONObject a) {
+                StringBuilder f = new StringBuilder();
+                for (String k : new String[]{"name", "role_description", "avatar", "model", "soul"}) if (a.has(k)) f.append(f.length() > 0 ? ", " : "").append(k);
+                return Builtin.card("Change bot " + a.optString("bot") + " (" + f + ")", "changes another bot's profile", a.optString("bot"));
+            }
+        }));
+
+        reg.register(new Spec("bot.delete", "Delete another bot (always asks the user). Cancels its work and removes its memory files and routines. A bot cannot delete itself.",
+                Tools.obj(props("bot", S, "reason", S), "bot"), Tools.INTERNAL, "ask", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) throws Exception {
+                JSONObject target = resolveBot(ctx, a.optString("bot"));
+                if (target.optString("id").equals(ctx.bot.optString("id"))) throw new ToolError("A bot cannot delete itself.");
+                ctx.b.bots.delete(target.optString("id"));
+                return J.obj("deleted", "@" + target.optString("handle"), "name", target.optString("name"));
+            }
+        }).hard().card(new Tools.Summarize() {
+            public JSONObject card(JSONObject a) {
+                return Builtin.card("Delete bot " + a.optString("bot") + (a.optString("reason").isEmpty() ? "" : " — " + J.truncate(a.optString("reason"), 120)),
+                        "permanently removes the bot, its memory files and routines", a.optString("bot"));
+            }
+        }));
+
+        reg.register(new Spec("bot.message", "Write to another bot (by handle). It answers in this chat; the conversation continues asynchronously — use task.delegate with wait=true when you need its result before going on.",
                 Tools.obj(props("bot", S, "text", S), "bot", "text"), Tools.INTERNAL, "allow", new Tools.Executor() {
             public Object run(final Ctx ctx, final JSONObject a) throws Exception {
                 final JSONObject target = resolveBot(ctx, a.optString("bot"));

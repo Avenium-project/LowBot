@@ -1,12 +1,13 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FiBookOpen, FiCheckSquare, FiChevronLeft, FiClock, FiFile, FiInbox, FiMonitor, FiPlus, FiSettings, FiUsers, FiZap } from 'react-icons/fi';
+import { FiBookOpen, FiCheckSquare, FiChevronLeft, FiClock, FiFile, FiFolder, FiInbox, FiMonitor, FiPlus, FiSettings, FiUsers, FiZap } from 'react-icons/fi';
 import ChatList from './ChatList';
 import { api, downloadPath, isLocal } from '../../lib/v2/api';
 import { DICT, LangContext, detectLang, useT } from '../../lib/v2/i18n';
 import { BotEditor, GroupCreator } from './BotEditor';
 import Conversation from './Conversation';
 import ComputerView from './ComputerView';
+import WorkspacesPanel from './WorkspacesPanel';
 import InboxPanel from './InboxPanel';
 import SettingsPanel from './SettingsPanel';
 import SetupWizard from './SetupWizard';
@@ -193,12 +194,13 @@ function Shell() {
     computer: (botId) => <ComputerView ws={ws} botId={botId} />,
     files: () => <FilesPanel ws={ws} conversationId={active} />,
     routines: () => <RoutinesPanel ws={ws} />,
+    workspaces: () => <WorkspacesPanel ws={ws} onOpenConversation={(id) => { setPage(null); openConv(id); }} />,
     memory: () => <MemoryPanel ws={ws} />,
     skills: () => <SkillsPanel ws={ws} skills={skills} reloadSkills={reloadSkills} />,
     settings: () => <SettingsPanel ws={ws} />,
     search: () => <SearchPanel onOpenConversation={openConv} onOpenTask={openTask} />,
   };
-  const titles = { tasks: t('tasks'), inbox: t('inbox'), computer: t('computer'), files: t('files'), routines: t('routines'),
+  const titles = { workspaces: 'Workspaces', tasks: t('tasks'), inbox: t('inbox'), computer: t('computer'), files: t('files'), routines: t('routines'),
     memory: t('memory'), skills: t('skills'), settings: t('settings'), search: t('search') };
 
   const pageView = page && page.kind === 'bot' ? <BotEditor ws={ws} bot={page.data} onDone={() => setPage(null)} /> : page && (
@@ -217,6 +219,7 @@ function Shell() {
       <SheetItem icon={<FiInbox />} label={`${t('approvals')} · ${t('notifications')}`} badge={inboxCount} onClick={() => { setSheet(null); setPage({ kind: 'inbox' }); }} />
       <SheetItem icon={<FiCheckSquare />} label={t('tasks')} badge={activeCount} onClick={() => { setSheet(null); setPage({ kind: 'tasks' }); }} />
       <SheetItem icon={<FiMonitor />} label={t('computer')} onClick={() => { setSheet(null); setPage({ kind: 'computer' }); }} />
+      {isLocal() && <SheetItem icon={<FiFolder />} label="Workspaces" onClick={() => { setSheet(null); setPage({ kind: 'workspaces' }); }} />}
       <SheetItem icon={<FiClock />} label={t('routines')} onClick={() => { setSheet(null); setPage({ kind: 'routines' }); }} />
       <SheetItem icon={<FiBookOpen />} label={t('memory')} onClick={() => { setSheet(null); setPage({ kind: 'memory' }); }} />
       <SheetItem icon={<FiZap />} label={t('skills')} onClick={() => { setSheet(null); setPage({ kind: 'skills' }); }} />

@@ -136,6 +136,7 @@ public class MainActivity extends Activity implements Computer.Host {
     // ----------------------------------------------------------- takeover --
     // ------------------------------------------------- takeover (browser control) --
     private TextView navBack, navFwd, navReload, recordPill, takeoverStatus;
+    private LinearLayout blankPage;
     private android.widget.ProgressBar loadBar;
     private boolean recording;
 
@@ -183,6 +184,8 @@ public class MainActivity extends Activity implements Computer.Host {
         takeoverStatus.setTextColor(Color.rgb(251, 191, 36));
         takeoverStatus.setTextSize(13);
         takeoverStatus.setGravity(Gravity.CENTER);
+        takeoverStatus.setSingleLine(true);
+        takeoverStatus.setEllipsize(android.text.TextUtils.TruncateAt.END);
         takeoverStatus.setPadding(dp(16), dp(8), dp(16), dp(4));
         takeover.addView(takeoverStatus, new LinearLayout.LayoutParams(-1, -2));
 
@@ -221,8 +224,7 @@ public class MainActivity extends Activity implements Computer.Host {
                 if (takeoverSurface != null && !u.isEmpty()) {
                     if (!u.contains(".") || u.contains(" ")) u = "https://duckduckgo.com/?q=" + Uri.encode(u);
                     else if (!u.startsWith("http://") && !u.startsWith("https://")) u = "https://" + u;
-                    takeoverSurface.web.loadUrl(u);
-                    takeoverSurface.web.requestFocus();
+                    openInTakeover(u);
                     ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(v.getWindowToken(), 0);
                 }
                 return true;
@@ -247,6 +249,7 @@ public class MainActivity extends Activity implements Computer.Host {
         LinearLayout.LayoutParams page = new LinearLayout.LayoutParams(-1, 0, 1f);
         page.setMargins(dp(8), dp(4), dp(8), 0);
         takeover.addView(takeoverContent, page);
+        blankPage = buildBlankPage();
 
         // Bottom dock: record to teach + give back control.
         LinearLayout dock = new LinearLayout(this);
@@ -276,6 +279,51 @@ public class MainActivity extends Activity implements Computer.Host {
         return takeover;
     }
 
+    /** Start screen shown instead of a white rectangle while the bot's tab has nothing open. */
+    private LinearLayout buildBlankPage() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
+        l.setGravity(Gravity.CENTER);
+        l.setBackgroundColor(Color.rgb(31, 31, 31));
+        l.setPadding(dp(24), dp(24), dp(24), dp(24));
+        l.setClickable(true);
+        TextView title = new TextView(this);
+        title.setText("Nothing is open yet");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(20);
+        title.setGravity(Gravity.CENTER);
+        l.addView(title, new LinearLayout.LayoutParams(-2, -2));
+        TextView sub = new TextView(this);
+        sub.setText("Type an address or a search above, or start from one of these. Sign-ins you finish here stay in this bot's browser.");
+        sub.setTextColor(Color.rgb(161, 161, 170));
+        sub.setTextSize(14);
+        sub.setGravity(Gravity.CENTER);
+        sub.setPadding(0, dp(8), 0, dp(20));
+        l.addView(sub, new LinearLayout.LayoutParams(-1, -2));
+        String[][] picks = { {"Google", "https://www.google.com"}, {"DuckDuckGo", "https://duckduckgo.com"},
+                {"Gmail", "https://mail.google.com"}, {"GitHub", "https://github.com/login"} };
+        for (final String[] p : picks) {
+            TextView b = pill(p[0], Color.rgb(42, 42, 42), Color.WHITE, new View.OnClickListener() {
+                @Override public void onClick(View v) { openInTakeover(p[1]); }
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(220), dp(46));
+            lp.setMargins(0, dp(5), 0, dp(5));
+            l.addView(b, lp);
+        }
+        return l;
+    }
+
+    private void openInTakeover(String u) {
+        if (takeoverSurface == null) return;
+        blankPage.setVisibility(View.GONE);
+        urlField.setText(u);
+        takeoverSurface.web.loadUrl(u);
+        takeoverSurface.web.requestFocus();
+        ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(urlField.getWindowToken(), 0);
+    }
+
+    private static boolean isBlank(String url) { return url == null || url.isEmpty() || url.startsWith("about:"); }
+
     private void setRecording(boolean on) {
         recording = on;
         recordPill.setText(on ? "● Recording…" : "● Record");
@@ -288,6 +336,7 @@ public class MainActivity extends Activity implements Computer.Host {
     @Override public void pageChanged(Computer.Surface s, String url, int progress) {
         if (s != takeoverSurface) return;
         if (url != null && !urlField.hasFocus()) urlField.setText(url.startsWith("about:") ? "" : url);
+        if (url != null && !isBlank(url)) blankPage.setVisibility(View.GONE);
         loadBar.setProgress(progress);
         loadBar.setVisibility(progress >= 100 ? View.INVISIBLE : View.VISIBLE);
         navBack.setAlpha(s.web.canGoBack() ? 1f : 0.35f);
@@ -299,7 +348,14 @@ public class MainActivity extends Activity implements Computer.Host {
         if (s.web.getParent() instanceof ViewGroup) ((ViewGroup) s.web.getParent()).removeView(s.web);
         ((android.content.MutableContextWrapper) s.web.getContext()).setBaseContext(this);
         takeoverContent.addView(s.web, new FrameLayout.LayoutParams(-1, -1));
-        takeoverStatus.setText("● " + getString(R.string.you_control, s.botName().trim()) + " — sign in or finish the step, then give it back");
+        if (blankPage.getParent() instanceof ViewGroup) ((ViewGroup) blankPage.getParent()).removeView(blankPage);
+        takeoverContent.addView(blankPage, new FrameLayout.LayoutParams(-1, -1));
+        blankPage.setVisibility(isBlank(s.web.getUrl()) ? View.VISIBLE : View.GONE);
+        // A WebView moved between windows can keep a stale (white) frame until it is resumed and redrawn.
+        s.web.onResume();
+        s.web.resumeTimers();
+        s.web.invalidate();
+        takeoverStatus.setText("● " + getString(R.string.you_control, s.botName().trim()));
         setRecording(s.isRecording());
         pageChanged(s, s.web.getUrl(), 100);
         takeover.setVisibility(View.VISIBLE);
@@ -307,10 +363,7 @@ public class MainActivity extends Activity implements Computer.Host {
         takeover.setTranslationY(dp(40));
         takeover.setAlpha(0f);
         takeover.animate().translationY(0).alpha(1f).setDuration(220).start();
-        if (s.web.getUrl() == null || s.web.getUrl().startsWith("about:")) {
-            urlField.requestFocus();
-            ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).showSoftInput(urlField, 0);
-        } else s.web.requestFocus();
+        if (!isBlank(s.web.getUrl())) s.web.requestFocus();
     }
 
     @Override public void hideTakeover() {

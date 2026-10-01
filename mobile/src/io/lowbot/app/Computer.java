@@ -82,7 +82,10 @@ public final class Computer {
         Surface(String id, String botId, WebView web) { this.id = id; this.botId = botId; this.web = web; }
         public String botName() {
             JSONObject b = backend.bots.get(botId);
-            return b == null ? "" : b.optString("avatar") + " " + b.optString("name");
+            if (b == null) return "";
+            String av = b.optString("avatar"), name = b.optString("name");
+            // Shape avatars ("shape:drop:#ef2b3c") are drawn by the UI, never shown as text.
+            return av.isEmpty() || av.startsWith("shape:") || av.equals("\uD83E\uDD16") ? name : av + " " + name;
         }
         public boolean isRecording() { return recording; }
     }

@@ -249,7 +249,30 @@ public final class Router {
         // ----------------------------------------------------------- projects
         if (a.equals("projects")) {
             if (id == null && get) return Response.json(b.mind.projects());
+            if (id == null && post) return Response.json(b.mind.createWorkspace(body.optString("name"), body.optString("agents_md", ""), J.strings(body.optJSONArray("members"))));
+            if (sub == null && get) return Response.json(b.mind.workspace(id));
+            if (sub == null && patch) {
+                if (body.has("agents_md")) b.mind.setProjectRules(id, body.optString("agents_md"));
+                if (body.has("members")) b.mind.setMembers(id, J.strings(body.optJSONArray("members")));
+                return Response.json(b.mind.workspace(id));
+            }
+            if (sub == null && del) { b.mind.deleteWorkspace(id); return Response.json(J.obj("deleted", id)); }
+            if ("files".equals(sub) && get) return Response.json(b.mind.files(id, 500));
             if ("agents".equals(sub) && (post || patch)) { b.mind.setProjectRules(id, body.optString("content")); return Response.json(b.mind.projects()); }
+            if ("chat".equals(sub) && post) {
+                // The workspace's group chat: all members, bound to the workspace folder and rules.
+                JSONObject w = b.mind.workspace(id);
+                List<String> mem = J.strings(w.optJSONArray("members"));
+                if (mem.isEmpty()) throw new ApiError(422, "Add at least one bot to the workspace first.");
+                String existing = b.core.db.scalar("SELECT id FROM conversations WHERE kind = 'group' AND project = ? AND archived = 0 ORDER BY created_at LIMIT 1", w.optString("name"));
+                if (existing != null) {
+                    for (String mb : mem) if (b.core.db.one("SELECT 1 FROM memberships WHERE conversation_id = ? AND member_type = 'bot' AND member_id = ?", existing, mb) == null)
+                        b.tasks.addMember(existing, mb);
+                    return Response.json(b.tasks.getConversation(existing));
+                }
+                JSONObject c = b.tasks.createConversation("group", mem.size() > 12 ? mem.subList(0, 12) : mem, w.optString("name"));
+                return Response.json(b.tasks.updateConversation(c.optString("id"), J.obj("project", w.optString("name"))));
+            }
         }
 
         // ------------------------------------------------------------- skills

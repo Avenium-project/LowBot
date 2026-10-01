@@ -165,7 +165,105 @@ public final class Mind {
         File d = projectDir(project);
         d.mkdirs();
         write(new File(d, "AGENTS.md"), limit(content, PROJECT_MAX, "AGENTS.md") + "\n");
-        b.core.db.tx(new Runnable() { public void run() { b.core.emit("project.updated", null, null, null, null, null); } });
+        projectEvent();
+    }
+
+    // ------------------------------------------------- shared workspaces
+    // A workspace is a folder in the shared /workspace (workspace/<name>/) with its own
+    // AGENTS.md (rules every member follows), its files, and a list of member bots.
+    // Membership is kept in the database (not in the folder), so a bot cannot add itself
+    // to a workspace by writing a file.
+
+    public List<String> members(String project) {
+        List<String> out = new ArrayList<String>();
+        JSONArray a = J.parseArr(b.core.kvGet("ws_members:" + projectDir(project).getName()));
+        for (int i = 0; i < a.length(); i++) if (b.bots.get(a.optString(i)) != null && !out.contains(a.optString(i))) out.add(a.optString(i));
+        return out;
+    }
+
+    public void setMembers(String project, List<String> botIds) {
+        JSONArray a = new JSONArray();
+        for (String id : botIds) { if (b.bots.get(id) == null) throw new ApiError(422, "Unknown bot: " + id); boolean dup = false;
+            for (int i = 0; i < a.length(); i++) if (a.optString(i).equals(id)) dup = true;
+            if (!dup) a.put(id); }
+        b.core.kvSet("ws_members:" + projectDir(project).getName(), a.toString());
+        projectEvent();
+    }
+
+    public void addMember(String project, String botId) {
+        List<String> m = members(project);
+        if (m.contains(botId)) return;
+        m.add(botId);
+        setMembers(project, m);
+    }
+
+    public List<String> workspacesOf(String botId) {
+        List<String> out = new ArrayList<String>();
+        for (JSONObject p : projects()) if (members(p.optString("name")).contains(botId)) out.add(p.optString("name"));
+        return out;
+    }
+
+    public JSONObject createWorkspace(String name, String rules, List<String> memberIds) {
+        File d = projectDir(name);
+        if (d.isDirectory() && new File(d, "AGENTS.md").isFile() && !members(d.getName()).isEmpty())
+            throw new ApiError(409, "A workspace named " + d.getName() + " already exists.");
+        d.mkdirs();
+        if (rules != null && !rules.trim().isEmpty()) write(new File(d, "AGENTS.md"), limit(rules, PROJECT_MAX, "AGENTS.md") + "\n");
+        else if (!new File(d, "AGENTS.md").isFile()) write(new File(d, "AGENTS.md"), "# " + d.getName() + "\n\nShared rules for every bot in this workspace.\n");
+        List<String> m = members(d.getName());
+        for (String id : memberIds) if (!m.contains(id)) m.add(id);
+        setMembers(d.getName(), m);
+        return workspace(d.getName());
+    }
+
+    /** Removes the folder (files and AGENTS.md) and its membership. Chats bound to it are unbound. */
+    public void deleteWorkspace(String name) {
+        final File d = projectDir(name);
+        if (!d.isDirectory()) throw new ApiError(404, "Unknown workspace: " + name);
+        deleteTree(d);
+        b.core.kvSet("ws_members:" + d.getName(), null);
+        b.core.db.exec("UPDATE conversations SET project = NULL WHERE project = ?", d.getName());
+        projectEvent();
+    }
+
+    static void deleteTree(File f) {
+        File[] kids = f.listFiles();
+        if (kids != null) for (File k : kids) {
+            // never follow symlinks out of the workspace
+            try { if (k.getCanonicalPath().startsWith(f.getCanonicalPath() + File.separator)) deleteTree(k); else k.delete(); }
+            catch (Exception e) { k.delete(); }
+        }
+        f.delete();
+    }
+
+    public JSONArray files(String project, int max) {
+        JSONArray out = new JSONArray();
+        File root = projectDir(project);
+        collect(root, root, out, max);
+        return out;
+    }
+
+    private static void collect(File root, File dir, JSONArray out, int max) {
+        File[] fs = dir.listFiles();
+        if (fs == null) return;
+        Arrays.sort(fs);
+        for (File f : fs) {
+            if (out.length() >= max) return;
+            if (f.getName().startsWith(".")) continue;
+            String rel = f.getAbsolutePath().substring(root.getAbsolutePath().length() + 1);
+            if (f.isDirectory()) collect(root, f, out, max);
+            else out.put(J.obj("path", rel, "size", f.length(), "updated_at", J.iso(f.lastModified())));
+        }
+    }
+
+    public JSONObject workspace(String name) {
+        File d = projectDir(name);
+        if (!d.isDirectory()) throw new ApiError(404, "Unknown workspace: " + name);
+        JSONArray mem = new JSONArray();
+        for (String id : members(d.getName())) mem.put(id);
+        JSONArray fs = files(d.getName(), 500);
+        return J.obj("name", d.getName(), "agents_md", read(new File(d, "AGENTS.md")), "members", mem, "files_count", fs.length(),
+                "folder", d.getName() + "/", "updated_at", J.iso(d.lastModified()));
     }
 
     public List<JSONObject> projects() {
@@ -175,15 +273,23 @@ public final class Mind {
         Arrays.sort(ds);
         for (File d : ds) {
             if (!d.isDirectory() || d.getName().startsWith(".")) continue;
-            out.add(J.obj("name", d.getName(), "agents_md", read(new File(d, "AGENTS.md"))));
+            // Only folders that are workspaces (rules or members), not every folder a tool created.
+            if (!new File(d, "AGENTS.md").isFile() && b.core.kvGet("ws_members:" + d.getName()) == null) continue;
+            out.add(workspace(d.getName()));
         }
         return out;
     }
 
+    void projectEvent() {
+        b.core.db.tx(new Runnable() { public void run() { b.core.emit("project.updated", null, null, null, null, null); } });
+    }
+
     // ------------------------------------------------------------------ misc
     public JSONObject all(String botId) {
+        List<JSONObject> mine = new ArrayList<JSONObject>();
+        for (String w : workspacesOf(botId)) mine.add(workspace(w));
         return J.obj("soul", soul(botId), "agents", handoff(botId), "memories", Db.toArray(memories(botId)),
-                "projects", Db.toArray(projects()), "folder", "bots/" + botId);
+                "projects", Db.toArray(mine), "folder", "bots/" + botId);
     }
 
     public void copy(String fromBot, String toBot) {
@@ -214,8 +320,29 @@ public final class Mind {
         if (!h.isEmpty()) sb.append("=== agents.md (handoff from your previous session — continue from here) ===\n").append(h).append("\n\n");
         if (project != null && !project.isEmpty()) {
             String r = projectRules(project).trim();
-            sb.append("=== Current project: ").append(project).append(" (folder ").append(project).append("/ in the workspace) ===\n");
-            sb.append(r.isEmpty() ? "No AGENTS.md yet. Use project.update_rules to record how to work on this project." : "AGENTS.md:\n" + r).append("\n\n");
+            sb.append("=== Current workspace: ").append(project).append(" (shared folder ").append(project).append("/ — every member bot sees the same files and rules) ===\n");
+            sb.append(r.isEmpty() ? "No AGENTS.md yet. Use project.update_rules to record how to work in this workspace." : "AGENTS.md (shared rules — follow them):\n" + r).append("\n");
+            StringBuilder who = new StringBuilder();
+            for (String id : members(project)) {
+                JSONObject o = b.bots.get(id);
+                if (o != null && !id.equals(botId)) who.append(who.length() > 0 ? ", " : "").append("@").append(o.optString("handle"));
+            }
+            if (who.length() > 0) sb.append("Other members: ").append(who).append("\n");
+            JSONArray fs = files(project, 30);
+            if (fs.length() > 0) {
+                sb.append("Shared files:");
+                for (int i = 0; i < fs.length(); i++) sb.append(i == 0 ? " " : ", ").append(project).append("/").append(fs.optJSONObject(i).optString("path"));
+                if (fs.length() >= 30) sb.append(", …");
+                sb.append("\n");
+            }
+            sb.append("\n");
+        }
+        List<String> mine = workspacesOf(botId);
+        mine.remove(project == null ? "" : project);
+        if (!mine.isEmpty()) {
+            sb.append("=== Your other workspaces (project.use to switch) ===\n");
+            for (String w : mine) sb.append("- ").append(w).append(": ").append(J.truncate(projectRules(w).replaceAll("\\s+", " ").trim(), 160)).append("\n");
+            sb.append("\n");
         }
         List<JSONObject> mems = memories(botId);
         if (!mems.isEmpty()) {

@@ -10,6 +10,6 @@
     <string name="working_text">%1$d task(s) in progress</string>
     <string name="give_back">Give back control</string>
     <string name="record_teach">Record (teach)</string>
-    <string name="you_control">You control %1$s\'s browser</string>
+    <string name="you_control">You\'re in control of %1$s\'s browser</string>
     <string name="share_label">Send to a bot</string>
 </resources>
