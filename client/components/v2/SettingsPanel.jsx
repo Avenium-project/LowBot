@@ -163,6 +163,53 @@ function Policies({ ws }) {
 }
 
 // Grok Bot settings that apply to the phone-hosted backend.
+function fmtBytes(n) { return n > 1e9 ? `${(n / 1e9).toFixed(1)} GB` : n > 1e6 ? `${(n / 1e6).toFixed(0)} MB` : `${Math.round(n / 1e3)} KB`; }
+
+// The bots' Linux (Alpine via proot) on the phone: install, size, remove.
+function LinuxSettings({ tick }) {
+  const [st, setSt] = useState(null);
+  const [err, setErr] = useState('');
+  const [confirm, setConfirm] = useState(false);
+  const load = () => api('/linux').then(setSt).catch((e) => setErr(e.message));
+  useEffect(() => { load(); }, [tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (st?.state !== 'installing') return undefined;
+    const h = setInterval(load, 1000);
+    return () => clearInterval(h);
+  }, [st?.state]); // eslint-disable-line react-hooks/exhaustive-deps
+  const act = (path, method) => api(path, { method }).then(setSt).catch((e) => setErr(e.message));
+  if (!st) return err ? <Section title="Linux terminal"><div className="text-[13px] text-rose-400">{err}</div></Section> : null;
+  const pct = st.total ? Math.min(100, Math.round((st.progress / st.total) * 100)) : 0;
+  return (
+    <Section title="Linux terminal">
+      <div className="rounded-[22px] bg-[#1f1f1f] p-4 space-y-3">
+        <div className="text-[15px] leading-snug">Bots with the terminal switched on get their own Alpine Linux shell on this phone — install tools with <code>apk add</code> (python3, git, nodejs…). Shared files are in <code>/workspace</code>.</div>
+        {!st.available ? <div className="text-[14px] text-amber-400">This build does not include the Linux runtime (proot), so the terminal is unavailable.</div>
+          : st.state === 'installing' ? (
+            <div className="space-y-2">
+              <div className="text-[14px] text-zinc-300">Downloading Alpine Linux… {st.total ? `${pct}% of ${fmtBytes(st.total)}` : ''}</div>
+              <div className="h-2 rounded-full bg-[#2a2a2a] overflow-hidden"><div className="h-full bg-white transition-all" style={{ width: `${pct}%` }} /></div>
+            </div>)
+          : st.installed ? (
+            <div className="space-y-2">
+              <div className="text-[14px] text-emerald-400">● Installed · Alpine {st.version} · {fmtBytes(st.size_bytes)} · {st.arch}</div>
+              {st.sessions?.length > 0 && <div className="text-[13px] text-zinc-500">{st.sessions.length} shell{st.sessions.length === 1 ? '' : 's'} open — see Computer.</div>}
+              {confirm
+                ? <div className="flex gap-2"><Button kind="danger" onClick={() => { setConfirm(false); act('/linux', 'DELETE'); }}>Remove Linux and its files</Button><Button onClick={() => setConfirm(false)}>Cancel</Button></div>
+                : <Button kind="danger" small onClick={() => setConfirm(true)}>Remove</Button>}
+            </div>)
+          : (
+            <div className="space-y-2">
+              {st.state === 'failed' && <div className="text-[13px] text-rose-400">Install failed: {st.error}</div>}
+              <Button kind="primary" onClick={() => act('/linux/install', 'POST')}>Install Linux (about 3 MB download)</Button>
+            </div>)}
+        <div className="text-[12px] text-zinc-500 leading-snug">{st.network_note}</div>
+      </div>
+      {err && <div className="text-[13px] text-rose-400 mt-2">{err}</div>}
+    </Section>
+  );
+}
+
 function PhoneSettings() {
   const { lang } = useT();
   const pl = lang === 'pl';
@@ -216,6 +263,7 @@ export default function SettingsPanel({ ws }) {
         {ws.health && <div className="text-[13px] text-zinc-500 mt-2">schema v{ws.health.schema_version} · {ws.health.timezone} · {ws.health.capabilities.join(', ')} · runs ≤ {ws.health.limits.max_active_runs}, screens ≤ {ws.health.limits.max_active_surfaces}</div>}
       </Section>
       {isLocal() && <PhoneSettings />}
+      {isLocal() && <LinuxSettings tick={ws?.tick} />}
       <Integrations ws={ws} />
       <Providers ws={ws} />
       {!isLocal() && <Devices />}

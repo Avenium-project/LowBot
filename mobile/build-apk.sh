@@ -42,6 +42,8 @@ rm -rf "$OUT" && mkdir -p "$OUT"/{res,gen,classes,dex,assets/www}
 echo "• bundling web UI"
 cp -R "$ROOT/client/out/." "$OUT/assets/www/"
 rm -rf "$OUT/assets/www/alternatives"   # marketing pages are not needed in the app
+# Linux terminal: pinned Alpine rootfs (URL + SHA-256), if the runtime has been fetched.
+if [ -f "$HERE/linux-runtime/alpine.json" ]; then mkdir -p "$OUT/assets/linux" && cp "$HERE/linux-runtime/alpine.json" "$OUT/assets/linux/"; fi
 
 echo "• resources (aapt2)"
 "$AAPT2" compile --dir "$HERE/res" -o "$OUT/res/compiled.zip"
@@ -71,6 +73,14 @@ else
 fi
 cp "$OUT/base.apk" "$OUT/unsigned.apk"
 (cd "$OUT/dex" && zip -qj "$OUT/unsigned.apk" classes.dex)
+# Native executables for the Linux terminal (proot), stored uncompressed under lib/<abi>/.
+if [ -d "$HERE/jniLibs" ] && ls "$HERE"/jniLibs/*/libproot.so >/dev/null 2>&1; then
+  echo "• linux runtime (proot)"
+  rm -rf "$OUT/native" && mkdir -p "$OUT/native/lib" && cp -R "$HERE/jniLibs/." "$OUT/native/lib/"
+  (cd "$OUT/native" && zip -q -0 -r "$OUT/unsigned.apk" lib)
+else
+  echo "• linux runtime not present (mobile/jniLibs) — the terminal will report it as unavailable"
+fi
 
 if [ "$MODE" = "test" ]; then
   KS="$HERE/.keystore/test.jks"

@@ -35,6 +35,7 @@ public class LowBotApp extends Application {
     Backend backend;
     Router router;
     Computer computer;
+    Linux linux;
     final List<Core.EventListener> uiListeners = new CopyOnWriteArrayList<Core.EventListener>();
     final Handler main = new Handler(Looper.getMainLooper());
 
@@ -48,6 +49,15 @@ public class LowBotApp extends Application {
         router = new Router(backend);
         computer = Computer.get(this, backend);
         computer.register(backend.tools);
+        linux = new Linux(this, backend);
+        linux.register(backend.tools);
+        router.linux = new Router.LinuxApi() {
+            public JSONObject status() { return linux.status(); }
+            public JSONObject install() { return linux.install(); }
+            public void remove() { linux.remove(); }
+            public JSONObject log(String botId) { return linux.log(botId); }
+            public void reset(String botId) { linux.reset(botId); }
+        };
         final Mcp mcp = new Mcp(backend);
         backend.tools.addProvider(new Tools.DynamicProvider() {
             public List<Tools.Spec> specs(JSONObject bot) { return mcp.specs(bot); }

@@ -521,7 +521,7 @@ public final class Engine {
             if (r != null && J.glob(r.optString("tool"), spec.name)) effects.add(r.optString("effect"));
         }
         // Grok "Execution on Local Computer" setting for the phone terminal.
-        if (spec.name.equals("terminal.run")) {
+        if (spec.name.equals("terminal.run") || spec.name.equals("linux.run")) {
             String mode = b.core.kvGet("local_execution");
             if ("never".equals(mode)) effects.add("deny");
             else if ("always".equals(mode)) effects.add("allow");

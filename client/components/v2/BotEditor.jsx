@@ -291,6 +291,9 @@ export function BotEditor({ ws, bot: initial, onDone }) {
   const av = parseAvatar(f.avatar) || { shape: 'pill', color: bot ? colorFor(bot.id) : AVATAR_COLORS[9] };
   const conv = bot && ws.conversations.find((c) => c.kind === 'private' && c.default_bot_id === bot.id);
   const tabs = [['info', 'Info'], ['links', 'Links'], ['media', 'Media'], ['files', 'Files']];
+  const toolList = f.tools.split(',').map((x) => x.trim()).filter(Boolean);
+  const hasTerminal = toolList.includes('linux.*') || toolList.includes('linux.run');
+  const setTool = (_, name, on) => (on ? [...toolList.filter((x) => !x.startsWith('linux.')), name] : toolList.filter((x) => !x.startsWith('linux.'))).join(', ');
 
   return (
     <div className="fixed inset-0 z-40 bg-[#141414] flex flex-col lb-page-in">
@@ -371,6 +374,11 @@ export function BotEditor({ ws, bot: initial, onDone }) {
                 <Toggle on={f.notify} label="notify" onChange={(on) => update({ notify: on })} />
               </div>
               <Caption>{'Get notified when this Bot finishes or needs an answer'}</Caption>
+              <div className={cls(card, 'mt-5 flex items-center justify-between px-5 py-4')}>
+                <span className="text-[17px]">{'Linux terminal'}</span>
+                <Toggle on={hasTerminal} label="Linux terminal" onChange={(on) => update({ tools: setTool(f.tools, 'linux.*', on) })} />
+              </div>
+              <Caption>{'Lets this bot run commands in its own Linux on this phone (Settings → Linux terminal). Each command asks you first unless you change that in Settings.'}</Caption>
             </>}
 
             {bot && <div className="mt-5"><Row icon={<FiShare className="text-sky-400" />} label={<span className="text-sky-400">{'Share as template'}</span>} onClick={shareTemplate} right={<span />} /></div>}

@@ -31,6 +31,15 @@ public final class Router {
         void reset();
     }
 
+    /** The bots' Linux (proot + Alpine), implemented by the Android layer. */
+    public interface LinuxApi {
+        JSONObject status();
+        JSONObject install();
+        void remove();
+        JSONObject log(String botId);
+        void reset(String botId);
+    }
+
     public static final class Response {
         public int status = 200;
         public String type = "application/json";
@@ -56,6 +65,7 @@ public final class Router {
 
     final Backend b;
     public volatile ComputerApi computer;
+    public volatile LinuxApi linux;
     public volatile Mcp mcp;
 
     public Router(Backend b) { this.b = b; }
@@ -412,6 +422,22 @@ public final class Router {
                     : b.core.db.all("SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", qi(u, "limit", 200, 2000));
             for (JSONObject r : rows) { J.put(r, "summary", J.parse(r.optString("summary_json"))); r.remove("summary_json"); }
             return Response.json(rows);
+        }
+
+        // -------------------------------------------------------------- linux
+        if (a.equals("linux")) {
+            LinuxApi l = linux;
+            if (l == null) throw new ApiError(503, "Linux is not available.");
+            if (id == null && get) return Response.json(l.status());
+            if ("install".equals(id) && post) return Response.json(l.install());
+            if (id == null && del) { l.remove(); return Response.json(l.status()); }
+            if ("sessions".equals(id) && sub != null) {
+                // Read-only view of a bot's terminal, plus restart. Commands only run through the bots' approved tool calls.
+                String[] rest = p.length > 3 ? new String[]{sub, p[3]} : new String[]{sub};
+                b.bots.require(rest[0]);
+                if (rest.length == 1 && get) return Response.json(l.log(rest[0]));
+                if (rest.length == 2 && "reset".equals(rest[1]) && post) { l.reset(rest[0]); return Response.json(l.log(rest[0])); }
+            }
         }
 
         // ----------------------------------------------------------- computer
