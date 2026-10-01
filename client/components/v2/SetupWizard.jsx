@@ -87,8 +87,8 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
         <div className="flex justify-between items-center">
           <h1 className="text-lg font-semibold">{t('setupTitle')}</h1>
         </div>
-        {local && step === 2 && <div className="text-sm text-zinc-400">{'LowBot runs entirely on this phone — no server. Pick a model provider and paste your API key (e.g. xAI for Grok models, or OpenCode Go). The key is encrypted with the Android keystore.'}</div>}
-        <ol className="flex gap-1 text-[11px] text-zinc-500 flex-wrap">{steps.map((s, i) => s && <li key={s} className={i === step ? 'text-sky-300' : ''}>{local ? i - 1 : i + 1}. {s}{i < steps.length - 1 ? ' ›' : ''}</li>)}</ol>
+        {local && step === 2 && <div className="text-[15px] text-zinc-400">{'LowBot runs entirely on this phone — no server. Pick a model provider and paste your API key (e.g. xAI for Grok models, or OpenCode Go). The key is encrypted with the Android keystore.'}</div>}
+        <ol className="flex gap-1 text-[12px] text-zinc-500 flex-wrap">{steps.map((s, i) => s && <li key={s} className={i === step ? 'text-sky-400' : ''}>{local ? i - 1 : i + 1}. {s}{i < steps.length - 1 ? ' ›' : ''}</li>)}</ol>
         {step === 0 && <>
           <Field label={t('serverUrl')} hint={'Your LowBot server (use HTTPS outside your LAN).'}>
             <input className={inputCls} value={server} onChange={(e) => setServer(e.target.value)} placeholder="https://dots.example.com" inputMode="url" /></Field>
@@ -113,20 +113,20 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
             <Field label="API key"><input className={inputCls} type="password" autoComplete="off" value={prov.api_key} onChange={(e) => setProv({ ...prov, api_key: e.target.value })} /></Field>
           </>}
           <Field label={t('model')} hint={prov.kind === 'codex_cli' ? ('Optional — empty = your ChatGPT plan default.') : ('Exact model id at your provider (empty = first model the provider lists, after the test).')}><input className={inputCls} value={prov.default_model} onChange={(e) => setProv({ ...prov, default_model: e.target.value })} /></Field>
-          {prov.kind === 'scripted_mock' && <div className="text-xs text-amber-300">{t('mockWarning')}</div>}
+          {prov.kind === 'scripted_mock' && <div className="text-[13px] text-amber-400">{t('mockWarning')}</div>}
           <Button kind="primary" disabled={busy || (prov.kind === 'codex_cli' && !integ?.codex?.logged_in) || (prov.kind === 'chatgpt_oauth' && !integ?.chatgpt?.logged_in)} onClick={saveProvider}>{t('next')}</Button>
         </>}
         {step === 3 && <>
           <Button disabled={busy} onClick={runTest}>{t('testConnection')}</Button>
-          {test && <div className="text-xs space-y-1">{Object.entries(test.checks).map(([k, v]) => <div key={k}>{v.ok ? '✅' : '⚠️'} {k}: {v.error || v.detail || v.sample || ''}</div>)}
-            {test.is_mock && <div className="text-amber-300">{t('mockWarning')}</div>}</div>}
+          {test && <div className="text-[13px] space-y-1">{Object.entries(test.checks).map(([k, v]) => <div key={k}>{v.ok ? '✅' : '⚠️'} {k}: {v.error || v.detail || v.sample || ''}</div>)}
+            {test.is_mock && <div className="text-amber-400">{t('mockWarning')}</div>}</div>}
           <div className="flex gap-2"><Button onClick={() => setStep(2)}>{t('back')}</Button><Button kind="primary" onClick={() => setStep(4)}>{t('next')}</Button></div>
         </>}
         {step === 4 && <>
           <Field label={t('firstBot')}><input className={inputCls} value={botName} onChange={(e) => setBotName(e.target.value)} /></Field>
           <Button kind="primary" disabled={busy} onClick={createBot}>{t('done')}</Button>
         </>}
-        {err && <div className="text-sm text-rose-300 break-words">{err}</div>}
+        {err && <div className="text-[15px] text-rose-400 break-words">{err}</div>}
       </Card>
     </div>
   );

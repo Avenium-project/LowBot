@@ -41,17 +41,17 @@ function Providers({ ws }) {
           <Field label="API key" hint="Stored encrypted; never shown again."><input type="password" autoComplete="off" className={inputCls} value={form.api_key} onChange={(e) => setForm({ ...form, api_key: e.target.value })} /></Field>
         </>}
         <Field label={t('model')} hint="Exact model id from your provider (use Test connection to list models)."><input className={inputCls} value={form.default_model} onChange={(e) => setForm({ ...form, default_model: e.target.value })} /></Field>
-        {form.kind === 'scripted_mock' && <div className="text-xs text-amber-300">{t('mockWarning')}</div>}
+        {form.kind === 'scripted_mock' && <div className="text-[13px] text-amber-400">{t('mockWarning')}</div>}
         <Button kind="primary" onClick={save}>{t('save')}</Button>
-        {err && <div className="text-xs text-rose-300">{err}</div>}
+        {err && <div className="text-[13px] text-rose-400">{err}</div>}
       </Card>
       {data.profiles.map((p) => (
         <Card key={p.id} className="mb-2">
           <div className="flex justify-between flex-wrap gap-2">
-            <div><b>{p.name}</b> {data.default_profile_id === p.id && <span className="text-xs text-emerald-300">default</span>}
-              <div className="text-xs text-zinc-400">{p.kind} · {p.base_url || '—'} · {p.default_model || '—'} · key {p.api_key_configured ? '✓' : '✗'}</div>
-              {p.is_mock && <div className="text-xs text-amber-300">{t('mockWarning')}</div>}
-              <div className="text-xs text-zinc-500">tools: {String(p.capabilities?.tools ?? '?')} · vision: {String(p.capabilities?.vision ?? '?')} · streaming: {String(p.capabilities?.streaming ?? '?')}</div>
+            <div><b>{p.name}</b> {data.default_profile_id === p.id && <span className="text-[13px] text-emerald-400">default</span>}
+              <div className="text-[13px] text-zinc-400">{p.kind} · {p.base_url || '—'} · {p.default_model || '—'} · key {p.api_key_configured ? '✓' : '✗'}</div>
+              {p.is_mock && <div className="text-[13px] text-amber-400">{t('mockWarning')}</div>}
+              <div className="text-[13px] text-zinc-500">tools: {String(p.capabilities?.tools ?? '?')} · vision: {String(p.capabilities?.vision ?? '?')} · streaming: {String(p.capabilities?.streaming ?? '?')}</div>
             </div>
             <div className="flex gap-1 flex-wrap">
               <Button small onClick={() => test(p.id)}>{t('testConnection')}</Button>
@@ -59,7 +59,7 @@ function Providers({ ws }) {
               <Button small kind="danger" onClick={() => confirm('Delete?') && api(`/providers/${p.id}`, { method: 'DELETE' }).then(load)}>{t('delete')}</Button>
             </div>
           </div>
-          {tests[p.id] && <pre className="text-[11px] text-zinc-300 whitespace-pre-wrap mt-2 max-h-48 overflow-y-auto">{tests[p.id].running ? '…' : JSON.stringify(tests[p.id], null, 1)}</pre>}
+          {tests[p.id] && <pre className="text-[12px] text-zinc-300 whitespace-pre-wrap mt-2 max-h-48 overflow-y-auto">{tests[p.id].running ? '…' : JSON.stringify(tests[p.id], null, 1)}</pre>}
         </Card>
       ))}
     </Section>
@@ -91,16 +91,16 @@ function Mcp() {
           : <><input className={inputCls} placeholder="command (e.g. npx)" value={form.command} onChange={(e) => setForm({ ...form, command: e.target.value })} />
             <input className={inputCls} placeholder="args" value={form.args} onChange={(e) => setForm({ ...form, args: e.target.value })} /></>}
         <Button kind="primary" onClick={save}>{t('save')}</Button>
-        {err && <div className="text-xs text-rose-300">{err}</div>}
+        {err && <div className="text-[13px] text-rose-400">{err}</div>}
       </Card>
       {rows.map((c) => (
         <Card key={c.id} className="mb-2">
           <div className="flex justify-between gap-2 flex-wrap"><div><b>{c.name}</b> · {c.transport} · {c.last_status || 'not tested'}
-            <div className="text-xs text-zinc-400 break-all">{c.url || `${c.command} ${c.args.join(' ')}`}</div>
-            <div className="text-xs text-zinc-500">{c.tools.map((x) => x.name).join(', ')}</div></div>
+            <div className="text-[13px] text-zinc-400 break-all">{c.url || `${c.command} ${c.args.join(' ')}`}</div>
+            <div className="text-[13px] text-zinc-500">{c.tools.map((x) => x.name).join(', ')}</div></div>
             <div className="flex gap-1"><Button small onClick={() => api(`/mcp/connections/${c.id}/test`, { method: 'POST' }).then(load)}>{t('testConnection')}</Button>
               <Button small kind="danger" onClick={() => api(`/mcp/connections/${c.id}`, { method: 'DELETE' }).then(load)}>{t('delete')}</Button></div></div>
-          {c.logs.length > 0 && <details><summary className="text-xs text-zinc-500 cursor-pointer">logs</summary><pre className="text-[11px] whitespace-pre-wrap">{c.logs.join('\n')}</pre></details>}
+          {c.logs.length > 0 && <details><summary className="text-[13px] text-zinc-500 cursor-pointer">logs</summary><pre className="text-[12px] whitespace-pre-wrap">{c.logs.join('\n')}</pre></details>}
         </Card>
       ))}
     </Section>
@@ -122,15 +122,15 @@ function Devices() {
   return (
     <Section title={t('devices')} actions={<Button small kind="primary" onClick={pair}>{t('pairDevice')}</Button>}>
       {code && <Card className="mb-2 text-center">
-        <div className="text-xs text-zinc-400">{t('pairingCode')} · {t('expires')} {fmtTime(code.expires_at)}</div>
+        <div className="text-[13px] text-zinc-400">{t('pairingCode')} · {t('expires')} {fmtTime(code.expires_at)}</div>
         <div className="text-2xl font-mono tracking-widest my-1 select-text">{code.code}</div>
-        <div className="text-xs text-zinc-400 break-all select-text">{code.server_url}</div>
+        <div className="text-[13px] text-zinc-400 break-all select-text">{code.server_url}</div>
         {qr && <img src={qr} alt="QR" className="mx-auto mt-2 rounded bg-white p-1" />}
-        <div className="text-[11px] text-zinc-500 mt-1">One-time code. It does not contain the owner token.</div>
+        <div className="text-[12px] text-zinc-500 mt-1">One-time code. It does not contain the owner token.</div>
       </Card>}
       {rows.length ? rows.map((d) => (
-        <div key={d.id} className="flex justify-between items-center py-2 border-b border-white/5 text-sm gap-2">
-          <span>{d.platform === 'android' ? '📱' : d.platform === 'windows' ? '💻' : '🔌'} {d.name} <span className="text-xs text-zinc-500">· {fmtTime(d.last_seen_at)}</span>{d.revoked_at && <span className="text-xs text-rose-300"> revoked</span>}</span>
+        <div key={d.id} className="flex justify-between items-center py-2 border-b border-white/5 text-[15px] gap-2">
+          <span>{d.platform === 'android' ? '📱' : d.platform === 'windows' ? '💻' : '🔌'} {d.name} <span className="text-[13px] text-zinc-500">· {fmtTime(d.last_seen_at)}</span>{d.revoked_at && <span className="text-[13px] text-rose-400"> revoked</span>}</span>
           {!d.revoked_at && <Button small kind="danger" onClick={() => api(`/devices/${d.id}`, { method: 'DELETE' }).then(load)}>{t('revoke')}</Button>}
         </div>)) : <Empty />}
     </Section>
@@ -146,7 +146,7 @@ function Policies({ ws }) {
   if (!data) return null;
   return (
     <Section title={t('policies')}>
-      <label className="flex items-center gap-2 text-sm mb-2"><input type="checkbox" checked={data.hierarchy_enforced}
+      <label className="flex items-center gap-2 text-[15px] mb-2"><input type="checkbox" checked={data.hierarchy_enforced}
         onChange={(e) => api('/settings/hierarchy', { method: 'POST', body: { enforced: e.target.checked } }).then(load)} /> {t('hierarchy')}</label>
       <Card className="mb-2 flex gap-2 flex-wrap">
         <input className={inputCls} placeholder="tool pattern, e.g. http.* or mcp.github.*" value={rule.tool} onChange={(e) => setRule({ ...rule, tool: e.target.value })} />
@@ -154,10 +154,10 @@ function Policies({ ws }) {
         <select className={inputCls} value={rule.bot_id} onChange={(e) => setRule({ ...rule, bot_id: e.target.value })}><option value="">all bots</option>{ws.bots.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
         <Button kind="primary" onClick={() => api('/policies', { method: 'POST', body: { ...rule, bot_id: rule.bot_id || null } }).then(load)}>{t('save')}</Button>
       </Card>
-      {data.rules.map((r) => <div key={r.id} className="text-sm flex justify-between py-1"><span><code>{r.tool_pattern}</code> → <b>{r.effect}</b> {r.bot_id ? `(${ws.bots.find((b) => b.id === r.bot_id)?.name})` : ''}</span>
+      {data.rules.map((r) => <div key={r.id} className="text-[15px] flex justify-between py-1"><span><code>{r.tool_pattern}</code> → <b>{r.effect}</b> {r.bot_id ? `(${ws.bots.find((b) => b.id === r.bot_id)?.name})` : ''}</span>
         <Button small kind="ghost" onClick={() => api(`/policies/${r.id}`, { method: 'DELETE' }).then(load)}>✕</Button></div>)}
-      <details className="mt-2"><summary className="text-xs text-zinc-400 cursor-pointer">Tool defaults</summary>
-        <div className="text-xs">{data.tools.map((x) => <div key={x.name}><code>{x.name}</code> · {x.effect_kind} · default <b>{x.default}</b>{x.hard_ask ? ' · always ask' : ''}</div>)}</div></details>
+      <details className="mt-2"><summary className="text-[13px] text-zinc-400 cursor-pointer">Tool defaults</summary>
+        <div className="text-[13px]">{data.tools.map((x) => <div key={x.name}><code>{x.name}</code> · {x.effect_kind} · default <b>{x.default}</b>{x.hard_ask ? ' · always ask' : ''}</div>)}</div></details>
     </Section>
   );
 }
@@ -170,21 +170,21 @@ function PhoneSettings() {
   const [err, setErr] = useState('');
   useEffect(() => { api('/settings').then(setSt).catch((e) => setErr(e.message)); }, []);
   const save = (patch) => api('/settings', { method: 'POST', body: patch }).then(setSt).catch((e) => setErr(e.message));
-  if (!st) return err ? <div className="text-xs text-rose-300">{err}</div> : null;
+  if (!st) return err ? <div className="text-[13px] text-rose-400">{err}</div> : null;
   return (
     <Section title={'Safety & execution'}>
-      <label className="flex items-start gap-2 text-sm mb-3"><input type="checkbox" className="mt-1" checked={st.auto_review} onChange={(e) => save({ auto_review: e.target.checked })} />
-        <span><b>Auto Review</b><br /><span className="text-xs text-zinc-400">{'A separate model call rates actions that need approval: allows obvious ones, denies harmful ones, leaves the rest to you. Payments, publishing and other always-ask actions always come to you.'}</span></span></label>
+      <label className="flex items-start gap-2 text-[15px] mb-3"><input type="checkbox" className="mt-1" checked={st.auto_review} onChange={(e) => save({ auto_review: e.target.checked })} />
+        <span><b>Auto Review</b><br /><span className="text-[13px] text-zinc-400">{'A separate model call rates actions that need approval: allows obvious ones, denies harmful ones, leaves the rest to you. Payments, publishing and other always-ask actions always come to you.'}</span></span></label>
       <Field label={'Execution on this phone (terminal)'}>
         <select className={inputCls} value={st.local_execution} onChange={(e) => save({ local_execution: e.target.value })}>
           <option value="ask">{'Ask every time'}</option>
           <option value="always">{'Always allow'}</option>
           <option value="never">{'Never allow'}</option>
         </select></Field>
-      <label className="flex items-start gap-2 text-sm my-3"><input type="checkbox" className="mt-1" checked={st.allow_private_network} onChange={(e) => save({ allow_private_network: e.target.checked })} />
+      <label className="flex items-start gap-2 text-[15px] my-3"><input type="checkbox" className="mt-1" checked={st.allow_private_network} onChange={(e) => save({ allow_private_network: e.target.checked })} />
         <span>{'Let bots reach your local network (LAN)'}</span></label>
       <Field label={'Routine time zone'}><input className={inputCls} defaultValue={st.timezone} onBlur={(e) => e.target.value !== st.timezone && save({ timezone: e.target.value })} /></Field>
-      {err && <div className="text-xs text-rose-300">{err}</div>}
+      {err && <div className="text-[13px] text-rose-400">{err}</div>}
     </Section>
   );
 }
@@ -199,9 +199,9 @@ function Admin() {
   const exportAudit = () => downloadPath('/audit/export', 'lowbot-audit.jsonl');
   return (
     <Section title={t('backup')} actions={<><Button small onClick={() => api('/admin/backup', { method: 'POST' }).then((r) => { setLast(r); load(); if (r.artifact_id) downloadPath(`/artifacts/${r.artifact_id}/download`, r.name); })}>{t('create')}</Button><Button small onClick={exportAudit}>Audit export</Button></>}>
-      {last?.note && <div className="text-xs text-amber-300 mb-1">{last.name}: {last.note}</div>}
-      {b && <div className="text-xs text-zinc-400 space-y-1">{b.backups.map((x) => <div key={x.name}>{x.name} · {(x.size / 1024).toFixed(0)} KB</div>)}<div>{b.restore}</div><div className="text-amber-300">{b.note}</div></div>}
-      {usage && <details className="mt-2"><summary className="text-xs text-zinc-400 cursor-pointer">Usage</summary><pre className="text-[11px] whitespace-pre-wrap">{JSON.stringify(usage, null, 1)}</pre></details>}
+      {last?.note && <div className="text-[13px] text-amber-400 mb-1">{last.name}: {last.note}</div>}
+      {b && <div className="text-[13px] text-zinc-400 space-y-1">{b.backups.map((x) => <div key={x.name}>{x.name} · {(x.size / 1024).toFixed(0)} KB</div>)}<div>{b.restore}</div><div className="text-amber-400">{b.note}</div></div>}
+      {usage && <details className="mt-2"><summary className="text-[13px] text-zinc-400 cursor-pointer">Usage</summary><pre className="text-[12px] whitespace-pre-wrap">{JSON.stringify(usage, null, 1)}</pre></details>}
     </Section>
   );
 }
@@ -213,7 +213,7 @@ export default function SettingsPanel({ ws }) {
         <input className={inputCls} placeholder={'Your name (initial shown in the app)'}
           defaultValue={typeof window !== 'undefined' ? window.localStorage.getItem('opendots.name') || '' : ''}
           onChange={(e) => window.localStorage.setItem('opendots.name', e.target.value)} />
-        {ws.health && <div className="text-xs text-zinc-500 mt-2">schema v{ws.health.schema_version} · {ws.health.timezone} · {ws.health.capabilities.join(', ')} · runs ≤ {ws.health.limits.max_active_runs}, screens ≤ {ws.health.limits.max_active_surfaces}</div>}
+        {ws.health && <div className="text-[13px] text-zinc-500 mt-2">schema v{ws.health.schema_version} · {ws.health.timezone} · {ws.health.capabilities.join(', ')} · runs ≤ {ws.health.limits.max_active_runs}, screens ≤ {ws.health.limits.max_active_surfaces}</div>}
       </Section>
       {isLocal() && <PhoneSettings />}
       <Integrations ws={ws} />

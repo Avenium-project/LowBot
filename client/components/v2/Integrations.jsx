@@ -23,12 +23,12 @@ export function CodexConnect({ status, onChanged, compact }) {
     return () => clearInterval(h);
   }, [login, onChanged]);
   if (!codex.installed) {
-    return <div className="text-sm text-zinc-400">{'Codex CLI is not installed on the server.'}</div>;
+    return <div className="text-[15px] text-zinc-400">{'Codex CLI is not installed on the server.'}</div>;
   }
   if (codex.logged_in) {
     return (
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="text-sm text-emerald-400">● {'Connected to ChatGPT'}</span>
+        <span className="text-[15px] text-emerald-400">● {'Connected to ChatGPT'}</span>
         {!compact && <Button small onClick={() => api('/integrations/codex/logout', { method: 'POST' }).then(onChanged)}>{'Sign out'}</Button>}
       </div>
     );
@@ -37,22 +37,22 @@ export function CodexConnect({ status, onChanged, compact }) {
   try { host = login?.url ? new URL(login.url).host : ''; } catch { host = ''; }
   return (
     <div className="space-y-3">
-      <div className="text-sm text-zinc-400">{'You sign in on OpenAI’s page with your ChatGPT account. LowBot never sees your password. Usage follows your ChatGPT plan limits (not API credits).'}</div>
+      <div className="text-[15px] text-zinc-400">{'You sign in on OpenAI’s page with your ChatGPT account. LowBot never sees your password. Usage follows your ChatGPT plan limits (not API credits).'}</div>
       {login?.url ? (
         <div className="rounded-2xl bg-black/30 p-4 text-center space-y-2">
-          <div className="text-xs text-zinc-400">{'One-time code'}</div>
+          <div className="text-[13px] text-zinc-400">{'One-time code'}</div>
           <div className="text-3xl font-mono tracking-widest select-all">{login.code || '—'}</div>
-          <div className="text-xs text-zinc-400">{'Domain'}: <b className="text-amber-300">{host}</b></div>
+          <div className="text-[13px] text-zinc-400">{'Domain'}: <b className="text-amber-400">{host}</b></div>
           <a href={login.url} target="_blank" rel="noopener noreferrer"
             className="inline-block rounded-full bg-white text-black px-5 py-2.5 font-medium">{'Open sign-in page'}</a>
-          <div className="text-xs text-zinc-500">{'Waiting for confirmation…'}</div>
+          <div className="text-[13px] text-zinc-500">{'Waiting for confirmation…'}</div>
         </div>
       ) : (
         <button onClick={start} disabled={busy} className="w-full rounded-full bg-white text-black py-3 font-medium disabled:opacity-50">
           {'Sign in with ChatGPT'}</button>
       )}
-      {login?.status === 'failed' && <div className="text-xs text-rose-300 whitespace-pre-wrap">{(login.output || []).join('\n')}</div>}
-      {err && <div className="text-xs text-rose-300">{err}</div>}
+      {login?.status === 'failed' && <div className="text-[13px] text-rose-400 whitespace-pre-wrap">{(login.output || []).join('\n')}</div>}
+      {err && <div className="text-[13px] text-rose-400">{err}</div>}
     </div>
   );
 }
@@ -84,21 +84,21 @@ export function ChatGptPhone({ status, onChanged, ws, compact }) {
       <div className="font-semibold">ChatGPT</div>
       {c.logged_in ? (
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="text-sm text-emerald-400">● {'Connected'}{c.account ? ` · ${c.account}` : ''}{c.plan ? ` · ${c.plan}` : ''}</span>
+          <span className="text-[15px] text-emerald-400">● {'Connected'}{c.account ? ` · ${c.account}` : ''}{c.plan ? ` · ${c.plan}` : ''}</span>
           {!compact && <Button small onClick={() => api('/integrations/chatgpt/logout', { method: 'POST' }).then(onChanged)}>{'Sign out'}</Button>}
         </div>
       ) : (
         <>
-          <div className="text-sm text-zinc-400">{'Sign in with your ChatGPT (Plus/Pro) account on OpenAI’s page — LowBot never sees your password and usage counts against your plan limits. Works like OpenCode’s sign-in: through the undocumented Codex backend.'}</div>
-          <label className="flex items-start gap-2 text-xs text-amber-300"><input type="checkbox" className="mt-0.5" checked={accept} onChange={(e) => setAccept(e.target.checked)} />
+          <div className="text-[15px] text-zinc-400">{'Sign in with your ChatGPT (Plus/Pro) account on OpenAI’s page — LowBot never sees your password and usage counts against your plan limits. Works like OpenCode’s sign-in: through the undocumented Codex backend.'}</div>
+          <label className="flex items-start gap-2 text-[13px] text-amber-400"><input type="checkbox" className="mt-0.5" checked={accept} onChange={(e) => setAccept(e.target.checked)} />
             <span>{'I understand this is unofficial: OpenAI may change or block it at any time, and I use it at my own risk.'}</span></label>
-          {waiting ? <div className="text-sm text-zinc-400">{'Finish signing in in the browser, then come back…'}</div>
+          {waiting ? <div className="text-[15px] text-zinc-400">{'Finish signing in in the browser, then come back…'}</div>
             : <button onClick={start} disabled={!accept} className="w-full rounded-full bg-white text-black py-3 font-medium disabled:opacity-40">{'Sign in with ChatGPT'}</button>}
-          {c.login?.status === 'failed' && <div className="text-xs text-rose-300">{(c.login.output || []).join(' ')}</div>}
+          {c.login?.status === 'failed' && <div className="text-[13px] text-rose-400">{(c.login.output || []).join(' ')}</div>}
         </>
       )}
-      {err && <div className="text-xs text-rose-300">{err}</div>}
-      {c.logged_in && !compact && <div className="text-xs text-zinc-500">{'A “ChatGPT (your account)” profile was added under Models — pick it in a bot’s settings or make it the default.'}</div>}
+      {err && <div className="text-[13px] text-rose-400">{err}</div>}
+      {c.logged_in && !compact && <div className="text-[13px] text-zinc-500">{'A “ChatGPT (your account)” profile was added under Models — pick it in a bot’s settings or make it the default.'}</div>}
     </Card>
   );
 }
@@ -136,12 +136,12 @@ export default function Integrations({ ws }) {
         {status?.codex?.logged_in && (
           <Button kind="primary" onClick={() => addProfile({ kind: 'codex_cli', name: 'ChatGPT (Codex)' })}>
             {'Add ChatGPT model profile'}</Button>)}
-        <div className="text-xs text-zinc-500">{'A bot on the ChatGPT profile answers through Codex (its own sandbox, no LowBot tools). Any bot can also use codex.run for coding tasks in its workspace, always after your approval.'}</div>
+        <div className="text-[13px] text-zinc-500">{'A bot on the ChatGPT profile answers through Codex (its own sandbox, no LowBot tools). Any bot can also use codex.run for coding tasks in its workspace, always after your approval.'}</div>
       </Card>)}
       <Card className="space-y-3">
         <div className="font-semibold">OpenCode Go</div>
-        <div className="text-sm text-zinc-400">{'OpenCode Go subscription (open coding models). Get the API key from the opencode.ai console. Stored encrypted.'}</div>
-        <div className="text-sm">{status?.opencode?.go_key_configured ? <span className="text-emerald-400">● {'Key saved'}</span> : <span className="text-zinc-500">○ {'No key'}</span>}</div>
+        <div className="text-[15px] text-zinc-400">{'OpenCode Go subscription (open coding models). Get the API key from the opencode.ai console. Stored encrypted.'}</div>
+        <div className="text-[15px]">{status?.opencode?.go_key_configured ? <span className="text-emerald-400">● {'Key saved'}</span> : <span className="text-zinc-500">○ {'No key'}</span>}</div>
         <Field label={'OpenCode Go API key'}><input type="password" autoComplete="off" className={inputCls} value={key} onChange={(e) => setKey(e.target.value)} /></Field>
         <Field label={'Model (OpenCode Go id)'} hint={'Exact id from the OpenCode Go model list; Test connection lists them.'}>
           <input className={inputCls} value={model} onChange={(e) => setModel(e.target.value)} /></Field>
@@ -151,10 +151,10 @@ export default function Integrations({ ws }) {
             onClick={() => addProfile({ kind: 'opencode_go', name: `OpenCode Go · ${model}`, default_model: model })}>
             {'Add OpenCode Go profile'}</Button>
         </div>
-        <div className="text-xs text-zinc-500">{'The OpenCode Go profile works with all LowBot tools (browser, delegation, approvals).'
+        <div className="text-[13px] text-zinc-500">{'The OpenCode Go profile works with all LowBot tools (browser, delegation, approvals).'
             + (status?.opencode?.installed ? ' OpenCode CLI is installed too — opencode.run tool (shell and web disabled).' : '')}</div>
       </Card>
-      {msg && <div className="text-sm text-amber-200 mt-2">{msg}</div>}
+      {msg && <div className="text-[15px] text-amber-200 mt-2">{msg}</div>}
     </Section>
   );
 }

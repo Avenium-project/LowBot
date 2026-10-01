@@ -12,7 +12,7 @@ import SettingsPanel from './SettingsPanel';
 import SetupWizard from './SetupWizard';
 import TasksPanel, { TaskDetail } from './TasksPanel';
 import { MemoryPanel, RoutinesPanel, SkillsPanel } from './AutomationPanels';
-import { Empty, Section, cls, fmtTime, inputCls } from './ui';
+import { Empty, Section, botLabel, cls, fmtTime, inputCls } from './ui';
 import { useWorkspace } from './useWorkspace';
 
 function FilesPanel({ ws, conversationId }) {
@@ -22,8 +22,8 @@ function FilesPanel({ ws, conversationId }) {
   return (
     <Section title="Files">
       {rows.length ? rows.map((a) => (
-        <button key={a.id} onClick={() => dl(a)} className="w-full text-left py-2 px-1 hover:bg-white/5 rounded text-sm min-h-[44px]">
-          📄 {a.name} <span className="text-xs text-zinc-500">v{a.version} · {(a.size / 1024).toFixed(1)} KB · {fmtTime(a.created_at)}{a.task_id ? ' · task' : ''}</span>
+        <button key={a.id} onClick={() => dl(a)} className="w-full text-left py-2 px-1 hover:bg-white/5 rounded text-[15px] min-h-[44px]">
+          📄 {a.name} <span className="text-[13px] text-zinc-500">v{a.version} · {(a.size / 1024).toFixed(1)} KB · {fmtTime(a.created_at)}{a.task_id ? ' · task' : ''}</span>
         </button>)) : <Empty />}
     </Section>
   );
@@ -40,10 +40,10 @@ function SearchPanel({ onOpenConversation, onOpenTask }) {
   return (
     <Section title="Search">
       <input autoFocus className={inputCls} value={q} onChange={(e) => setQ(e.target.value)} placeholder="…" />
-      {r && <div className="mt-2 space-y-2 text-sm">
-        {r.bots.map((b) => <div key={b.id}>{b.avatar} {b.name} @{b.handle}</div>)}
+      {r && <div className="mt-2 space-y-2 text-[15px]">
+        {r.bots.map((b) => <div key={b.id}>{botLabel(b)} @{b.handle}</div>)}
         {r.messages.map((m) => <button key={m.id} className="block text-left w-full hover:bg-white/5 rounded p-1" onClick={() => onOpenConversation(m.conversation_id)}>💬 {m.text}</button>)}
-        {r.tasks.map((x) => <button key={x.id} className="block text-left w-full hover:bg-white/5 rounded p-1" onClick={() => onOpenTask(x.id)}>✅ {x.title} <span className="text-xs text-zinc-500">{x.status}</span></button>)}
+        {r.tasks.map((x) => <button key={x.id} className="block text-left w-full hover:bg-white/5 rounded p-1" onClick={() => onOpenTask(x.id)}>✅ {x.title} <span className="text-[13px] text-zinc-500">{x.status}</span></button>)}
         {r.memories.map((m) => <div key={m.id} className="text-zinc-400">🧠 {m.content}</div>)}
         {r.artifacts.map((a) => <div key={a.id}>📄 {a.name}</div>)}
       </div>}
@@ -84,7 +84,7 @@ export default function Workspace() {
           <span className="lb-blob-busy inline-flex"><svg viewBox="0 0 100 64" width="96" height="62" aria-hidden="true"><rect x="2" y="2" width="96" height="60" rx="30" fill="#3b82f6" />
             <g transform="rotate(-12 54 20)"><rect className="lb-blob-eye" x="52" y="14" width="5" height="12" rx="2.5" fill="#1c1917" /></g>
             <g transform="rotate(12 66 20)"><rect className="lb-blob-eye" x="64" y="14" width="5" height="12" rx="2.5" fill="#1c1917" /></g></svg></span>
-          <span className="text-zinc-500 text-sm tracking-wide">LowBot</span>
+          <span className="text-zinc-500 text-[15px] tracking-wide">LowBot</span>
         </div>)
         : authed === 'ok' ? <Shell /> : <SetupWizard startAt={authed === 'empty' ? 2 : 0} onReady={() => { setAuthed('ok'); }} />}
     </LangContext.Provider>

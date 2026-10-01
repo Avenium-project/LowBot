@@ -1,16 +1,17 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { api, saveBlob } from '../../lib/v2/api';
+import { api, isLocal, saveBlob } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
-import { Button, Card, Empty, Field, Section, TaskBadge, fmtTime, inputCls } from './ui';
+import { BotBlob, Button, Card, Empty, Field, Section, TaskBadge, Toggle, botLabel, fmtTime, inputCls } from './ui';
 
 export function RoutinesPanel({ ws }) {
   const { t } = useT();
   const [list, setList] = useState([]);
-  const [form, setForm] = useState({ bot_id: '', name: '', schedule: 'codziennie o 8:00', prompt: '', kind: 'schedule' });
+  const [form, setForm] = useState({ bot_id: '', name: '', schedule: 'every day at 8:00', prompt: '', kind: 'schedule' });
   const [preview, setPreview] = useState(null);
   const [msg, setMsg] = useState('');
   const [hist, setHist] = useState({});
+  const [open, setOpen] = useState(false);
   const load = () => api('/routines').then(setList);
   useEffect(() => { load(); }, [ws.tick]);
   useEffect(() => {
@@ -27,48 +28,55 @@ export function RoutinesPanel({ ws }) {
         schedule: form.kind === 'schedule' ? form.schedule : undefined, kind: form.kind === 'event' ? 'event' : undefined,
       } });
       if (r.webhook_secret) setMsg(`Webhook: POST ${r.webhook_path} — secret (shown once): ${r.webhook_secret}`);
-      load();
+      load(); setOpen(false);
     } catch (e) { setMsg(e.message); }
   };
   const bot = (id) => ws.bots.find((b) => b.id === id);
+  const local = isLocal();
+  const form_ = open && (
+    <Card className="space-y-3 mb-4">
+      <Field label="Bot"><select className={inputCls} value={form.bot_id} onChange={(e) => setForm({ ...form, bot_id: e.target.value })}>
+        {ws.bots.map((b) => <option key={b.id} value={b.id}>{botLabel(b)}</option>)}</select></Field>
+      <Field label={t('name')}><input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+      {!local && <Field label="Trigger"><select className={inputCls} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
+        <option value="schedule">{t('schedule')}</option><option value="event">Webhook</option></select></Field>}
+      {form.kind === 'schedule' && <Field label={t('schedule')} hint="e.g. “every day at 8:00”, “weekdays at 7:30”, “every 15 minutes”, or cron">
+        <input className={inputCls} value={form.schedule} onChange={(e) => setForm({ ...form, schedule: e.target.value })} /></Field>}
+      {preview && !preview.error && <div className="text-[13px] text-zinc-500 px-1">{preview.schedule.kind === 'cron' ? `cron: ${preview.schedule.cron}` : 'once'} · {preview.timezone}<br />{t('nextRuns')}: {preview.next_runs_local.slice(0, 3).join(' · ')}</div>}
+      {preview?.error && <div className="text-[13px] text-rose-400 px-1">{preview.error}</div>}
+      <Field label={t('prompt')}><textarea className={`${inputCls} h-24`} value={form.prompt} onChange={(e) => setForm({ ...form, prompt: e.target.value })} /></Field>
+      <div className="flex gap-2"><Button kind="primary" onClick={create}>{t('create')}</Button><Button onClick={() => setOpen(false)}>{t('cancel')}</Button></div>
+    </Card>
+  );
   return (
     <div>
-      <Section title={t('routines')}>
-        <Card className="space-y-2 mb-3">
-          <Field label="Bot"><select className={inputCls} value={form.bot_id} onChange={(e) => setForm({ ...form, bot_id: e.target.value })}>
-            {ws.bots.map((b) => <option key={b.id} value={b.id}>{b.avatar} {b.name}</option>)}</select></Field>
-          <Field label={t('name')}><input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-          <Field label="Trigger"><select className={inputCls} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
-            <option value="schedule">{t('schedule')}</option><option value="event">Webhook</option></select></Field>
-          {form.kind === 'schedule' && <Field label={t('schedule')} hint="np. „codziennie o 8:00”, „w dni robocze o 7:30”, „co 15 minut”, cron">
-            <input className={inputCls} value={form.schedule} onChange={(e) => setForm({ ...form, schedule: e.target.value })} /></Field>}
-          {preview && !preview.error && <div className="text-xs text-zinc-400">{preview.schedule.kind === 'cron' ? `cron: ${preview.schedule.cron}` : 'once'} · {preview.timezone}<br />{t('nextRuns')}: {preview.next_runs_local.join(' · ')}</div>}
-          {preview?.error && <div className="text-xs text-rose-300">{preview.error}</div>}
-          <Field label={t('prompt')}><textarea className={inputCls} value={form.prompt} onChange={(e) => setForm({ ...form, prompt: e.target.value })} /></Field>
-          <Button kind="primary" onClick={create}>{t('create')}</Button>
-          {msg && <div className="text-xs text-amber-200 break-all select-text">{msg}</div>}
-        </Card>
-        {list.length ? list.map((r) => (
-          <Card key={r.id} className="mb-2">
-            <div className="flex justify-between gap-2 flex-wrap">
-              <div><b>{r.name}</b> · {bot(r.bot_id)?.name} · <span className={r.enabled ? 'text-emerald-300' : 'text-zinc-500'}>{r.enabled ? t('enabled') : t('disabled')}</span>
-                <div className="text-xs text-zinc-400">{r.kind === 'event' ? 'webhook' : (r.schedule.cron || r.schedule.at)} · {r.timezone}</div>
-                {r.preview?.length > 0 && <div className="text-xs text-zinc-500">{t('nextRuns')}: {r.preview.join(' · ')}</div>}
+      <Section title={t('routines')} actions={!open && <Button small kind="primary" onClick={() => setOpen(true)}>+ New routine</Button>}>
+        {form_}
+        {msg && <div className="text-[13px] text-amber-400 break-all select-text mb-3 px-1 whitespace-pre-wrap">{msg}</div>}
+        {list.length ? <div className="space-y-3">{list.map((r) => (
+          <Card key={r.id}>
+            <div className="flex items-start gap-3">
+              <BotBlob bot={bot(r.bot_id)} size={40} />
+              <div className="flex-1 min-w-0">
+                <div className="text-[17px] font-medium truncate">{r.name}</div>
+                <div className="text-[13px] text-zinc-500">{bot(r.bot_id)?.name} · {r.kind === 'event' ? 'webhook' : (r.schedule.source || r.schedule.cron || r.schedule.at)}</div>
+                {r.enabled && r.preview?.length > 0 && <div className="text-[13px] text-zinc-500">Next: {r.preview[0]}</div>}
               </div>
-              <div className="flex gap-1 flex-wrap">
-                <Button small onClick={() => api(`/routines/${r.id}`, { method: 'PATCH', body: { enabled: !r.enabled } }).then(load)}>{r.enabled ? t('pause') : t('resume')}</Button>
-                <Button small onClick={() => api(`/routines/${r.id}/simulate`, { method: 'POST' }).then((s) => setMsg(JSON.stringify(s, null, 1)))}>{t('simulate')}</Button>
-                <Button small kind="primary" onClick={() => api(`/routines/${r.id}/test-run`, { method: 'POST' }).then(load)}>{t('testRun')}</Button>
-                <Button small onClick={() => api(`/routines/${r.id}/history`).then((h) => setHist({ ...hist, [r.id]: h }))}>{t('history')}</Button>
-                <Button small kind="danger" onClick={() => confirm('Delete?') && api(`/routines/${r.id}`, { method: 'DELETE' }).then(load)}>{t('delete')}</Button>
-              </div>
+              <Toggle on={r.enabled} label={r.name} onChange={(on) => api(`/routines/${r.id}`, { method: 'PATCH', body: { enabled: on } }).then(load)} />
             </div>
-            {hist[r.id] && <div className="mt-2 text-xs space-y-1">{hist[r.id].map((h) => (
-              <div key={h.id} className="flex gap-2 flex-wrap"><span>{fmtTime(h.scheduled_for || h.created_at)}</span><span>{h.trigger}</span>
-                <TaskBadge status={h.task_status || h.status} /><span className="text-zinc-400 truncate max-w-[50%]">{h.result_text || h.task_error || h.error}</span>
-                <span className="text-zinc-500">cost {Number(h.cost || 0).toFixed(4)}</span></div>))}</div>}
+            <div className="flex gap-2 flex-wrap mt-3">
+              <Button small onClick={() => api(`/routines/${r.id}/test-run`, { method: 'POST' }).then(load)}>{t('testRun')}</Button>
+              <Button small onClick={() => api(`/routines/${r.id}/simulate`, { method: 'POST' }).then((x) => setMsg(`${x.prompt}\n${t('nextRuns')}: ${x.next_runs_local.join(' · ')}`))}>{t('simulate')}</Button>
+              <Button small onClick={() => (hist[r.id] ? setHist({ ...hist, [r.id]: null }) : api(`/routines/${r.id}/history`).then((h) => setHist({ ...hist, [r.id]: h })))}>{t('history')}</Button>
+              <Button small kind="danger" onClick={() => confirm('Delete?') && api(`/routines/${r.id}`, { method: 'DELETE' }).then(load)}>{t('delete')}</Button>
+            </div>
+            {hist[r.id] && <div className="lb-rise mt-3 space-y-2">{hist[r.id].length ? hist[r.id].map((h) => (
+              <div key={h.id} className="flex items-center gap-2 text-[13px]"><TaskBadge status={h.task_status || h.status} />
+                <span className="text-zinc-400">{fmtTime(h.scheduled_for || h.created_at)} · {h.trigger}</span>
+                <span className="text-zinc-500 truncate flex-1">{h.result_text || h.task_error || h.error}</span></div>))
+              : <div className="text-[13px] text-zinc-500">No runs yet</div>}</div>}
           </Card>
-        )) : <Empty />}
+        ))}</div> : !open && <Empty>No routines yet — tap “New routine”.</Empty>}
       </Section>
     </div>
   );
@@ -95,8 +103,8 @@ export function MemoryPanel({ ws }) {
       </Card>
       {rows.length ? rows.map((m) => (
         <Card key={m.id} className="mb-2">
-          <div className="text-xs text-zinc-500">{m.scope}{m.bot_id ? ` · ${ws.bots.find((b) => b.id === m.bot_id)?.name || m.bot_id}` : ''} · {m.source} · {fmtTime(m.updated_at)}</div>
-          <div className="text-sm whitespace-pre-wrap select-text">{m.content}</div>
+          <div className="text-[13px] text-zinc-500">{m.scope}{m.bot_id ? ` · ${ws.bots.find((b) => b.id === m.bot_id)?.name || m.bot_id}` : ''} · {m.source} · {fmtTime(m.updated_at)}</div>
+          <div className="text-[15px] whitespace-pre-wrap select-text">{m.content}</div>
           <div className="flex gap-2 mt-1">
             <Button small onClick={() => { const c = prompt('Edit', m.content); if (c != null) api(`/memories/${m.id}`, { method: 'PATCH', body: { content: c } }).then(load); }}>{t('edit')}</Button>
             <Button small kind="danger" onClick={() => api(`/memories/${m.id}`, { method: 'DELETE' }).then(load)}>{t('delete')}</Button>
@@ -136,19 +144,19 @@ export function SkillsPanel({ ws, skills, reloadSkills }) {
                 <Button small onClick={() => { const v = prompt('Instructions', s.instructions); if (v != null) api(`/skills/${s.id}`, { method: 'PATCH', body: { instructions: v } }).then(reloadSkills); }}>{t('edit')}</Button>
                 <Button small kind="danger" onClick={() => api(`/skills/${s.id}`, { method: 'DELETE' }).then(reloadSkills)}>{t('delete')}</Button>
               </div></div>
-            <pre className="text-xs text-zinc-400 whitespace-pre-wrap max-h-32 overflow-y-auto">{s.instructions}</pre>
+            <pre className="text-[13px] text-zinc-400 whitespace-pre-wrap max-h-32 overflow-y-auto">{s.instructions}</pre>
           </Card>
         ))}
       </Section>
       <Section title="Teach a task">
         <Card className="space-y-2">
-          <div className="text-xs text-zinc-400">Turns the tool steps of a finished run into an editable DRAFT skill. Sensitive values are redacted and typed text becomes inputs. Test the draft on safe data.</div>
+          <div className="text-[13px] text-zinc-400">Turns the tool steps of a finished run into an editable DRAFT skill. Sensitive values are redacted and typed text becomes inputs. Test the draft on safe data.</div>
           <input className={inputCls} placeholder="run id (from task details)" value={teach.run_id} onChange={(e) => setTeach({ ...teach, run_id: e.target.value })} />
           <input className={inputCls} placeholder={t('name')} value={teach.name} onChange={(e) => setTeach({ ...teach, name: e.target.value })} />
-          <label className="text-sm flex gap-2 items-center"><input type="checkbox" checked={teach.consent} onChange={(e) => setTeach({ ...teach, consent: e.target.checked })} /> I consent to using this recording</label>
+          <label className="text-[15px] flex gap-2 items-center"><input type="checkbox" checked={teach.consent} onChange={(e) => setTeach({ ...teach, consent: e.target.checked })} /> I consent to using this recording</label>
           <Button disabled={!teach.consent} onClick={() => api('/skills/teach', { method: 'POST', body: teach }).then(reloadSkills).catch((e) => setMsg(e.message))}>{t('create')}</Button>
         </Card>
-        {msg && <div className="text-xs text-rose-300">{msg}</div>}
+        {msg && <div className="text-[13px] text-rose-400">{msg}</div>}
       </Section>
     </div>
   );

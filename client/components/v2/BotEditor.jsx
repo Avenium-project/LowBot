@@ -6,18 +6,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FiChevronLeft, FiChevronRight, FiFileText, FiMoreHorizontal, FiPlus, FiShare, FiCpu } from 'react-icons/fi';
 import { api, downloadPath, isLocal, saveBlob } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
-import { AVATAR_COLORS, BotBlob, Button, Field, SHAPES, Section, ShapeIcon, cls, colorFor, inputCls, parseAvatar, shortTime } from './ui';
+import { Toggle, AVATAR_COLORS, BotBlob, Button, Field, SHAPES, Section, ShapeIcon, botLabel, cls, colorFor, inputCls, parseAvatar, shortTime } from './ui';
 
 const card = 'rounded-[22px] bg-[#1f1f1f]';
-
-function Toggle({ on, onChange, label }) {
-  return (
-    <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)}
-      className={cls('relative h-8 w-14 rounded-full transition-colors duration-200', on ? 'bg-white' : 'bg-[#3a3a3c]')}>
-      <span className={cls('absolute top-1 h-6 w-6 rounded-full transition-all duration-200 ease-out', on ? 'left-7 bg-black' : 'left-1 bg-zinc-400')} />
-    </button>
-  );
-}
 
 function Row({ icon, label, onClick, right }) {
   return (
@@ -409,7 +400,7 @@ export function GroupCreator({ ws, onDone }) {
       <input className={`${inputCls} mb-2`} placeholder={t('name')} value={title} onChange={(e) => setTitle(e.target.value)} />
       <div className="max-h-64 overflow-y-auto">{ws.bots.map((b) => (
         <label key={b.id} className="flex items-center gap-2 py-1.5 text-sm min-h-[40px]"><input type="checkbox" checked={sel.includes(b.id)}
-          onChange={(e) => setSel(e.target.checked ? [...sel, b.id] : sel.filter((x) => x !== b.id))} />{b.avatar} {b.name} <span className="text-xs text-zinc-500">@{b.handle}</span></label>))}</div>
+          onChange={(e) => setSel(e.target.checked ? [...sel, b.id] : sel.filter((x) => x !== b.id))} />{botLabel(b)} <span className="text-xs text-zinc-500">@{b.handle}</span></label>))}</div>
       {err && <div className="text-xs text-rose-300">{err}</div>}
       <div className="flex gap-2 mt-2"><Button kind="primary" disabled={!sel.length} onClick={create}>{t('create')}</Button>{onDone && <Button onClick={() => onDone()}>{t('cancel')}</Button>}</div>
     </Section>

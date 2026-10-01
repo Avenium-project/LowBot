@@ -2,9 +2,9 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **2.3.0** — English-only UI; bot memory as Markdown files (soul.md, handoff agents.md instead of
-  context compaction, memories/*.md, project AGENTS.md). SHA-256:
-  `27175f97801e85c23a647b5a58d1bf8cad0ab401d619832563f116b86a66e9cc`
+- Version **2.4.0** — one consistent design across all screens (borderless cards, pill buttons, grey section
+  labels, bot characters everywhere); English-only; bot memory files. SHA-256:
+  `ad77bfcae9c2fdbda8f77c82ecb52535eee9689006814f212824205d3b69bb7c`
 - Android 8.0+ (API 26). Podpis kluczem testowym — instaluje się jako aktualizacja poprzedniej wersji
   z tego katalogu. Instalacja spoza Sklepu Play: zezwól przeglądarce/menedżerowi plików na
   „instalowanie nieznanych aplikacji”.

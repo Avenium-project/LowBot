@@ -4,30 +4,32 @@ import { useT } from '../../lib/v2/i18n';
 
 export function cls(...xs) { return xs.filter(Boolean).join(' '); }
 
+// One visual language everywhere (matches the chat and bot profile screens):
+// borderless #1f1f1f cards with 22px radius, pill buttons, grey section labels.
 export function Button({ children, onClick, kind = 'default', small, disabled, type = 'button', title, className }) {
-  const base = 'lb-press inline-flex items-center justify-center gap-1 rounded-lg font-medium transition disabled:opacity-40 disabled:cursor-not-allowed';
-  const size = small ? 'px-2 py-1 text-xs min-h-[32px]' : 'px-3 py-2 text-sm min-h-[40px]';
+  const base = 'lb-press inline-flex items-center justify-center gap-1.5 rounded-full font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
+  const size = small ? 'px-3.5 text-[14px] min-h-[36px]' : 'px-5 text-[15px] min-h-[44px]';
   const kinds = {
-    default: 'bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-white/10',
-    primary: 'bg-blue-600 hover:bg-blue-500 text-white',
-    danger: 'bg-rose-700 hover:bg-rose-600 text-white',
+    default: 'bg-[#2a2a2a] hover:bg-[#333] text-zinc-100',
+    primary: 'bg-white hover:bg-zinc-200 text-black',
+    danger: 'bg-[#2a2a2a] hover:bg-rose-950 text-rose-400',
     ghost: 'hover:bg-white/5 text-zinc-300',
-    success: 'bg-emerald-700 hover:bg-emerald-600 text-white',
+    success: 'bg-emerald-500 hover:bg-emerald-400 text-black',
   };
-  return <button type={type} title={title} disabled={disabled} onClick={onClick} className={cls(base, size, kinds[kind], className)}>{children}</button>;
+  return <button type={type} title={title} disabled={disabled} onClick={onClick} className={cls(base, size, kinds[kind] || kinds.default, className)}>{children}</button>;
 }
 
 export function Field({ label, children, hint }) {
   return (
-    <label className="block text-sm">
-      <span className="block text-zinc-400 mb-1">{label}</span>
+    <label className="block">
+      <span className="block text-[13px] text-zinc-500 mb-1.5 px-1">{label}</span>
       {children}
-      {hint && <span className="block text-xs text-zinc-500 mt-1">{hint}</span>}
+      {hint && <span className="block text-[12px] text-zinc-500 mt-1.5 px-1 leading-snug">{hint}</span>}
     </label>
   );
 }
 
-export const inputCls = 'w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500';
+export const inputCls = 'w-full rounded-2xl bg-[#2a2a2a] border border-transparent px-4 py-3 text-[16px] text-zinc-100 placeholder:text-zinc-500 outline-none transition-colors focus:border-white/20';
 
 export function StatusDot({ status }) {
   const { t } = useT();
@@ -45,24 +47,30 @@ export function StatusDot({ status }) {
 }
 
 export function Card({ children, className }) {
-  return <div className={cls('rounded-xl border border-white/10 bg-zinc-900/70 p-3', className)}>{children}</div>;
+  return <div className={cls('lb-rise rounded-[22px] bg-[#1f1f1f] p-4', className)}>{children}</div>;
 }
 
 export function Empty({ children }) {
   const { t } = useT();
-  return <div className="text-sm text-zinc-500 p-4 text-center">{children || t('empty')}</div>;
+  return <div className="text-[15px] text-zinc-500 py-10 px-4 text-center">{children || t('empty')}</div>;
 }
 
 export function Section({ title, actions, children }) {
   return (
-    <section className="mb-5">
-      <div className="flex items-center justify-between mb-2 gap-2">
-        <h3 className="text-sm font-semibold text-zinc-200">{title}</h3>
+    <section className="mb-6">
+      {(title || actions) && <div className="flex items-center justify-between mb-2 gap-2 min-h-[36px]">
+        <h3 className="text-[14px] text-zinc-500 px-2">{title}</h3>
         <div className="flex gap-2 flex-wrap justify-end">{actions}</div>
-      </div>
+      </div>}
       {children}
     </section>
   );
+}
+
+/** Plain bot name for <select> options and inline text (avatars are drawn, never printed). */
+export function botLabel(bot) {
+  if (!bot) return '';
+  return /^shape:/.test(bot.avatar || '') || !bot.avatar || bot.avatar === '🤖' ? bot.name : `${bot.avatar} ${bot.name}`;
 }
 
 export function TaskBadge({ status }) {
@@ -73,7 +81,7 @@ export function TaskBadge({ status }) {
     cancelled: 'bg-zinc-800 text-zinc-400', running: 'bg-sky-900/60 text-sky-300', queued: 'bg-zinc-800 text-zinc-300',
     unknown_outcome: 'bg-rose-900/60 text-rose-200',
   }[status] || 'bg-amber-900/50 text-amber-200';
-  return <span className={cls('rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap', c)}>{label}</span>;
+  return <span className={cls('rounded-full px-2.5 py-1 text-[12px] font-medium whitespace-nowrap', c)}>{label}</span>;
 }
 
 export function fmtTime(iso) {
@@ -161,3 +169,13 @@ export function shortTime(iso) {
   if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
+
+export function Toggle({ on, onChange, label }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)}
+      className={cls('relative h-8 w-14 rounded-full transition-colors duration-200', on ? 'bg-white' : 'bg-[#3a3a3c]')}>
+      <span className={cls('absolute top-1 h-6 w-6 rounded-full transition-all duration-200 ease-out', on ? 'left-7 bg-black' : 'left-1 bg-zinc-400')} />
+    </button>
+  );
+}
+
