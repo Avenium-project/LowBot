@@ -198,7 +198,8 @@ public class SelfTest extends BroadcastReceiver {
         check(lastBotMessage(b, cid).optString("text").equals("[mock] hello rotation"), "bot continues after the handoff");
 
         // 7c. an empty model answer is retried once, then reported clearly (never "(no response)")
-        api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "say nothing"));
+        String cidEmpty = api(r, "POST", "/api/v2/bots/" + helper.optString("id") + "/conversation", null).optString("id");
+        api(r, "POST", "/api/v2/conversations/" + cidEmpty + "/messages", J.obj("text", "say nothing"));
         b.engine.drain(30000);
         check(b.core.db.count("SELECT COUNT(*) FROM messages WHERE text = '(no response)'") == 0
                 && b.core.db.count("SELECT COUNT(*) FROM messages WHERE author_type = 'system' AND text LIKE '%empty answer%'") == 1, "empty answer reported, not '(no response)'");
