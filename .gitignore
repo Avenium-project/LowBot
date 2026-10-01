@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 client/node_modules/
 client/package-lock.json
 
@@ -47,3 +46,4 @@ desktop/src-tauri/target/
 desktop/src-tauri/gen/
 desktop/node_modules/
 mobile/node_modules/
+deploy/.env

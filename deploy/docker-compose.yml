@@ -1,0 +1,50 @@
+# Self-hosted Open Dots: API/worker/scheduler + HTTPS reverse proxy.
+#   cp deploy/.env.example deploy/.env  # edit DOMAIN, APP_AUTH_TOKEN, APP_ENCRYPTION_KEY
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
+# Data lives in named volumes; back up `opendots-data` AND your encryption key.
+services:
+  opendots:
+    build: { context: .., dockerfile: Dockerfile }
+    image: open-dots:local
+    restart: unless-stopped
+    environment:
+      APP_AUTH_TOKEN: ${APP_AUTH_TOKEN:?set a long random owner token}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?generate a Fernet key}
+      PUBLIC_SERVER_URL: https://${DOMAIN}
+      CORS_ORIGINS: https://${DOMAIN}
+      AUTH_COOKIE_SECURE: "1"
+      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Europe/Warsaw}
+      MAX_ACTIVE_RUNS: ${MAX_ACTIVE_RUNS:-4}
+      MAX_ACTIVE_SURFACES: ${MAX_ACTIVE_SURFACES:-2}
+      ALLOW_PRIVATE_NETWORK: "0"
+    volumes:
+      - opendots-data:/data
+    # No published port: only the proxy can reach the API.
+    expose: ["8000"]
+    read_only: true
+    tmpfs: ["/tmp:size=512m"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    shm_size: "512m"            # Chromium
+    mem_limit: ${MEM_LIMIT:-3g}
+    cpus: ${CPUS:-2.0}
+    pids_limit: 1024
+    # Never mount the Docker socket or a home directory into this service.
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?set your domain}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      opendots: { condition: service_healthy }
+
+volumes:
+  opendots-data:
+  caddy-data:
+  caddy-config:

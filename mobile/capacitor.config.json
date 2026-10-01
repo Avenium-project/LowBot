@@ -1,0 +1,14 @@
+{
+  "appId": "io.lowbot.opendots",
+  "appName": "Open Dots",
+  "webDir": "../client/out",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": []
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  }
+}

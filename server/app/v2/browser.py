@@ -382,7 +382,21 @@ class BrowserBroker:
 
 
 # =================================================================== tools ===
+def browser_available() -> bool:
+    """Only advertise the capability when Playwright AND a Chromium build exist."""
+    import importlib.util
+    from pathlib import Path
+    if os.getenv("BROWSER_DISABLED") == "1" or importlib.util.find_spec("playwright") is None:
+        return False
+    if os.getenv("BROWSER_EXECUTABLE"):
+        return Path(os.environ["BROWSER_EXECUTABLE"]).exists()
+    root = Path(os.getenv("PLAYWRIGHT_BROWSERS_PATH") or Path.home() / ".cache" / "ms-playwright")
+    return root.exists() and any(root.glob("chromium*"))
+
+
 def register_browser(runtime) -> None:
+    if not browser_available():
+        raise RuntimeError("Playwright/Chromium not installed")
     broker = BrowserBroker(runtime)
     runtime.services["browser"] = broker
     runtime.services["capabilities"].add("browser")

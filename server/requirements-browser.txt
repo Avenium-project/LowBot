@@ -1,0 +1,2 @@
+# Optional: real browser computer surfaces (Playwright + Chromium).
+playwright>=1.50,<2

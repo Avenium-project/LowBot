@@ -1,0 +1,3 @@
+-r requirements.txt
+-r requirements-browser.txt
+pytest>=8

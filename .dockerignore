@@ -1,0 +1,8 @@
+**/node_modules
+**/.next
+client/out
+**/__pycache__
+**/.pytest_cache
+desktop/src-tauri/target
+mobile/android
+.git

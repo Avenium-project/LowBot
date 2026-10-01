@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import NativeRedirect from '../components/v2/NativeRedirect';
 
 const alternatives = [
   ['openai-dots', 'OpenAI Dots'],
@@ -14,6 +15,7 @@ const alternatives = [
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#09090b] text-zinc-100">
+      <NativeRedirect />
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <Link href="/" className="text-lg font-semibold">Open Dots</Link>
         <nav className="flex items-center gap-5 text-sm text-zinc-300">

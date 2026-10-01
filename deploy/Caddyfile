@@ -1,0 +1,13 @@
+{$DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+	}
+	# SSE must not be buffered.
+	reverse_proxy opendots:8000 {
+		flush_interval -1
+	}
+}

@@ -1,0 +1,72 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Install
+        working-directory: server
+        run: |
+          pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+      - name: Unit + acceptance tests (deterministic, scripted mock provider)
+        working-directory: server
+        run: python -m pytest -q tests tests/v2
+
+  client-and-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: client/package-lock.json }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Build static UI
+        working-directory: client
+        run: npm ci && npm run lint && npm run build:export
+      - name: Phone (360 px) end-to-end test
+        working-directory: server
+        env: { E2E_SCREENSHOTS: "${{ github.workspace }}/e2e-shots" }
+        run: |
+          pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+          python -m pytest -q tests/e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: e2e-screenshots, path: e2e-shots }
+
+  live-providers:
+    # Real model integration. Skipped (reported as skipped, never green-washed)
+    # when the repository has no provider secrets configured.
+    runs-on: ubuntu-latest
+    env:
+      LIVE_PROVIDER_KIND: ${{ vars.LIVE_PROVIDER_KIND }}
+      LIVE_PROVIDER_BASE_URL: ${{ vars.LIVE_PROVIDER_BASE_URL }}
+      LIVE_PROVIDER_MODEL: ${{ vars.LIVE_PROVIDER_MODEL }}
+      LIVE_PROVIDER_API_KEY: ${{ secrets.LIVE_PROVIDER_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - working-directory: server
+        run: pip install -r requirements-dev.txt && python -m pytest -q -rs tests/live
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --build-arg WITH_BROWSER=1 -t open-dots:ci .
+      - name: Smoke test hardened container
+        run: |
+          docker run -d --name od --read-only --tmpfs /tmp --cap-drop ALL -e APP_AUTH_TOKEN=ci-token-0123456789 \
+            -e APP_ENCRYPTION_KEY=$(python3 -c "import base64,os;print(base64.urlsafe_b64encode(os.urandom(32)).decode())") \
+            -p 8000:8000 open-dots:ci
+          for i in $(seq 1 30); do curl -fs localhost:8000/api/v2/health && break; sleep 2; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/api/v2/bots)" = 401
+          curl -fs localhost:8000/bots/ > /dev/null

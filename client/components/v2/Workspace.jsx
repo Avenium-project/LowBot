@@ -59,6 +59,21 @@ export default function Workspace() {
   const t = useCallback((k) => DICT[lang][k] || DICT.en[k] || k, [lang]);
   const ctx = useMemo(() => ({ lang, t, setLang }), [lang, t, setLang]);
 
+  // Deep link from a scanned pairing QR: opendots://pair?server=...&code=...
+  useEffect(() => {
+    const appPlugin = window.Capacitor?.Plugins?.App;
+    if (!appPlugin) return undefined;
+    const sub = appPlugin.addListener('appUrlOpen', ({ url }) => {
+      try {
+        const u = new URL(url);
+        if (u.protocol === 'opendots:' && u.host === 'pair') {
+          window.location.replace(`/bots/?server=${encodeURIComponent(u.searchParams.get('server') || '')}&code=${encodeURIComponent(u.searchParams.get('code') || '')}`);
+        }
+      } catch { /* ignore malformed links */ }
+    });
+    return () => { sub?.then?.((h) => h.remove()); };
+  }, []);
+
   const check = useCallback(() => api('/bots').then((b) => setAuthed(b.length ? 'ok' : 'empty')).catch(() => setAuthed('no')), []);
   useEffect(() => { check(); const h = () => setAuthed('no'); window.addEventListener('opendots:auth-required', h); return () => window.removeEventListener('opendots:auth-required', h); }, [check]);
 
