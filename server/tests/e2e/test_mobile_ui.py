@@ -105,7 +105,7 @@ def test_M_phone_flow(server):
         assert sel(page.get_by_placeholder("Ask Assistant")) == "text"         # input: selectable
         # Bot profile (Grok-style): character, model/provider, instructions, routines
         page.locator("header button").nth(1).click()
-        expect(page.get_by_text("Character")).to_be_visible()
+        expect(page.get_by_text("Character", exact=True)).to_be_visible()
         page.get_by_role("button", name="triangle").click()
         expect(page.get_by_text("Saved")).to_be_visible(timeout=5000)
         assert api(server, "/bots")[0]["avatar"].startswith("shape:triangle:")
