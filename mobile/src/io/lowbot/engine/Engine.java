@@ -159,7 +159,8 @@ public final class Engine {
             try { Thread.sleep(50); } catch (InterruptedException e) { return; }
             boolean runnable = db.count("SELECT COUNT(*) FROM runs r JOIN bots b ON b.id = r.bot_id WHERE b.paused = 0 AND (r.status IN ('queued','running') "
                     + "OR (r.status = 'retry_scheduled' AND r.not_before <= ?))", J.nowIso()) > 0;
-            if (!runnable && inFlight.get() == 0) return;
+            boolean retrySoon = db.count("SELECT COUNT(*) FROM runs WHERE status = 'retry_scheduled' AND not_before <= ?", J.iso(deadline)) > 0;
+            if (!runnable && !retrySoon && inFlight.get() == 0) return;
         }
         throw new TimeoutException("drain timed out");
     }
