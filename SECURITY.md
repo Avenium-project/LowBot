@@ -87,6 +87,11 @@ podatności w publicznym issue.
   więc istnieje okno na DNS rebinding; podzasoby stron w przeglądarce botów nie są filtrowane.
 - `terminal.run` uruchamia `sh` Androida jako użytkownik aplikacji (bez roota), domyślnie „Pytaj za każdym
   razem”; to ograniczenie uprawnień, nie piaskownica.
+- `linux.run` (Linux terminal) uruchamia Alpine przez proot jako użytkownik aplikacji. proot to nie
+  piaskownica bezpieczeństwa: polecenia mają dostęp do plików aplikacji przez `/workspace`, a ruch sieciowy
+  z Linuxa **nie** przechodzi przez filtr SSRF/LAN LowBota. Dlatego polecenia botów podlegają zgodom
+  („Execution on this phone”), a obraz Alpine jest przypięty sumą SHA-256. Polecenia wpisane przez
+  właściciela w Computer → Terminals wykonują się od razu i są zapisywane w dzienniku audytu.
 - Boty nie wpisują haseł (pola `password` są odrzucane) — logowanie, 2FA i CAPTCHA robisz sam po
   „Przejmij”. Nagrywanie „Naucz zadania” zapisuje etykiety elementów i wpisany tekst (bez haseł) tylko
   gdy zaznaczysz „Nagrywaj”; strona otwarta w przeglądarce bota może w tym czasie dopisać własne kroki
