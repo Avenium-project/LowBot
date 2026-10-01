@@ -37,3 +37,7 @@ server/app/services/__pycache__/
 Thumbs.db
 .vscode/
 .idea/
+__pycache__/
+*.pyc
+.pytest_cache/
+server/.venv/

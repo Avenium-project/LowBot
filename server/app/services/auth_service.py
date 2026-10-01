@@ -32,6 +32,9 @@ class AuthService:
         self.configured_token = os.getenv("APP_AUTH_TOKEN", "").strip()
         self.token = self.configured_token or self._load_or_create_token()
         self._sessions: Dict[str, float] = {}
+        # LowBot extension: additional bearer authenticators (e.g. revocable
+        # per-device tokens issued by the v2 pairing flow).
+        self.bearer_authenticators: list = []
 
     @property
     def user(self) -> Dict[str, str]:
@@ -69,6 +72,11 @@ class AuthService:
         scheme, _, bearer = authorization.partition(" ")
         if scheme.lower() == "bearer" and self.authenticate_token(bearer.strip()):
             return self.user
+        if scheme.lower() == "bearer" and bearer.strip():
+            for authenticator in self.bearer_authenticators:
+                device = authenticator(bearer.strip())
+                if device:
+                    return {**self.user, "device_id": device["id"]}
 
         if self.authenticate_session(request.cookies.get(SESSION_COOKIE)):
             return self.user
