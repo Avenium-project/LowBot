@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { FiArrowUp, FiCheckCircle, FiChevronLeft, FiClock, FiHeadphones, FiLock, FiMic, FiMonitor, FiPaperclip, FiPlus, FiSquare, FiStopCircle, FiXCircle } from 'react-icons/fi';
+import { FiArrowUp, FiCheckCircle, FiChevronLeft, FiClock, FiLock, FiMic, FiMonitor, FiPaperclip, FiPlus, FiSquare, FiStopCircle, FiXCircle } from 'react-icons/fi';
 import { api, downloadPath, isLocal, pendingOutbox, sendMessage } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { ElicitationCard } from './InboxPanel';
@@ -173,9 +173,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
   const [listening, setListening] = useState(false);
   const [level, setLevel] = useState(0);
   const [plusOpen, setPlusOpen] = useState(false);
-  const [voiceChat, setVoiceChat] = useState(false);
   const local = isLocal();
-  const lastSpoken = useRef(null);
   const [firstUnread] = useState(conversation.unread > 0 ? conversation.last_read_seq : null);
   const endRef = useRef(null);
   const fileRef = useRef(null);
@@ -306,39 +304,6 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
     onOpenComputer?.(lead);
   };
 
-  // Voice chat (Grok "Start voice chat"): Android speech recognition in, text-to-speech out.
-  const listenForVoiceChat = useCallback(() => {
-    if (!window.LowBotNative?.startDictation) return;
-    const onEv = (e) => {
-      const d = e.detail || {};
-      if (d.type !== 'result' && d.type !== 'error') return;
-      window.removeEventListener('lowbot:dictation', onEv);
-      setListening(false);
-      if (d.type === 'result' && d.text) sendMessage(conversation.id, d.text, []).then(load).catch((err) => setError(err.message));
-    };
-    window.addEventListener('lowbot:dictation', onEv);
-    setListening(true);
-    window.LowBotNative.startDictation(lang);
-  }, [conversation.id, lang, load]);
-
-  useEffect(() => {
-    if (!voiceChat || !messages.length) return;
-    const last = messages[messages.length - 1];
-    if (last.author_type !== 'bot' || last.id === lastSpoken.current) return;
-    lastSpoken.current = last.id;
-    const plain = last.text.replace(/[`*_#>\[\]()]/g, '').slice(0, 2000);
-    window.LowBotNative?.speak?.(plain, lang);
-    const h = setTimeout(listenForVoiceChat, Math.min(60000, 1200 + plain.split(/\s+/).length * 380));
-    return () => clearTimeout(h);
-  }, [messages, voiceChat, lang, listenForVoiceChat]);
-
-  const toggleVoiceChat = () => {
-    if (voiceChat) { setVoiceChat(false); window.LowBotNative?.stopSpeaking?.(); return; }
-    lastSpoken.current = messages.length ? messages[messages.length - 1].id : null;
-    setVoiceChat(true);
-    listenForVoiceChat();
-  };
-
   const pending = pendingOutbox(conversation.id);
   const title = conversation.title || (conversation.kind === 'group' ? members.map((b) => b.name).join(', ') : lead?.name);
   const placeholder = conversation.kind === 'group'
@@ -357,7 +322,6 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
           <span className="font-semibold text-[17px] truncate">{title}</span>
         </button>
         <span className="flex-1" />
-        {voiceChat && <button onClick={toggleVoiceChat} className="lb-pop lb-attention h-10 shrink-0 rounded-full bg-rose-600 px-4 text-[14px] flex items-center gap-2"><FiHeadphones /> {'End'}</button>}
         <button aria-label={t('computer')} title={t('computer')} onClick={() => onOpenComputer?.(conversation.kind === 'group' ? null : lead)}
           className="h-12 w-12 shrink-0 rounded-full bg-[#2a2a2a]/95 border border-white/10 flex items-center justify-center text-xl"><FiMonitor /></button>
       </header>
@@ -409,7 +373,6 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); fileRef.current.click(); }}><FiPaperclip /> {t('attach')}</button>
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); setText('/'); }}>⚡ {t('skills')}</button>
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); onOpenComputer?.(lead); }}><FiMonitor /> {t('computer')}</button>
-            {local && <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); toggleVoiceChat(); }}><FiHeadphones /> {'Voice chat'}</button>}
           </div>
         )}
         {attachments.length > 0 && <div className="text-[13px] text-zinc-400 mb-2">{attachments.map((a) => `📎 ${a.name}`).join('  ')}</div>}
@@ -429,10 +392,10 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
                 className={cls('relative h-11 w-11 flex items-center justify-center shrink-0 text-xl rounded-full transition-colors', listening ? 'text-white bg-rose-600' : 'text-zinc-400')}>
                 {listening && <span className="absolute inset-0 rounded-full bg-rose-500/40 transition-transform duration-100" style={{ transform: `scale(${1 + level * 0.06})` }} />}
                 <FiMic className="relative" /></button>
-              <button type="button" aria-label={local ? 'Voice chat' : t('voiceNote')} title={local ? ('Start voice chat') : t('voiceNote')} onClick={local ? toggleVoiceChat : toggleVoice}
-                className={cls('h-11 w-14 rounded-full flex items-center justify-center shrink-0', recording || voiceChat ? 'bg-rose-600 text-white' : 'bg-white text-black')}>
+              {!local && <button type="button" aria-label={t('voiceNote')} title={t('voiceNote')} onClick={toggleVoice}
+                className={cls('h-11 w-14 rounded-full flex items-center justify-center shrink-0', recording ? 'bg-rose-600 text-white' : 'bg-white text-black')}>
                 {recording ? <FiSquare /> : <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor">{[4, 8, 12, 16, 20].map((x, i) => <rect key={x} x={x - 1} y={[9, 5, 3, 6, 9][i]} width="2" height={[6, 14, 18, 12, 6][i]} rx="1" />)}</g></svg>}
-              </button>
+              </button>}
             </>}
           </div>
         </div>

@@ -23,7 +23,7 @@ Legenda: ✅ LowBot robi to samo · 🟨 odpowiednik z różnicą (opisaną) · 
 
 | Grok Bot | LowBot |
 |---|---|
-| Tekst, wklejanie linków i obrazów, załączniki, dyktowanie, **Start voice chat** (gdy composer pusty) | ✅ (voice chat: rozpoznawanie mowy + synteza mowy Androida) |
+| Tekst, wklejanie linków i obrazów, załączniki, dyktowanie, **Start voice chat** (gdy composer pusty) | 🟨 dyktowanie (rozpoznawanie mowy Androida) ✅; voice chat tymczasowo usunięty |
 | `@` wzmianka bota, grupy, rutyny, konektora | 🟨 boty i `@everyone`; rutyny/konektory przez menu |
 | Grupa: 2–6 botów, widoczne przekazania | ✅ |
 | Bez wzmianki „boty same decydują, kto odpowiada”; `@bot` — właściciel; kilka wzmianek; `@everyone` oszczędnie | 🟨 `@bot`, kilka wzmianek i `@everyone` ✅; bez wzmianki odpowiada prowadzący bot, który z instrukcji systemowej decyduje, czy odpowiedzieć sam, czy przekazać (`task.delegate`/@wzmianka) lepiej dopasowanemu członkowi |
