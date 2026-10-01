@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FiChevronLeft, FiChevronRight, FiFileText, FiMoreHorizontal, FiPlus, FiShare, FiCpu } from 'react-icons/fi';
 import { api, downloadPath, isLocal, saveBlob } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
-import { Toggle, AVATAR_COLORS, BotBlob, Button, Field, SHAPES, Section, ShapeIcon, botLabel, cls, colorFor, inputCls, parseAvatar, shortTime } from './ui';
+import { Ghost, Toggle, AVATAR_COLORS, BotBlob, Button, Field, SHAPES, Section, ShapeIcon, botLabel, cls, colorFor, inputCls, parseAvatar, shortTime } from './ui';
 
 const card = 'rounded-[22px] bg-[#1f1f1f]';
 
@@ -323,7 +323,7 @@ export function BotEditor({ ws, bot: initial, onDone }) {
               : api(`/bots/${bot.id}/mind/${screen.kind}`, { method: 'POST', body: { content: v } }))}
             extra={screen.kind === 'agents' ? <Button onClick={() => api(`/bots/${bot.id}/mind/agents`, { method: 'POST', body: { content: '' } }).then(() => { screen.reload?.(); setScreen(null); })}>Clear</Button> : null} />
         ) : screen === 'instructions' ? <InstructionsScreen f={f} set={set} pl={pl} onBack={() => setScreen(null)} save={() => { commit(); setScreen(null); }} /> : <>
-          <div className="flex justify-center py-4"><span key={f.avatar} className="lb-pop"><ShapeIcon shape={av.shape} color={av.color} size={150} /></span></div>
+          <div className="flex justify-center py-4"><span key={f.avatar} className="lb-pop inline-flex"><Ghost id={bot?.id || f.avatar} size={150} busy={["working","queued","retrying"].includes(bot?.status)}><ShapeIcon shape={av.shape} color={av.color} size={150} /></Ghost></span></div>
           <div className={cls(card, 'overflow-hidden')}>
             <input aria-label={t('name')} value={f.name} onChange={set('name')} onBlur={() => bot && f.name.trim() && commit()}
               className="w-full bg-transparent text-center text-[26px] font-semibold py-4 outline-none" />

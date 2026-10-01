@@ -69,7 +69,7 @@ export function TaskDetail({ taskId, ws, onClose }) {
           </div>
         </Card>
       )}
-      {d.task.result_text && <Card><div className="text-[13px] text-zinc-400">{t('result')}</div><div className="text-[15px] whitespace-pre-wrap select-text">{d.task.result_text}</div></Card>}
+      {d.task.result_text && <Card><div className="text-[13px] text-zinc-400">{t('result')}</div><div className="text-[15px] whitespace-pre-wrap">{d.task.result_text}</div></Card>}
       {d.task.error && <Card className="border-rose-500/40"><div className="text-[13px] text-zinc-400">{t('error')}</div><div className="text-[15px] text-rose-200 whitespace-pre-wrap">{d.task.error}</div></Card>}
       {(d.children.length > 0 || d.task.parent_task_id) && <Section title={t('subtasks')}><Tree node={d} botsById={botsById} /></Section>}
       <Section title={t('steps')}>{(d.steps || []).map((s) => <StepRow key={s.id} s={s} />)}</Section>

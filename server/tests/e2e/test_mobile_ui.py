@@ -92,12 +92,17 @@ def test_M_phone_flow(server):
         expect(page.get_by_text("Assistant")).to_be_visible()
         assert no_horizontal_scroll(page)
         page.screenshot(path=SHOTS / "02-chats.png")
+        assert page.get_by_text("Assistant").first.evaluate("e => getComputedStyle(e).userSelect") == "none"  # home list
         page.get_by_text("Assistant").click()
         page.get_by_placeholder("Ask Assistant").fill("cześć z telefonu")
         page.get_by_role("button", name="Send").click()
         expect(page.get_by_text("[mock] cześć z telefonu")).to_be_visible(timeout=15000)
         assert no_horizontal_scroll(page)
         page.screenshot(path=SHOTS / "03-conversation.png")
+        sel = lambda loc: loc.evaluate("e => getComputedStyle(e).userSelect || getComputedStyle(e).webkitUserSelect")
+        assert sel(page.get_by_text("[mock] cześć z telefonu")) == "text"      # bot message: selectable
+        assert sel(page.get_by_text("cześć z telefonu", exact=True)) == "none"  # own message: not
+        assert sel(page.get_by_placeholder("Ask Assistant")) == "text"         # input: selectable
         # Bot profile (Grok-style): character, model/provider, instructions, routines
         page.locator("header button").nth(1).click()
         expect(page.get_by_text("Character")).to_be_visible()

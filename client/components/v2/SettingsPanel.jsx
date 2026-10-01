@@ -123,8 +123,8 @@ function Devices() {
     <Section title={t('devices')} actions={<Button small kind="primary" onClick={pair}>{t('pairDevice')}</Button>}>
       {code && <Card className="mb-2 text-center">
         <div className="text-[13px] text-zinc-400">{t('pairingCode')} · {t('expires')} {fmtTime(code.expires_at)}</div>
-        <div className="text-2xl font-mono tracking-widest my-1 select-text">{code.code}</div>
-        <div className="text-[13px] text-zinc-400 break-all select-text">{code.server_url}</div>
+        <div className="text-2xl font-mono tracking-widest my-1">{code.code}</div>
+        <div className="text-[13px] text-zinc-400 break-all">{code.server_url}</div>
         {qr && <img src={qr} alt="QR" className="mx-auto mt-2 rounded bg-white p-1" />}
         <div className="text-[12px] text-zinc-500 mt-1">One-time code. It does not contain the owner token.</div>
       </Card>}

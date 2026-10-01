@@ -1,5 +1,6 @@
 'use client';
 // Small shared UI primitives for the v2 workspace.
+import { useState } from 'react';
 import { useT } from '../../lib/v2/i18n';
 
 export function cls(...xs) { return xs.filter(Boolean).join(' '); }
@@ -121,33 +122,50 @@ export function ShapeIcon({ shape, color, size = 48, eyes = true, blinkDelay = 0
   const [ex, ey] = s.eyes;
   const eye = color.toLowerCase() === '#ffffff' ? '#3f3f46' : '#1c1917';
   return (
-    <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
+    <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true" style={{ overflow: 'visible' }}>
       <path d={s.d} fill={color} />
-      {eyes && <>
+      {eyes && <g className="lb-eyes">
         <g transform={`rotate(-10 ${ex} ${ey})`}><rect className="lb-blob-eye" style={{ animationDelay: `${blinkDelay}s` }} x={ex - 2.8} y={ey - 6.5} width="5.6" height="13" rx="2.8" fill={eye} /></g>
         <g transform={`rotate(10 ${ex + 12} ${ey})`}><rect className="lb-blob-eye" style={{ animationDelay: `${blinkDelay}s` }} x={ex + 9.2} y={ey - 6.5} width="5.6" height="13" rx="2.8" fill={eye} /></g>
-      </>}
+      </g>}
     </svg>
   );
 }
 
-export function BotBlob({ bot, size = 48, group, busy }) {
+// A bot's living character: floats and looks around when idle, hops when working,
+// wiggles when it needs you, squishes when tapped.
+export function Ghost({ id = '', size, busy, attention, still, children }) {
+  const [squish, setSquish] = useState(false);
+  const phase = `${-((colorFor(id).charCodeAt(1) + id.length * 7) % 40) / 10}s`;
+  return (
+    <span className={cls('lb-ghost shrink-0 items-center justify-center', !still && busy && 'is-busy', !still && !busy && attention && 'is-attention', squish && 'is-squish')}
+      style={{ width: size, height: size, '--lb-phase': phase }}
+      onPointerDown={() => { if (!still) { setSquish(true); setTimeout(() => setSquish(false), 460); } }}>
+      {busy && !still && <span className="lb-ghost-shadow" />}
+      <span className="lb-ghost-body inline-flex items-center justify-center" style={{ width: size, height: size, animation: still ? 'none' : undefined }}>{children}</span>
+    </span>
+  );
+}
+
+export function BotBlob({ bot, size = 48, group, busy, attention, still }) {
   const parsed = !group && parseAvatar(bot?.avatar);
   const color = parsed ? parsed.color : group ? '#52525b' : colorFor(bot?.id);
   const emoji = !group && !parsed && bot?.avatar && bot.avatar !== '🤖' ? bot.avatar : null;
   const delay = (colorFor(bot?.id || '').charCodeAt(2) % 5) * 0.7;
   return (
-    <span className={cls('relative inline-flex shrink-0 items-center justify-center', busy && 'lb-blob-busy')} style={{ width: size, height: size }}>
-      {parsed ? <ShapeIcon shape={parsed.shape} color={color} size={size} blinkDelay={delay} /> : (
-        <svg viewBox="0 0 100 64" width={size} height={size * 0.64} aria-hidden="true">
-          <rect x="2" y="2" width="96" height="60" rx="30" fill={color} />
-          {!emoji && !group && <>
-            <g transform="rotate(-12 54 20)"><rect className="lb-blob-eye" style={{ animationDelay: `${delay}s` }} x="52" y="14" width="5" height="12" rx="2.5" fill="#1c1917" /></g>
-            <g transform="rotate(12 66 20)"><rect className="lb-blob-eye" style={{ animationDelay: `${delay}s` }} x="64" y="14" width="5" height="12" rx="2.5" fill="#1c1917" /></g>
-          </>}
-        </svg>)}
-      {(emoji || group) && <span className="absolute text-[0.9em]" style={{ fontSize: size * 0.32 }}>{group ? '👥' : emoji}</span>}
-      {busy && <span className="lb-pop absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-[#141414] animate-pulse" />}
+    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
+      <Ghost id={bot?.id || (group ? 'group' : '')} size={size} busy={busy} attention={attention} still={still || group}>
+        {parsed ? <ShapeIcon shape={parsed.shape} color={color} size={size} blinkDelay={delay} /> : (
+          <svg viewBox="0 0 100 64" width={size} height={size * 0.64} aria-hidden="true" style={{ overflow: 'visible' }}>
+            <rect x="2" y="2" width="96" height="60" rx="30" fill={color} />
+            {!emoji && !group && <g className="lb-eyes">
+              <g transform="rotate(-12 54 20)"><rect className="lb-blob-eye" style={{ animationDelay: `${delay}s` }} x="52" y="14" width="5" height="12" rx="2.5" fill="#1c1917" /></g>
+              <g transform="rotate(12 66 20)"><rect className="lb-blob-eye" style={{ animationDelay: `${delay}s` }} x="64" y="14" width="5" height="12" rx="2.5" fill="#1c1917" /></g>
+            </g>}
+          </svg>)}
+        {(emoji || group) && <span className="absolute" style={{ fontSize: size * 0.32 }}>{group ? '👥' : emoji}</span>}
+      </Ghost>
+      {busy && <span className="lb-pop absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-[#141414]" />}
     </span>
   );
 }

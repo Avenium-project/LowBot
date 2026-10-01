@@ -75,9 +75,9 @@ function Bubble({ m, bot, showName, onOpenComputer, animate }) {
   const mine = m.author_type === 'user';
   return (
     <div className={cls('flex my-1.5', mine ? 'justify-end' : 'justify-start', animate && (mine ? 'lb-msg-right' : 'lb-msg-left'))}>
-      <div className={cls('max-w-[85%] px-4 py-3 text-[16px] leading-snug break-words select-text rounded-[22px]',
+      <div className={cls('max-w-[85%] px-4 py-3 text-[16px] leading-snug break-words rounded-[22px]', !mine && 'lb-selectable',
         mine ? 'bg-[#3a3a3c] text-white' : 'bg-[#262626] text-zinc-100')}>
-        {showName && bot && <div className="flex items-center gap-1.5 mb-1 text-[13px] text-zinc-400"><BotBlob bot={bot} size={18} />{bot.name}</div>}
+        {showName && bot && <div className="flex items-center gap-1.5 mb-1 text-[13px] text-zinc-400"><BotBlob bot={bot} size={18} still />{bot.name}</div>}
         {mine ? <div className="whitespace-pre-wrap">{m.text}</div>
           : <div className="prose prose-invert max-w-none prose-p:my-1 prose-pre:my-2 text-[16px]"><ReactMarkdown>{m.text}</ReactMarkdown></div>}
         {m.attachments?.length > 0 && <div>{m.attachments.map((a, i) => <Attachment key={i} a={a} />)}</div>}

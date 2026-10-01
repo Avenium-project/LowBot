@@ -52,7 +52,7 @@ export function RoutinesPanel({ ws }) {
     <div>
       <Section title={t('routines')} actions={!open && <Button small kind="primary" onClick={() => setOpen(true)}>+ New routine</Button>}>
         {form_}
-        {msg && <div className="text-[13px] text-amber-400 break-all select-text mb-3 px-1 whitespace-pre-wrap">{msg}</div>}
+        {msg && <div className="text-[13px] text-amber-400 break-all mb-3 px-1 whitespace-pre-wrap">{msg}</div>}
         {list.length ? <div className="space-y-3">{list.map((r) => (
           <Card key={r.id}>
             <div className="flex items-start gap-3">
@@ -104,7 +104,7 @@ export function MemoryPanel({ ws }) {
       {rows.length ? rows.map((m) => (
         <Card key={m.id} className="mb-2">
           <div className="text-[13px] text-zinc-500">{m.scope}{m.bot_id ? ` · ${ws.bots.find((b) => b.id === m.bot_id)?.name || m.bot_id}` : ''} · {m.source} · {fmtTime(m.updated_at)}</div>
-          <div className="text-[15px] whitespace-pre-wrap select-text">{m.content}</div>
+          <div className="text-[15px] whitespace-pre-wrap">{m.content}</div>
           <div className="flex gap-2 mt-1">
             <Button small onClick={() => { const c = prompt('Edit', m.content); if (c != null) api(`/memories/${m.id}`, { method: 'PATCH', body: { content: c } }).then(load); }}>{t('edit')}</Button>
             <Button small kind="danger" onClick={() => api(`/memories/${m.id}`, { method: 'DELETE' }).then(load)}>{t('delete')}</Button>

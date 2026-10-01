@@ -263,7 +263,7 @@ function Shell() {
 
   const sideTabs = [['tasks', t('tasks')], ['inbox', `${t('inbox')}${inboxCount ? ` ${inboxCount}` : ''}`], ['computer', t('computer')], ['files', t('files')]];
   return (
-    <div className="h-[100dvh] bg-[#141414] text-zinc-100 select-text overflow-hidden">
+    <div className="h-[100dvh] bg-[#141414] text-zinc-100 overflow-hidden">
       {wide ? (
         <div className="flex h-full">
           <aside className="w-[340px] border-r border-white/[0.06] min-h-0">{list}</aside>

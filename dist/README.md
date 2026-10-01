@@ -2,10 +2,10 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **2.5.0** — new browser control: full-screen takeover with back/forward/reload, address bar
-  (URL or search), load progress, Record and Give back control; Computer screen with live view, status
-  (working / needs you / you're in control) and Open browser per bot. SHA-256:
-  `519a8277a13e82d8c41732d6c594d2c4008752f789b03c493c2300bdd5c283a5`
+- Version **2.6.0** — text can be selected only in bot messages and input fields; animated bot
+  characters (float and look around, hop while working, wiggle when they need you, squish on tap);
+  browser control UI from 2.5.0. SHA-256:
+  `eb6259654807a26bffa3e9046611798a5a192092ebb9863d359a38725e9173e4`
 - Android 8.0+ (API 26). Podpis kluczem testowym — instaluje się jako aktualizacja poprzedniej wersji
   z tego katalogu. Instalacja spoza Sklepu Play: zezwól przeglądarce/menedżerowi plików na
   „instalowanie nieznanych aplikacji”.

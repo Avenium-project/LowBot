@@ -153,3 +153,29 @@ body {
 .lb-stagger > *:nth-child(11) { --i: 10; }
 .lb-stagger > *:nth-child(12) { --i: 11; }
 .lb-stagger > *:nth-child(13) { --i: 12; }
+
+/* ------------------------------------------------ text selection
+   Nothing in the app is selectable except what a bot wrote and the input fields. */
+html, body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+input, textarea, select, [contenteditable="true"] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+.lb-selectable, .lb-selectable * { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+
+/* ------------------------------------------------ bot characters ("ghosts")
+   idle: gentle float + look around + blink · busy: bouncy hop, eyes darting
+   attention: wiggle · tap: squish. Each bot gets its own phase via --lb-phase. */
+@keyframes lbFloat { 0%, 100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-2.5px) rotate(-1.5deg); } 75% { transform: translateY(-1px) rotate(1.5deg); } }
+@keyframes lbHop { 0%, 100% { transform: translateY(0) scale(1, 1); } 15% { transform: translateY(0) scale(1.08, 0.9); } 45% { transform: translateY(-14%) scale(0.95, 1.06); } 70% { transform: translateY(0) scale(1.06, 0.94); } 85% { transform: translateY(0) scale(0.98, 1.02); } }
+@keyframes lbWiggle { 0%, 70%, 100% { transform: rotate(0deg); } 76% { transform: rotate(-9deg); } 82% { transform: rotate(8deg); } 88% { transform: rotate(-5deg); } 94% { transform: rotate(3deg); } }
+@keyframes lbLook { 0%, 30%, 100% { transform: translate(0, 0); } 36%, 48% { transform: translate(-3px, 1px); } 56%, 70% { transform: translate(3px, -1px); } 76% { transform: translate(0, 0); } }
+@keyframes lbDart { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-3px, 0); } 50% { transform: translate(3px, 1px); } 75% { transform: translate(1px, -2px); } }
+@keyframes lbSquish { 0% { transform: scale(1, 1); } 30% { transform: scale(1.18, 0.8); } 55% { transform: scale(0.9, 1.12); } 80% { transform: scale(1.04, 0.97); } 100% { transform: scale(1, 1); } }
+@keyframes lbShadow { 0%, 100% { transform: scaleX(1); opacity: 0.35; } 45% { transform: scaleX(0.7); opacity: 0.18; } }
+
+.lb-ghost { display: inline-flex; position: relative; }
+.lb-ghost .lb-ghost-body { transform-origin: 50% 85%; animation: lbFloat 4.2s ease-in-out infinite; animation-delay: var(--lb-phase, 0s); }
+.lb-ghost .lb-eyes { animation: lbLook 7s ease-in-out infinite; animation-delay: var(--lb-phase, 0s); }
+.lb-ghost.is-busy .lb-ghost-body { animation: lbHop 0.9s cubic-bezier(0.3, 0, 0.3, 1) infinite; }
+.lb-ghost.is-busy .lb-eyes { animation: lbDart 1.8s steps(1, end) infinite; }
+.lb-ghost.is-attention .lb-ghost-body { animation: lbWiggle 2.4s ease-in-out infinite; }
+.lb-ghost.is-squish .lb-ghost-body { animation: lbSquish 0.45s var(--lb-ease-spring) 1; }
+.lb-ghost-shadow { position: absolute; left: 22%; right: 22%; bottom: 2%; height: 8%; border-radius: 50%; background: #000; filter: blur(2px); animation: lbShadow 0.9s ease-in-out infinite; }

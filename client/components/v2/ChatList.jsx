@@ -69,7 +69,7 @@ export default function ChatList({ ws, activeId, onOpen, onProfile, onNew, atten
             <button key={r.key} onClick={() => open(r)} style={{ '--i': i }}
               className={cls('lb-press w-full flex items-center gap-4 px-4 text-left transition active:bg-white/5', compact ? 'py-2.5' : 'py-3',
                 activeId && r.conv?.id === activeId ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]')}>
-              <BotBlob bot={r.bot} group={r.group} size={compact ? 46 : 56} busy={BUSY.includes(r.bot?.status)} />
+              <BotBlob bot={r.bot} group={r.group} size={compact ? 46 : 56} busy={BUSY.includes(r.bot?.status)} attention={ATTN.includes(r.bot?.status)} />
               <span className="flex-1 min-w-0">
                 <span className="flex items-baseline justify-between gap-2">
                   <span className="text-[17px] font-semibold text-zinc-50 truncate">{r.name}</span>
