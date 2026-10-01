@@ -24,6 +24,12 @@ PRESETS: Dict[str, Dict[str, Any]] = {
             "base_url": "https://api.x.ai/v1", "key_required": True},
     "openrouter": {"label": "OpenRouter", "adapter": "chat",
                    "base_url": "https://openrouter.ai/api/v1", "key_required": True},
+    "opencode_go": {"label": "OpenCode Go (subscription, API key)", "adapter": "chat",
+                    "base_url": "https://opencode.ai/zen/go/v1", "key_required": True},
+    "codex_cli": {"label": "ChatGPT via Codex CLI (sign in with ChatGPT)", "adapter": "codex",
+                  "base_url": "", "key_required": False},
+    "opencode_cli": {"label": "OpenCode CLI agent (e.g. opencode-go/<model>)", "adapter": "opencode",
+                     "base_url": "", "key_required": False},
     "local": {"label": "Local OpenAI-compatible endpoint", "adapter": "chat",
               "base_url": "http://127.0.0.1:11434/v1", "key_required": False},
     "scripted_mock": {"label": "Scripted mock (offline, NOT a model)", "adapter": "mock",
@@ -87,6 +93,9 @@ class ProviderService:
                 values[f"{key}_json"] = data[key] or ([] if key == "models" else {})
         if "allow_fallback" in data:
             values["allow_fallback"] = bool(data["allow_fallback"])
+        if kind in ("codex_cli", "opencode_cli") and profile_id is None:
+            values["capabilities_json"] = {"tools": False, "vision": False, "streaming": False,
+                                           "note": "agent CLI: uses its own sandboxed tools, not LowBot tools"}
         if kind == "scripted_mock" and "script" in data:
             script_from_json(json.dumps(data["script"]))  # validate
             values["capabilities_json"] = {**(data.get("capabilities") or {}), "script": data["script"],
@@ -140,6 +149,8 @@ class ProviderService:
         if not profile:
             raise ProviderError("config", "The bot's provider profile no longer exists.")
         model = bot.get("model") or profile["default_model"]
+        if not model and profile["kind"] == "codex_cli":
+            model = "default"  # let Codex use the plan's default model
         if not model:
             raise ProviderError("config", "No model id set for this bot or provider profile.")
         return profile, self.adapter(profile), model
@@ -150,8 +161,16 @@ class ProviderService:
         preset = PRESETS[profile["kind"]]
         if preset["adapter"] == "mock":
             return ScriptedAdapter(script=(profile.get("capabilities") or {}).get("script") or [])
+        if preset["adapter"] in ("codex", "opencode"):
+            from app.v2.providers.cli import CodexCliAdapter, OpenCodeCliAdapter
+            cli = self.core.services.get("agent_cli")
+            if cli is None:
+                raise ProviderError("config", "Agent CLI integration is not available.")
+            return CodexCliAdapter(cli) if preset["adapter"] == "codex" else OpenCodeCliAdapter(cli)
         row = self.db.one("SELECT api_key_secret_id FROM provider_profiles WHERE id = ?", (profile["id"],))
         key = self.core.secrets.get(row["api_key_secret_id"]) if row else None
+        if not key and profile["kind"] == "opencode_go":
+            key = self.core.secrets.get(self.core.kv_get("opencode_go_secret_id"))
         if preset["key_required"] and not key:
             raise ProviderError("config", f"API key missing for provider '{profile['name']}'.")
         headers = {}
@@ -188,6 +207,9 @@ class ProviderService:
         except ProviderError as exc:
             result["checks"]["text"] = {"ok": False, "kind": exc.kind, "error": str(exc)}
             return self._save_test(profile_id, result, {"text": False})
+        if PRESETS[profile["kind"]]["adapter"] in ("codex", "opencode"):
+            result["checks"]["tools"] = {"ok": False, "detail": "agent CLI: LowBot tools are not exposed to it"}
+            return self._save_test(profile_id, result, {**caps, "tools": False, "streaming": False})
         # 2. tool calling
         try:
             r = await adapter.complete(ModelRequest(

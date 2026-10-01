@@ -69,6 +69,8 @@ class Runtime:
             s["capabilities"].add("shell")
         s["tools"] = reg
         self.services = s
+        from app.v2.agents_cli import register_agent_tools
+        register_agent_tools(self)  # ChatGPT/Codex and OpenCode (tools only if the CLI is installed)
         self.engine = Engine(self.core, s, worker_id=worker_id)
         s["engine"] = self.engine
         self._stop = asyncio.Event()

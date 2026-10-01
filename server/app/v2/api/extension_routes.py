@@ -143,3 +143,42 @@ def answer_elicitation(eid: str, body: Dict[str, Any], request: Request):
         return _mcp(request).respond(eid, body.get("action", ""), body.get("content"))
     except ValueError as exc:
         raise bad(exc, 409)
+
+
+# ----------------------------------------------- ChatGPT (Codex) / OpenCode ---
+def _cli(request: Request):
+    c = rt(request).services.get("agent_cli")
+    if c is None:
+        raise HTTPException(503, "Agent CLI integration unavailable.")
+    return c
+
+
+@router.get("/integrations")
+async def integrations(request: Request):
+    return await _cli(request).status()
+
+
+@router.post("/integrations/codex/login")
+async def codex_login(request: Request):
+    from app.v2.agents_cli import CliError
+    try:
+        return await _cli(request).start_codex_login()
+    except CliError as exc:
+        raise bad(exc, 503)
+
+
+@router.post("/integrations/codex/logout")
+async def codex_logout(request: Request):
+    await _cli(request).codex_logout()
+    return {"ok": True}
+
+
+@router.post("/integrations/opencode/key")
+def opencode_key(body: Dict[str, Any], request: Request):
+    key = (body.get("api_key") or "").strip()
+    if key and len(key) < 8:
+        raise HTTPException(422, "That does not look like an API key.")
+    _cli(request).set_opencode_key(key or None)
+    if body.get("default_model"):
+        rt(request).core.kv_set("opencode_default_model", body["default_model"])
+    return {"go_key_configured": bool(key)}

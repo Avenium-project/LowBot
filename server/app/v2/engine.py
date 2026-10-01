@@ -338,7 +338,11 @@ class Engine:
         if img_dropped:
             notes.append("Attached images were NOT sent: the model's vision capability test failed.")
         system = self._system_prompt(bot, task, skill, notes)
+        workdir = (self.s.data_dir / "workspace-isolated" / bot["id"]) if bot.get("computer_mode") == "isolated" \
+            else self.s.shared_workspace
+        workdir.mkdir(parents=True, exist_ok=True)
         req = ModelRequest(model=model, system=system, messages=messages, timeout_s=self.s.model_timeout_s,
+                           workdir=str(workdir),
                            tools=[ToolWire(wire_name(n), sp.description, sp.input_schema)
                                   for n, sp in sorted(available.items())] if tools_supported else [])
         est_in = sum(len(json.dumps(m)) for m in messages) // 4 + len(system) // 4
@@ -351,7 +355,8 @@ class Engine:
         self.core.emit("run.model_call", task_id=task["id"], run_id=run["id"], bot_id=bot["id"], model=model,
                        provider=profile["kind"], mock=profile["is_mock"])
         try:
-            resp = await asyncio.wait_for(adapter.complete(req), self.s.model_timeout_s + 5)
+            limit = max(self.s.model_timeout_s, 900) if profile["kind"] in ("codex_cli", "opencode_cli") else self.s.model_timeout_s
+            resp = await asyncio.wait_for(adapter.complete(req), limit + 5)
         except asyncio.TimeoutError:
             providers.release(usage_id)
             self._schedule_retry(run, "Model call timed out.")

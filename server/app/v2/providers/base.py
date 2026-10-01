@@ -27,6 +27,7 @@ class ModelRequest:
     tools: List[ToolWire] = field(default_factory=list)
     max_output_tokens: Optional[int] = None
     timeout_s: float = 120.0
+    workdir: Optional[str] = None  # used by CLI-agent providers (Codex/OpenCode)
 
 
 @dataclass
