@@ -196,6 +196,14 @@ final class NativeBridge {
         });
     }
 
+    @JavascriptInterface
+    public void stopDictation() {
+        if (!trusted()) return;
+        activity.runOnUiThread(new Runnable() {
+            @Override public void run() { activity.stopDictation(); }
+        });
+    }
+
     /** Called by the UI when it has nothing left to close on Back. */
     @JavascriptInterface
     public void exitApp() {

@@ -374,7 +374,7 @@ public class MainActivity extends Activity implements Computer.Host {
             });
             return;
         }
-        tts.setLanguage(java.util.Locale.US);
+        tts.setLanguage(java.util.Locale.getDefault());
         tts.speak(text == null ? "" : text, TextToSpeech.QUEUE_FLUSH, null, "lowbot");
     }
 
@@ -529,6 +529,11 @@ public class MainActivity extends Activity implements Computer.Host {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQ_SPEECH_DIALOG) {
+            ArrayList<String> r = data == null ? null : data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+            dictationEvent("result", resultCode == RESULT_OK && r != null && !r.isEmpty() ? r.get(0) : "");
+            return;
+        }
         if (requestCode == REQ_FILE && fileCallback != null) {
             Uri[] result = null;
             if (resultCode == RESULT_OK && data != null && data.getData() != null) result = new Uri[]{data.getData()};
@@ -548,21 +553,47 @@ public class MainActivity extends Activity implements Computer.Host {
             pendingPermission = null;
         } else if (requestCode == REQ_MIC_DICTATE) {
             if (ok && pendingDictationLang != null) startDictation(pendingDictationLang);
-            else dictationEvent("error", "microphone permission denied");
+            else dictationEvent("error", "Microphone permission denied");
         }
     }
 
     // ----------------------------------------------------------- dictation --
+    static final int REQ_SPEECH_DIALOG = 15;
+
+    /** Speech language: the phone's own language (the app UI is English, people dictate in theirs). */
+    static String speechLang() { return java.util.Locale.getDefault().toLanguageTag(); }
+
+    private Intent speechIntent() {
+        Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, speechLang());
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, speechLang());
+        i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+        i.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
+        return i;
+    }
+
+    /** Fallback: the system speech dialog (Google voice typing UI). */
+    private void speechDialog() {
+        try {
+            startActivityForResult(speechIntent(), REQ_SPEECH_DIALOG);
+            dictationEvent("listening", "");
+        } catch (ActivityNotFoundException e) {
+            dictationEvent("error", "No speech recognition on this phone. Install or enable Google speech services.");
+        }
+    }
+
+    void stopDictation() {
+        if (recognizer != null) recognizer.stopListening();
+    }
+
     void startDictation(String lang) {
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             pendingDictationLang = lang;
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC_DICTATE);
             return;
         }
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            dictationEvent("error", "speech recognition is not available on this device");
-            return;
-        }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) { speechDialog(); return; }
         if (recognizer != null) recognizer.destroy();
         recognizer = SpeechRecognizer.createSpeechRecognizer(this);
         recognizer.setRecognitionListener(new RecognitionListener() {
@@ -570,19 +601,24 @@ public class MainActivity extends Activity implements Computer.Host {
                 ArrayList<String> r = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 dictationEvent("result", r != null && !r.isEmpty() ? r.get(0) : "");
             }
-            @Override public void onError(int error) { dictationEvent("error", "speech error " + error); }
+            @Override public void onPartialResults(Bundle partial) {
+                ArrayList<String> r = partial.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                if (r != null && !r.isEmpty() && !r.get(0).isEmpty()) dictationEvent("partial", r.get(0));
+            }
+            @Override public void onError(int error) {
+                if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) { dictationEvent("result", ""); return; }
+                if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) { dictationEvent("error", "Microphone permission denied"); return; }
+                // Busy/unavailable/client errors: fall back to the system speech dialog.
+                speechDialog();
+            }
             @Override public void onReadyForSpeech(Bundle params) { dictationEvent("listening", ""); }
             @Override public void onBeginningOfSpeech() { }
-            @Override public void onRmsChanged(float rmsdB) { }
+            @Override public void onRmsChanged(float rmsdB) { dictationEvent("level", String.valueOf(Math.max(0, Math.min(10, (int) rmsdB)))); }
             @Override public void onBufferReceived(byte[] buffer) { }
-            @Override public void onEndOfSpeech() { }
-            @Override public void onPartialResults(Bundle partialResults) { }
+            @Override public void onEndOfSpeech() { dictationEvent("processing", ""); }
             @Override public void onEvent(int eventType, Bundle params) { }
         });
-        Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "pl".equals(lang) ? "pl-PL" : "en-US");
-        recognizer.startListening(i);
+        recognizer.startListening(speechIntent());
     }
 
     private void dictationEvent(String type, String text) {

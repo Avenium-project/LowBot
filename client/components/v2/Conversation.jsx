@@ -171,6 +171,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
   const [error, setError] = useState('');
   const [recording, setRecording] = useState(null);
   const [listening, setListening] = useState(false);
+  const [level, setLevel] = useState(0);
   const [plusOpen, setPlusOpen] = useState(false);
   const [voiceChat, setVoiceChat] = useState(false);
   const local = isLocal();
@@ -235,13 +236,19 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
 
   // Dictation: browser/OS speech recognition, only after an explicit tap.
   const dictate = () => {
-    if (window.LowBotNative?.startDictation) { // Android shell: native speech recognizer
+    if (window.LowBotNative?.startDictation) { // Android speech recognition, in the phone's language
+      if (listening) { window.LowBotNative.stopDictation?.(); return; } // tap again = done talking
+      const base = text.trim();
+      const join = (s) => `${base} ${s || ''}`.trim();
       const onEv = (e) => {
         const d = e.detail || {};
-        if (d.type === 'result') setText((x) => `${x} ${d.text}`.trim());
+        if (d.type === 'partial') setText(join(d.text));
+        if (d.type === 'level') setLevel(Number(d.text) || 0);
+        if (d.type === 'result') setText(join(d.text));
         if (d.type === 'error') setError(d.text);
-        if (d.type !== 'listening') { setListening(false); window.removeEventListener('lowbot:dictation', onEv); }
+        if (d.type === 'result' || d.type === 'error') { setListening(false); setLevel(0); window.removeEventListener('lowbot:dictation', onEv); }
       };
+      setError('');
       window.addEventListener('lowbot:dictation', onEv);
       setListening(true);
       window.LowBotNative.startDictation(lang);
@@ -304,7 +311,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
     if (!window.LowBotNative?.startDictation) return;
     const onEv = (e) => {
       const d = e.detail || {};
-      if (d.type === 'listening') return;
+      if (d.type !== 'result' && d.type !== 'error') return;
       window.removeEventListener('lowbot:dictation', onEv);
       setListening(false);
       if (d.type === 'result' && d.text) sendMessage(conversation.id, d.text, []).then(load).catch((err) => setError(err.message));
@@ -415,10 +422,13 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
             <textarea rows={1} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} aria-label={t('typeMessage')}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !suggestions.length) submit(e); }}
               className="flex-1 bg-transparent resize-none outline-none text-[17px] text-zinc-100 placeholder:text-zinc-500 max-h-36 py-2.5 min-w-0" />
-            {text.trim() || attachments.length ? (
+            {(text.trim() || attachments.length) && !listening ? (
               <button type="submit" aria-label={t('send')} title={t('send')} className="lb-pop lb-press h-11 w-11 rounded-full bg-white text-black flex items-center justify-center shrink-0 text-xl"><FiArrowUp /></button>
             ) : <>
-              <button type="button" aria-label={t('dictate')} title={t('dictate')} onClick={dictate} className={cls('h-11 w-10 flex items-center justify-center shrink-0 text-xl', listening ? 'text-rose-400' : 'text-zinc-400')}><FiMic /></button>
+              <button type="button" aria-label={t('dictate')} title={listening ? 'Tap when you are done' : t('dictate')} onClick={dictate}
+                className={cls('relative h-11 w-11 flex items-center justify-center shrink-0 text-xl rounded-full transition-colors', listening ? 'text-white bg-rose-600' : 'text-zinc-400')}>
+                {listening && <span className="absolute inset-0 rounded-full bg-rose-500/40 transition-transform duration-100" style={{ transform: `scale(${1 + level * 0.06})` }} />}
+                <FiMic className="relative" /></button>
               <button type="button" aria-label={local ? 'Voice chat' : t('voiceNote')} title={local ? ('Start voice chat') : t('voiceNote')} onClick={local ? toggleVoiceChat : toggleVoice}
                 className={cls('h-11 w-14 rounded-full flex items-center justify-center shrink-0', recording || voiceChat ? 'bg-rose-600 text-white' : 'bg-white text-black')}>
                 {recording ? <FiSquare /> : <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor">{[4, 8, 12, 16, 20].map((x, i) => <rect key={x} x={x - 1} y={[9, 5, 3, 6, 9][i]} width="2" height={[6, 14, 18, 12, 6][i]} rx="1" />)}</g></svg>}
