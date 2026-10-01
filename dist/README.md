@@ -2,11 +2,14 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **2.8.0** — bots manage the team: they can list, create, change and delete other bots (creating, changing
+- Version **2.8.1** — bot.create works for bots made before 2.8 (a new bot gets the part of the default tools its
+  creator has, instead of failing); bots see the tools they really called in earlier replies (no more invented or denied
+  errors); long code in replies wraps inside the bubble; Grok-style "<bot> is working" line with a shimmering text.
+  SHA-256: `aa30c582d3625d9ae55bd42a904a183b9b5c400e1ab8f515a7999144070fa986`
+- 2.8.0 — bots manage the team: they can list, create, change and delete other bots (creating, changing
   and deleting always needs your approval) and write to each other; shared **Workspaces** (Menu → Workspaces): a folder
   with shared files, one AGENTS.md of rules for every member bot, members and a team chat. Fixed browser takeover:
   no more "shape:drop:#…" in the status line, and an empty tab shows a start page instead of a white rectangle.
-  SHA-256: `21b59d6c791242aa8bbe6e7263ea93efc9189d62256c135bc7ffe69a047dec19`
 - Android 8.0+ (API 26). Podpis kluczem testowym — instaluje się jako aktualizacja poprzedniej wersji
   z tego katalogu. Instalacja spoza Sklepu Play: zezwól przeglądarce/menedżerowi plików na
   „instalowanie nieznanych aplikacji”.

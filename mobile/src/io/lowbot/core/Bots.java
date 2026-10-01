@@ -133,11 +133,17 @@ public final class Bots {
         if (createdBy != null) {
             if (!createdBy.optBoolean("can_create_bots")) throw new ApiError(403, "This bot is not allowed to create bots.");
             List<String> parent = J.strings(createdBy.optJSONArray("tools"));
+            boolean explicit = toolsArr != null && toolsArr.length() > 0;
+            List<String> granted = new ArrayList<String>(), missing = new ArrayList<String>();
             for (String t : tools) {
                 boolean ok = false;
                 for (String p : parent) if (p.equals(t) || J.glob(p, t)) ok = true;
-                if (!ok) throw new ApiError(403, "A created bot cannot receive tools its creator does not have.");
+                if (ok) granted.add(t); else missing.add(t);
             }
+            // Asked for specific tools: refuse and say which. Default set: give the part the creator has.
+            if (explicit && !missing.isEmpty())
+                throw new ApiError(403, "A created bot cannot receive tools its creator does not have: " + missing + ". Your tools: " + parent + ".");
+            tools = granted;
             JSONArray merged = J.parseArr(createdBy.optJSONArray("policy").toString());
             for (int i = 0; i < policy.length(); i++) {
                 JSONObject r = policy.optJSONObject(i);

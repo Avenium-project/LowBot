@@ -228,6 +228,12 @@ public class SelfTest extends BroadcastReceiver {
         b.engine.drain(20000);
         JSONObject researcher = b.bots.byHandle("researcher");
         check(researcher != null && lastBotMessage(b, cid).optString("text").startsWith("hired"), "bot created another bot");
+        check(b.engine.toolLog(tHire.optString("id"), "other").contains("bot.create"), "earlier tool calls stay visible to the bot");
+        JSONObject limited = api(r, "POST", "/api/v2/bots", J.obj("name", "Limited", "tools", new JSONArray().put("workspace.*").put("bot.*")));
+        JSONObject sub = b.bots.create(J.obj("name", "Sub"), b.bots.get(limited.optString("id")));
+        check(sub.optJSONArray("tools").length() == 2, "default tools narrowed to the creator's (" + sub.optJSONArray("tools") + ")");
+        b.bots.delete(sub.optString("id"));
+        b.bots.delete(limited.optString("id"));
         check(b.mind.soul(researcher.optString("id")).contains("Finds sources") && b.mind.members("team").contains(researcher.optString("id")),
                 "new bot gets its soul and joins the workspace");
         JSONObject tFire = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "fire the researcher")).optJSONArray("tasks").getJSONObject(0);

@@ -130,6 +130,13 @@ body {
 .lb-typing span { display: inline-block; width: 6px; height: 6px; border-radius: 9999px; background: currentColor; animation: lbTyping 1.1s infinite ease-in-out; }
 .lb-typing span:nth-child(2) { animation-delay: 0.15s; }
 .lb-typing span:nth-child(3) { animation-delay: 0.3s; }
+/* "Bot is working": a light band sweeps left to right across grey text. */
+.lb-shimmer-text {
+  background: linear-gradient(90deg, #8e8e93 0%, #8e8e93 38%, #f4f4f5 50%, #8e8e93 62%, #8e8e93 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: lbTextShimmer 2.2s linear infinite;
+}
+@keyframes lbTextShimmer { from { background-position: 100% 0; } to { background-position: 0% 0; } }
 .lb-blob-busy svg { animation: lbBreathe 1.6s ease-in-out infinite; transform-origin: 50% 80%; }
 .lb-blob-eye { transform-box: fill-box; transform-origin: center; animation: lbBlink 5s infinite; }
 .lb-skeleton { background: linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%); background-size: 200% 100%; animation: lbShimmer 1.4s linear infinite; }
@@ -179,3 +186,13 @@ input, textarea, select, [contenteditable="true"] { -webkit-user-select: text; u
 .lb-ghost.is-attention .lb-ghost-body { animation: lbWiggle 2.4s ease-in-out infinite; }
 .lb-ghost.is-squish .lb-ghost-body { animation: lbSquish 0.45s var(--lb-ease-spring) 1; }
 .lb-ghost-shadow { position: absolute; left: 22%; right: 22%; bottom: 2%; height: 8%; border-radius: 50%; background: #000; filter: blur(2px); animation: lbShadow 0.9s ease-in-out infinite; }
+
+/* Markdown in chat bubbles never spills out: long code wraps instead of overflowing. */
+.lb-md { overflow-wrap: anywhere; min-width: 0; }
+.lb-md pre { white-space: pre-wrap; word-break: break-word; overflow-x: auto; max-width: 100%; background: #1a1a1a; border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+.lb-md code { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; font-size: 14px; }
+.lb-md pre code { background: none; padding: 0; }
+.lb-md :not(pre) > code { background: #1a1a1a; border-radius: 6px; padding: 1px 5px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.lb-md :not(pre) > code::before, .lb-md :not(pre) > code::after { content: none; }
+.lb-md table { display: block; overflow-x: auto; max-width: 100%; }
+.lb-md img { max-width: 100%; height: auto; }

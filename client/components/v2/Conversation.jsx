@@ -8,8 +8,6 @@ import { ElicitationCard } from './InboxPanel';
 import { BotBlob, cls } from './ui';
 
 const BUSY = ['working', 'queued', 'retrying', 'waiting'];
-const RUN_LABEL = { running: 'working', queued: 'queued', waiting_input: 'needs_input', waiting_approval: 'needs_approval',
-  waiting_dependency: 'waiting', retry_scheduled: 'retrying', paused: 'paused', unknown_outcome: 'needs_resolution' };
 
 function dayLabel(iso, lang) {
   const d = new Date(iso);
@@ -75,11 +73,11 @@ function Bubble({ m, bot, showName, onOpenComputer, animate }) {
   const mine = m.author_type === 'user';
   return (
     <div className={cls('flex my-1.5', mine ? 'justify-end' : 'justify-start', animate && (mine ? 'lb-msg-right' : 'lb-msg-left'))}>
-      <div className={cls('max-w-[85%] px-4 py-3 text-[16px] leading-snug break-words rounded-[22px]', !mine && 'lb-selectable',
+      <div className={cls('min-w-0 max-w-[85%] px-4 py-3 text-[16px] leading-snug break-words [overflow-wrap:anywhere] rounded-[22px]', !mine && 'lb-selectable',
         mine ? 'bg-[#3a3a3c] text-white' : 'bg-[#262626] text-zinc-100')}>
         {showName && bot && <div className="flex items-center gap-1.5 mb-1 text-[13px] text-zinc-400"><BotBlob bot={bot} size={18} still />{bot.name}</div>}
         {mine ? <div className="whitespace-pre-wrap">{m.text}</div>
-          : <div className="prose prose-invert max-w-none prose-p:my-1 prose-pre:my-2 text-[16px]"><ReactMarkdown>{m.text}</ReactMarkdown></div>}
+          : <div className="lb-md prose prose-invert max-w-none prose-p:my-1 prose-pre:my-2 text-[16px]"><ReactMarkdown>{m.text}</ReactMarkdown></div>}
         {m.attachments?.length > 0 && <div>{m.attachments.map((a, i) => <Attachment key={i} a={a} />)}</div>}
       </div>
     </div>
@@ -138,22 +136,28 @@ function ApprovalInline({ a, ws, onChanged }) {
   );
 }
 
+// Grok-style "<bot> is working" line: the bot's character plus a shimmering status text.
+const WORK_PHRASE = { running: 'is working', queued: 'is working', retry_scheduled: 'is retrying', waiting_dependency: 'is waiting for another bot',
+  waiting_approval: 'is waiting for your approval', waiting_input: 'is asking you', paused: 'is paused', unknown_outcome: 'needs you to check a result' };
+
 function WorkingStrip({ task, bot, onAnswer, special }) {
   const { t } = useT();
   const [answer, setAnswer] = useState('');
   const asking = task.run_status === 'waiting_input' && !special;
+  const needsYou = ['waiting_input', 'waiting_approval', 'unknown_outcome'].includes(task.run_status);
+  const phrase = WORK_PHRASE[task.run_status] || 'is working';
   return (
-    <div className="lb-rise my-2 rounded-[18px] bg-[#1f1f1f] border border-white/5 px-4 py-2.5 text-[14px]">
-      <div className="flex items-center gap-2">
-        {asking || task.run_status === 'waiting_approval'
-          ? <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-          : <span className="lb-typing inline-flex gap-1 text-emerald-400" aria-hidden="true"><span /><span /><span /></span>}
-        <span className="flex-1 truncate text-zinc-300">{bot?.name}: {t(`status_${RUN_LABEL[task.run_status] || 'working'}`)}</span>
+    <div className="lb-rise my-3">
+      <div className="flex items-center gap-3">
+        <BotBlob bot={bot} size={30} busy={!needsYou} attention={needsYou} />
+        <span className={cls('flex-1 min-w-0 truncate text-[17px]', needsYou ? 'text-amber-400' : 'lb-shimmer-text')}>
+          {bot?.name || 'Bot'} {phrase}
+        </span>
         <button aria-label={t('stop')} title={t('stop')} onClick={() => api(`/tasks/${task.id}/cancel`, { method: 'POST' })}
-          className="text-zinc-400 hover:text-rose-300 h-8 w-8 flex items-center justify-center"><FiStopCircle /></button>
+          className="lb-press text-zinc-500 hover:text-rose-300 h-9 w-9 flex items-center justify-center rounded-full"><FiStopCircle /></button>
       </div>
       {asking && (
-        <form className="flex gap-2 mt-2" onSubmit={(e) => { e.preventDefault(); if (answer.trim()) { onAnswer(task.id, answer); setAnswer(''); } }}>
+        <form className="flex gap-2 mt-2 pl-[42px]" onSubmit={(e) => { e.preventDefault(); if (answer.trim()) { onAnswer(task.id, answer); setAnswer(''); } }}>
           <input className="flex-1 min-w-0 rounded-full bg-[#2a2a2a] px-4 py-2 outline-none text-zinc-100" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={t('answer')} />
           <button type="submit" className="rounded-full bg-white text-black px-4">{t('answer')}</button>
         </form>

@@ -894,6 +894,22 @@ public final class Engine {
         return out.toString();
     }
 
+    /** Compact record of the tools an earlier task actually called and what they returned. */
+    public String toolLog(String taskId, String currentTaskId) {
+        if (taskId == null || taskId.equals(currentTaskId)) return "";
+        List<JSONObject> rows = db.all("SELECT s.tool_name, s.status, s.input_json, s.output_json, s.error FROM run_steps s JOIN runs r ON r.id = s.run_id "
+                + "WHERE r.task_id = ? AND s.kind = 'tool' ORDER BY s.seq LIMIT 12", taskId);
+        if (rows.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder("[tool log of this earlier reply — what really happened]");
+        for (JSONObject r : rows) {
+            JSONObject out = J.parse(r.optString("output_json"));
+            String res = r.optString("error").isEmpty() ? (out.has("error") ? "error: " + out.optString("error") : J.truncate(out.toString(), 240)) : "error: " + r.optString("error");
+            sb.append("\n- ").append(r.optString("tool_name")).append(" ").append(J.truncate(J.redact(r.optString("input_json")), 160))
+                    .append(" → ").append(r.optString("status")).append(": ").append(J.truncate(J.redact(res), 240));
+        }
+        return sb.toString();
+    }
+
     List<JSONObject> transcript(JSONObject task, JSONObject bot, List<JSONObject> steps, boolean vision, boolean[] dropped) {
         List<JSONObject> msgs = new ArrayList<JSONObject>();
         String cid = J.str(task, "conversation_id", null);
@@ -905,6 +921,7 @@ public final class Engine {
             }
             long fromSeq = b.mind.handoffSeq(bot.optString("id"), cid);
             List<JSONObject> hist = db.all("SELECT * FROM (SELECT * FROM messages WHERE conversation_id = ? AND seq <= ? AND seq > ? ORDER BY seq DESC LIMIT 60) ORDER BY seq", cid, limitSeq, fromSeq);
+            java.util.Set<String> loggedTasks = new java.util.HashSet<String>();
             for (JSONObject m : hist) {
                 JSONArray images = new JSONArray();
                 JSONArray att = J.parseArr(m.optString("attachments_json"));
@@ -917,7 +934,13 @@ public final class Engine {
                 }
                 if (images.length() > 0 && !vision) { dropped[0] = true; images = new JSONArray(); }
                 String at = m.optString("author_type"), text = m.optString("text");
-                if ("bot".equals(at) && bot.optString("id").equals(m.optString("author_id"))) msgs.add(J.obj("role", "assistant", "content", text));
+                if ("bot".equals(at) && bot.optString("id").equals(m.optString("author_id"))) {
+                    // Earlier turns keep only their final text; without the tool log the model cannot tell
+                    // what it really did (and may invent or deny earlier tool results).
+                    String tid = J.str(m, "task_id", null);
+                    String log = tid != null && loggedTasks.add(tid) ? toolLog(tid, task.optString("id")) : "";
+                    msgs.add(J.obj("role", "assistant", "content", log.isEmpty() ? text : log + "\n" + text));
+                }
                 else if ("bot".equals(at)) {
                     JSONObject o = b.bots.get(m.optString("author_id"));
                     msgs.add(J.obj("role", "user", "content", "[@" + (o == null ? m.optString("author_id") : o.optString("handle")) + "]: " + text));
