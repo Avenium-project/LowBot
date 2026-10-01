@@ -183,6 +183,9 @@ export default function SettingsPanel({ ws }) {
       <Section title={t('language')}>
         <div className="flex gap-2"><Button kind={lang === 'pl' ? 'primary' : 'default'} onClick={() => setLang('pl')}>Polski</Button>
           <Button kind={lang === 'en' ? 'primary' : 'default'} onClick={() => setLang('en')}>English</Button></div>
+        <input className={`${inputCls} mt-2`} placeholder={lang === 'pl' ? 'Twoje imię (inicjał w aplikacji)' : 'Your name (initial shown in the app)'}
+          defaultValue={typeof window !== 'undefined' ? window.localStorage.getItem('opendots.name') || '' : ''}
+          onChange={(e) => window.localStorage.setItem('opendots.name', e.target.value)} />
         {ws.health && <div className="text-xs text-zinc-500 mt-2">schema v{ws.health.schema_version} · {ws.health.timezone} · {ws.health.capabilities.join(', ')} · runs ≤ {ws.health.limits.max_active_runs}, screens ≤ {ws.health.limits.max_active_surfaces}</div>}
       </Section>
       <Providers ws={ws} />

@@ -88,18 +88,18 @@ def test_M_phone_flow(server):
         expect(page.get_by_text("Dostawca testowy (atrapa)")).to_be_visible()
         page.get_by_role("button", name="Dalej").click()
         page.get_by_role("button", name="Gotowe").click()
-        # Chats list -> conversation
+        # Home: one chat list -> conversation
         expect(page.get_by_text("Asystent")).to_be_visible()
         assert no_horizontal_scroll(page)
         page.screenshot(path=SHOTS / "02-chats.png")
-        page.get_by_text("Asystent").first.click()
-        page.get_by_placeholder("Napisz wiadomość").fill("cześć z telefonu")
+        page.get_by_text("Asystent").click()
+        page.get_by_placeholder("Zapytaj Asystent").fill("cześć z telefonu")
         page.get_by_role("button", name="Wyślij").click()
         expect(page.get_by_text("[mock] cześć z telefonu")).to_be_visible(timeout=15000)
         assert no_horizontal_scroll(page)
         page.screenshot(path=SHOTS / "03-conversation.png")
 
-        # Approval flow from the phone.
+        # Approval inline in the conversation.
         prof = api(server, "/providers", {"kind": "scripted_mock", "name": "Approver", "default_model": "scripted-mock",
                                           "script": [{"when": "zapamiętaj", "call": {"name": "memory.save", "arguments": {"content": "kawa bez cukru"}}},
                                                      {"on": "tool", "reply": "Zapisane."}]})
@@ -108,18 +108,20 @@ def test_M_phone_flow(server):
         conv = api(server, f"/bots/{bot['id']}/conversation", {})
         api(server, f"/conversations/{conv['id']}/messages", {"text": "zapamiętaj: kawa bez cukru", "client_msg_id": "e2e-1"})
         page.get_by_role("button", name="back").click()
-        page.get_by_role("button", name="Skrzynka").click()
-        expect(page.get_by_text("kawa bez cukru").first).to_be_visible(timeout=15000)
+        expect(page.get_by_text("czeka na zgodę")).to_be_visible(timeout=15000)
+        page.screenshot(path=SHOTS / "04-list-attention.png")
+        page.get_by_text("Sekretarz").click()
+        expect(page.get_by_text("Prośba o zgodę")).to_be_visible(timeout=15000)
         assert no_horizontal_scroll(page)
-        page.screenshot(path=SHOTS / "04-approval.png")
+        page.screenshot(path=SHOTS / "05-approval-inline.png")
         page.get_by_role("button", name="Zatwierdź").click()
-        page.get_by_role("button", name="Rozmowy").click()
-        page.get_by_text("Sekretarz").first.click()
         expect(page.get_by_text("Zapisane.")).to_be_visible(timeout=15000)
+        expect(page.get_by_text("Zatwierdzono")).to_be_visible(timeout=15000)
+        page.screenshot(path=SHOTS / "06-approved.png")
 
         # Offline -> send -> back online: exactly one message, no duplicate work.
         ctx.set_offline(True)
-        page.get_by_placeholder("Napisz wiadomość").fill("wiadomość offline")
+        page.get_by_placeholder("Zapytaj Sekretarz").fill("wiadomość offline")
         page.get_by_role("button", name="Wyślij").click()
         expect(page.get_by_text("⏳ wiadomość offline")).to_be_visible()
         ctx.set_offline(False)
@@ -128,9 +130,10 @@ def test_M_phone_flow(server):
         msgs = api(server, f"/conversations/{conv['id']}/messages")
         assert sum(1 for m in msgs if m["text"] == "wiadomość offline") == 1
 
-        # Routines from the phone: natural language -> preview in Europe/Warsaw.
+        # Routines from the avatar menu: natural language -> preview in Europe/Warsaw.
         page.get_by_role("button", name="back").click()
-        page.get_by_role("button", name="Więcej").click()
+        page.get_by_role("button", name="Menu").click()
+        page.screenshot(path=SHOTS / "07-menu.png")
         page.get_by_role("button", name="Rutyny").click()
         page.get_by_role("textbox", name="Harmonogram").fill("w dni robocze o 7:30")
         expect(page.get_by_text("cron: 30 7 * * 1-5")).to_be_visible(timeout=5000)
@@ -138,9 +141,10 @@ def test_M_phone_flow(server):
         page.get_by_role("button", name="Utwórz").click()
         expect(page.get_by_text("Europe/Warsaw").first).to_be_visible()
         assert no_horizontal_scroll(page)
-        page.screenshot(path=SHOTS / "05-routines.png")
+        page.screenshot(path=SHOTS / "08-routines.png")
+        page.get_by_role("button", name="back").click()
 
-        # Computer tab: a bot opens a page, the user takes over from the phone.
+        # Monitor button in the bot's header: live view + take over.
         prof2 = api(server, "/providers", {"kind": "scripted_mock", "name": "Nav", "default_model": "scripted-mock",
                                            "script": [{"when": "otwórz", "call": {"name": "browser.navigate", "arguments": {"url": f"{server}/api/v2/health"}}},
                                                       {"on": "tool", "reply": "Otwarte."}]})
@@ -151,13 +155,14 @@ def test_M_phone_flow(server):
             if api(server, f"/conversations/{c2['id']}/messages")[-1]["text"] == "Otwarte.":
                 break
             time.sleep(0.1)
+        page.get_by_text("Przeglądacz").click()
         page.get_by_role("button", name="Komputer").click()
         expect(page.get_by_role("button", name="Przejmij sterowanie")).to_be_visible(timeout=10000)
         page.get_by_role("button", name="Przejmij sterowanie").click()
         expect(page.get_by_role("button", name="Oddaj sterowanie")).to_be_visible(timeout=10000)
         expect(page.get_by_alt_text("Podgląd na żywo")).to_be_visible(timeout=10000)
         assert no_horizontal_scroll(page)
-        page.screenshot(path=SHOTS / "06-takeover.png")
+        page.screenshot(path=SHOTS / "09-takeover.png")
         page.get_by_role("button", name="Oddaj sterowanie").click()
         expect(page.get_by_role("button", name="Przejmij sterowanie")).to_be_visible(timeout=10000)
         browser.close()

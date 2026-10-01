@@ -43,3 +43,7 @@ __pycache__/
 server/.venv/
 client/out/
 client/.next/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/node_modules/
+mobile/node_modules/

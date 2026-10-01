@@ -76,7 +76,7 @@ function LiveSurface({ s, ws }) {
   );
 }
 
-export default function ComputerView({ ws }) {
+export default function ComputerView({ ws, botId }) {
   const { t } = useT();
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
@@ -86,7 +86,10 @@ export default function ComputerView({ ws }) {
   return (
     <Section title={`${t('computer')} — ${data.kind}`}>
       <div className="text-xs text-zinc-500 mb-2">max {data.max_active_surfaces} active surfaces</div>
-      {data.surfaces.length ? data.surfaces.map((s) => <LiveSurface key={s.id} s={s} ws={ws} />) : <Empty>{t('noSurfaces')}</Empty>}
+      {(() => {
+        const list = botId ? data.surfaces.filter((s) => s.bot_id === botId) : data.surfaces;
+        return list.length ? list.map((s) => <LiveSurface key={s.id} s={s} ws={ws} />) : <Empty>{t('noSurfaces')}</Empty>;
+      })()}
     </Section>
   );
 }

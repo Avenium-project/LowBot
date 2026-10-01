@@ -17,6 +17,12 @@ import jsonschema
 from app.v2.bots import tool_allowed
 
 EffectKind = str  # "read" | "workspace" | "internal" | "external"
+EFFECT_TEXT = {
+    "read": "read-only",
+    "workspace": "changes files in the workspace",
+    "internal": "changes data inside Open Dots",
+    "external": "has an effect outside Open Dots",
+}
 
 
 @dataclass
@@ -71,7 +77,9 @@ class ToolSpec:
     def card(self, args: Dict[str, Any]) -> Dict[str, str]:
         if self.summarize:
             return self.summarize(args)
-        return {"summary": f"{self.name}", "target": "", "effect": self.effect_kind}
+        preview = "; ".join(f"{k}: {str(v)[:80]}" for k, v in list((args or {}).items())[:3])
+        return {"summary": f"{self.description.split('.')[0]} ({preview})" if preview else self.description.split(".")[0],
+                "target": "", "effect": EFFECT_TEXT.get(self.effect_kind, self.effect_kind)}
 
 
 def wire_name(name: str) -> str:

@@ -1,0 +1,14 @@
+{
+  "name": "open-dots-desktop",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Open Dots Windows client (Tauri shell around the static web UI). LowBot extension.",
+  "scripts": {
+    "build:ui": "cd ../client && npm ci && npm run build:export",
+    "tauri": "tauri",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Open Dots",
+  "version": "2.0.0",
+  "identifier": "io.lowbot.opendots",
+  "build": {
+    "beforeBuildCommand": "npm --prefix ../client run build:export",
+    "frontendDist": "../../client/out"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Open Dots",
+        "url": "bots/index.html",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 360,
+        "minHeight": 560
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost https: http://localhost:* http://127.0.0.1:*; frame-src 'none'; object-src 'none'",
+      "freezePrototype": true
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.png", "icons/icon.ico"],
+    "category": "Productivity",
+    "shortDescription": "Persistent AI collaborators",
+    "copyright": "MIT. Based on Anil-matcha/open-dots; LowBot extensions.",
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "nsis": { "installMode": "currentUser", "languages": ["Polish", "English"] }
+    }
+  }
+}

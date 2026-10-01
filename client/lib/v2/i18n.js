@@ -28,6 +28,7 @@ export const DICT = {
     hierarchy: 'Hierarchia (CEO → Head → Manager → Worker)', reportsTo: 'Raportuje do', orgRole: 'Rola w strukturze',
     computerMode: 'Tryb komputera', shared: 'wspólny', isolated: 'izolowany', budget: 'Budżet / dzień', tools: 'Narzędzia',
     pause_bot: 'Wstrzymaj bota', resume_bot: 'Wznów bota', export: 'Eksport', mockWarning: 'Dostawca testowy (atrapa) — to nie jest prawdziwy model.',
+    you: 'Ty', menu: 'Menu', emptyBots: 'Nie masz jeszcze botów. Dotknij +, aby utworzyć pierwszego.', waitingApprovals: 'czeka na Twoją zgodę', newChoice: 'Co chcesz utworzyć?', profile: 'Profil',
     elicitation: 'Pytanie z narzędzia MCP', openLink: 'Otwórz link', domain: 'Domena', accept: 'Akceptuj', decline: 'Odmów',
   },
   en: {
@@ -56,6 +57,7 @@ export const DICT = {
     hierarchy: 'Hierarchy (CEO → Head → Manager → Worker)', reportsTo: 'Reports to', orgRole: 'Org role',
     computerMode: 'Computer mode', shared: 'shared', isolated: 'isolated', budget: 'Budget / day', tools: 'Tools',
     pause_bot: 'Pause bot', resume_bot: 'Resume bot', export: 'Export', mockWarning: 'Test (mock) provider — not a real model.',
+    you: 'You', menu: 'Menu', emptyBots: 'No bots yet. Tap + to create your first one.', waitingApprovals: 'awaiting your approval', newChoice: 'What do you want to create?', profile: 'Profile',
     elicitation: 'Question from an MCP tool', openLink: 'Open link', domain: 'Domain', accept: 'Accept', decline: 'Decline',
   },
 };

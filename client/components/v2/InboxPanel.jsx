@@ -4,7 +4,7 @@ import { api } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Card, Empty, Section, fmtTime, inputCls } from './ui';
 
-function ApprovalCard({ a, ws }) {
+export function ApprovalCard({ a, ws }) {
   const { t } = useT();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(JSON.stringify(a.display, null, 2));
@@ -49,7 +49,7 @@ function ApprovalCard({ a, ws }) {
   );
 }
 
-function ElicitationCard({ e, ws }) {
+export function ElicitationCard({ e, ws }) {
   const { t } = useT();
   const props = e.schema?.properties || {};
   const [vals, setVals] = useState({});

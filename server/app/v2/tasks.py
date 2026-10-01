@@ -74,8 +74,12 @@ class TaskService:
             "SELECT member_id FROM memberships WHERE conversation_id = ? AND member_type = 'bot' ORDER BY joined_at",
             (conv_id,))]
         conv["archived"] = bool(conv["archived"])
-        last = self.db.one("SELECT MAX(seq) AS s FROM messages WHERE conversation_id = ?", (conv_id,))
-        conv["last_seq"] = (last or {}).get("s") or 0
+        last = self.db.one(
+            "SELECT seq, text, author_type, author_id, created_at FROM messages WHERE conversation_id = ? "
+            "ORDER BY seq DESC LIMIT 1", (conv_id,))
+        conv["last_seq"] = (last or {}).get("seq") or 0
+        conv["last_message"] = {"text": last["text"][:160], "author_type": last["author_type"],
+                                "author_id": last["author_id"], "created_at": last["created_at"]} if last else None
         conv["unread"] = self.db.scalar(
             "SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND seq > ? AND author_type != 'user'",
             (conv_id, conv["last_read_seq"])) or 0
