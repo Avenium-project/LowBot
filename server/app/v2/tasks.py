@@ -108,6 +108,12 @@ class TaskService:
                 "UPDATE conversations SET last_read_seq = MAX(last_read_seq, ?) WHERE id = ?", (seq, conv_id))
             self.db.execute("UPDATE tasks SET unread = 0 WHERE conversation_id = ?", (conv_id,))
 
+    def mark_unread(self, conv_id: str) -> None:
+        """Show the conversation as unread again from its latest bot/system message."""
+        seq = self.db.scalar("SELECT MAX(seq) FROM messages WHERE conversation_id = ? AND author_type != 'user'", (conv_id,))
+        with self.db.tx():
+            self.db.execute("UPDATE conversations SET last_read_seq = ? WHERE id = ?", (max(0, (seq or 1) - 1), conv_id))
+
     # -- messages ------------------------------------------------------------
     def messages(self, conv_id: str, after_seq: int = 0, limit: int = 200) -> List[Dict[str, Any]]:
         rows = self.db.all(

@@ -2,10 +2,9 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **2.6.0** — text can be selected only in bot messages and input fields; animated bot
-  characters (float and look around, hop while working, wiggle when they need you, squish on tap);
-  browser control UI from 2.5.0. SHA-256:
-  `eb6259654807a26bffa3e9046611798a5a192092ebb9863d359a38725e9173e4`
+- Version **2.7.0** — long-press a chat: Mark as unread, Pin, New section, Hide, More; pinned chats as
+  big characters on top, sections, Hidden chats. SHA-256:
+  `a9a610d9b4edb51c49ce4d77ee464c3c190220da04c732826f38dc618ca885b6`
 - Android 8.0+ (API 26). Podpis kluczem testowym — instaluje się jako aktualizacja poprzedniej wersji
   z tego katalogu. Instalacja spoza Sklepu Play: zezwól przeglądarce/menedżerowi plików na
   „instalowanie nieznanych aplikacji”.

@@ -195,6 +195,12 @@ def _artifact_data_url(r, artifact_id: str) -> str:
     return f"data:{meta['mime']};base64," + base64.b64encode(path.read_bytes()).decode()
 
 
+@router.post("/conversations/{conv_id}/unread")
+def mark_unread(conv_id: str, request: Request):
+    rt(request).services["tasks"].mark_unread(conv_id)
+    return {"ok": True}
+
+
 @router.post("/conversations/{conv_id}/read")
 def mark_read(conv_id: str, body: Dict[str, int], request: Request):
     rt(request).services["tasks"].mark_read(conv_id, int(body.get("seq", 0)))

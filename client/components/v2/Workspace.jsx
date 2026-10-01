@@ -254,7 +254,7 @@ function Shell() {
     return () => { delete window.__lowbotBack; };
   }, [sheet, page, active, wide, share]);
 
-  const list = <ChatList ws={ws} activeId={active} onOpen={openConv} onProfile={() => setSheet('menu')} onNew={() => setSheet('new')}
+  const list = <ChatList ws={ws} activeId={active} onOpen={openConv} onOpenBot={(b) => setPage({ kind: 'bot', data: b })} onProfile={() => setSheet('menu')} onNew={() => setSheet('new')}
     attention={attention} compact={wide} />;
   const conv = conversation && <Conversation key={conversation.id} conversation={conversation} ws={ws} skills={skills}
     onBack={wide ? null : () => setActive(null)}

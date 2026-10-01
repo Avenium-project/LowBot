@@ -122,6 +122,13 @@ public final class Tasks {
         return getConversation(cid);
     }
 
+    public void markUnread(final String cid) {
+        final long seq = db.count("SELECT COALESCE(MAX(seq), 1) FROM messages WHERE conversation_id = ? AND author_type != 'user'", cid);
+        db.tx(new Runnable() {
+            @Override public void run() { db.exec("UPDATE conversations SET last_read_seq = ? WHERE id = ?", Math.max(0, seq - 1), cid); }
+        });
+    }
+
     public void markRead(final String cid, final long seq) {
         db.tx(new Runnable() {
             @Override public void run() {

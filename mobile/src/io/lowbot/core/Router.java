@@ -138,6 +138,7 @@ public final class Router {
                 }
                 return Response.json(b.tasks.postUserMessage(id, body.optString("text"), J.str(body, "client_msg_id", null), att, J.str(body, "thread_root_id", null)));
             }
+            if ("unread".equals(sub) && post) { b.tasks.markUnread(id); return Response.json(J.obj("ok", true)); }
             if ("read".equals(sub) && post) { b.tasks.markRead(id, body.optLong("seq")); return Response.json(J.obj("ok", true)); }
         }
 
