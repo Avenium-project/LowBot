@@ -15,7 +15,7 @@ import java.util.Set;
 /** Bot profiles: lifecycle, permission narrowing, Duplicate, export. Mirrors server/app/v2/bots.py. */
 public final class Bots {
     public static final String[] DEFAULT_TOOLS = {
-        "workspace.*", "web.fetch", "http.post", "memory.*", "user.ask", "secret.request",
+        "workspace.*", "web.fetch", "http.post", "memory.*", "handoff.write", "soul.update", "project.*", "user.ask", "secret.request",
         "task.delegate", "task.get_status", "task.complete", "bot.message", "artifact.share",
         "browser.*", "routine.create",
     };
@@ -162,6 +162,7 @@ public final class Bots {
         db.tx(new Runnable() {
             @Override public void run() {
                 db.insert("bots", row);
+                b.mind.seed(row);
                 b.core.emit("bot.created", null, null, null, id, J.obj("name", row.optString("name")));
                 b.core.audit("bot.create", createdBy == null ? "user" : "bot", createdBy == null ? null : createdBy.optString("id"),
                         null, null, null, null, null, J.obj("bot_id", id));
@@ -239,6 +240,7 @@ public final class Bots {
         for (String k : EDITABLE) if (src.has(k) && !k.equals("pinned") && !k.equals("hidden")) J.put(d, k, src.opt(k));
         J.put(d, "name", src.optString("name") + " copy");
         final JSONObject copy = create(d, null);
+        b.mind.copy(id, copy.optString("id"));
         final String srcId = id;
         db.tx(new Runnable() {
             @Override public void run() {
@@ -265,7 +267,7 @@ public final class Bots {
         List<String> skills = new ArrayList<String>();
         for (JSONObject r : db.all("SELECT s.slug FROM bot_skills bs JOIN skills s ON s.id = bs.skill_id WHERE bs.bot_id = ?", id))
             skills.add(r.optString("slug"));
-        return J.obj("format", "opendots.bot.v1", "bot", out, "skills", J.arr(skills));
+        return J.obj("format", "opendots.bot.v1", "bot", out, "skills", J.arr(skills), "soul_md", b.mind.soul(id));
     }
 
     public JSONObject importBot(JSONObject payload) {
@@ -273,7 +275,9 @@ public final class Bots {
         JSONObject src = payload.optJSONObject("bot");
         JSONObject d = new JSONObject();
         if (src != null) for (String k : EDITABLE) if (src.has(k)) J.put(d, k, src.opt(k));
-        return create(d, null);
+        JSONObject bot = create(d, null);
+        if (!payload.optString("soul_md").isEmpty()) b.mind.setSoul(bot.optString("id"), payload.optString("soul_md"));
+        return bot;
     }
 
     /** Delete cancels active work and removes profile, memories and routines (Grok: deleting a bot deletes its routines). */
@@ -298,6 +302,7 @@ public final class Bots {
                 db.exec("UPDATE conversations SET archived = 1 WHERE kind = 'private' AND default_bot_id = ?", id);
                 db.exec("DELETE FROM bots WHERE id = ?", id);
                 b.core.emit("bot.deleted", null, null, null, id, null);
+                b.mind.deleteAll(id);
                 b.core.audit("bot.delete", "user", null, null, null, null, null, null, J.obj("bot_id", id));
             }
         });

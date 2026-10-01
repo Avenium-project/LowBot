@@ -88,4 +88,9 @@ final class Schema {
             + "run_id TEXT, approval_id TEXT, decision TEXT, outcome TEXT, summary_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL)",
         "CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
     };
+
+    /** v2: a conversation can be bound to a project folder (workspace/<project>/AGENTS.md). */
+    static final String[] V2 = {
+        "ALTER TABLE conversations ADD COLUMN project TEXT",
+    };
 }

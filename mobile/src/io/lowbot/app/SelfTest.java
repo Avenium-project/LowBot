@@ -103,6 +103,7 @@ public class SelfTest extends BroadcastReceiver {
         check("ok".equals(api(r, "GET", "/api/v2/health", null).optString("status")), "health");
 
         JSONArray script = new JSONArray()
+                .put(J.obj("when", "Write the new handoff now", "reply", "## Goal\nKeep testing LowBot.\n## Next steps\n- continue"))
                 .put(J.obj("when", "write a file", "call", J.obj("name", "workspace.write", "arguments", J.obj("path", "notes/a.txt", "content", "hello phone"))))
                 .put(J.obj("after_tool", "workspace.write", "reply", "file written"))
                 .put(J.obj("when", "post it", "call", J.obj("name", "http.post", "arguments", J.obj("url", "https://example.invalid/hook", "json", J.obj("a", 1)))))
@@ -180,6 +181,20 @@ public class SelfTest extends BroadcastReceiver {
         api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "remember this"));
         b.engine.drain(20000);
         check(b.memory.search("green tea", b.bots.get(bot.optString("id")), 5).size() == 1, "memory saved and searchable");
+        check(b.mind.memories(bot.optString("id")).size() == 1, "small memory written as memories/*.md");
+        check(b.mind.soul(bot.optString("id")).startsWith("# Asystent"), "soul.md seeded for a new bot");
+
+        // 7b. project rules + handoff instead of compaction
+        api(r, "PATCH", "/api/v2/conversations/" + cid, J.obj("project", "demo"));
+        b.mind.setProjectRules("demo", "Use tabs. Run tests before saying done.");
+        check(b.mind.promptSection(bot.optString("id"), "demo").contains("Use tabs"), "project AGENTS.md in prompt");
+        b.core.settings.handoffMaxMessages = 4;
+        api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "hello rotation"));
+        b.engine.drain(20000);
+        b.core.settings.handoffMaxMessages = 40;
+        check(b.mind.handoff(bot.optString("id")).contains("Keep testing LowBot"), "handoff replaced agents.md");
+        check(b.mind.handoffSeq(bot.optString("id"), cid) > 0, "context restarts after the handoff");
+        check(lastBotMessage(b, cid).optString("text").equals("[mock] hello rotation"), "bot continues after the handoff");
 
         // 8. Always allow stores a rule for this bot + tool
         JSONObject t8 = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "post it again")).optJSONArray("tasks").getJSONObject(0);

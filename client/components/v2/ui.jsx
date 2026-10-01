@@ -65,17 +65,9 @@ export function Section({ title, actions, children }) {
   );
 }
 
-const TASK_LABELS = {
-  pl: { completed: 'gotowe', failed: 'błąd', cancelled: 'zatrzymane', running: 'pracuje', queued: 'w kolejce',
-    unknown_outcome: 'wymaga decyzji', waiting_approval: 'czeka na zgodę', waiting_input: 'czeka na odpowiedź',
-    waiting_dependency: 'czeka na bota', retry_scheduled: 'ponawia', paused: 'wstrzymane', proposed: 'proponowane',
-    awaiting_approval: 'czeka na zgodę', ready: 'gotowe do wykonania', executing: 'wykonuje', waiting: 'czeka',
-    denied: 'odrzucone', unknown: 'niepewny wynik' },
-};
-
 export function TaskBadge({ status }) {
   const { lang } = useT();
-  const label = TASK_LABELS[lang]?.[status] || String(status || '').replace(/_/g, ' ');
+  const label = String(status || '').replace(/_/g, ' ');
   const c = {
     completed: 'bg-emerald-900/60 text-emerald-300', failed: 'bg-rose-900/60 text-rose-300',
     cancelled: 'bg-zinc-800 text-zinc-400', running: 'bg-sky-900/60 text-sky-300', queued: 'bg-zinc-800 text-zinc-300',

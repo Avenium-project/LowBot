@@ -17,6 +17,7 @@ browser version, served from the APK's own assets and talking to the in-app back
 | Routines | `Routines` + `AlarmReceiver` | Europe/Warsaw by default, DST rules, AlarmManager wake-ups, missed slots recorded |
 | Background work | `WorkService` | foreground service (dataSync) while tasks run; stops when idle |
 | Notifications | `LowBotApp.notifyOs` | finished / needs you; approvals with **Allow once / Deny** actions; muted while the app is on screen |
+| Bot memory files | `Mind` | per bot folder `bots/<id>/`: `soul.md` (purpose + behaviour, sent first in every prompt), `agents.md` (handoff: **cleared and replaced** instead of context compaction — when a conversation passes ~40 messages/48k chars the bot writes the exact goal, done, next steps, and continues with a fresh context), `memories/*.md` (small long-term notes via `memory.save`); per project `workspace/<project>/AGENTS.md` (only how to behave on that project, `project.use` / `project.update_rules`) |
 | Secrets | `Core.secretPut` | AES-256-GCM, key in the Android Keystore; never in messages, events or the model context |
 
 **Limits (honest):** work continues when you leave the app, but **not when the phone is off**;

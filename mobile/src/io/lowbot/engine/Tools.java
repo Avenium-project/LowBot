@@ -189,7 +189,7 @@ public final class Tools {
         Map<String, Spec> out = new TreeMap<String, Spec>();
         List<String> allowed = J.strings(bot.optJSONArray("tools"));
         for (Map.Entry<String, Spec> e : all(bot).entrySet()) {
-            if (!J.anyGlob(allowed, e.getKey())) continue;
+            if (!J.anyGlob(allowed, e.getKey()) && !J.anyGlob(MIND_TOOLS, e.getKey())) continue;
             if (skillTools != null && !skillTools.isEmpty() && !J.anyGlob(skillTools, e.getKey())) continue;
             if (e.getValue().requires != null && caps != null && !caps.contains(e.getValue().requires)) continue;
             out.put(e.getKey(), e.getValue());
@@ -198,4 +198,7 @@ public final class Tools {
     }
 
     public Spec get(JSONObject bot, String name) { return all(bot).get(name); }
+
+    /** Every bot can keep its own memory files (soul.md still needs approval). */
+    static final List<String> MIND_TOOLS = java.util.Arrays.asList("memory.save", "memory.search", "memory.forget", "handoff.write", "soul.update", "project.use", "project.update_rules");
 }

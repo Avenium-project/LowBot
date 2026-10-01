@@ -172,20 +172,18 @@ function PhoneSettings() {
   const save = (patch) => api('/settings', { method: 'POST', body: patch }).then(setSt).catch((e) => setErr(e.message));
   if (!st) return err ? <div className="text-xs text-rose-300">{err}</div> : null;
   return (
-    <Section title={pl ? 'Bezpieczeństwo i wykonywanie' : 'Safety & execution'}>
+    <Section title={'Safety & execution'}>
       <label className="flex items-start gap-2 text-sm mb-3"><input type="checkbox" className="mt-1" checked={st.auto_review} onChange={(e) => save({ auto_review: e.target.checked })} />
-        <span><b>Auto Review</b><br /><span className="text-xs text-zinc-400">{pl
-          ? 'Niezależne wywołanie modelu ocenia akcje wymagające zgody: przepuszcza oczywiste, odrzuca szkodliwe, resztę zostawia Tobie. Płatności, publikacje i inne akcje „zawsze pytaj” zawsze trafiają do Ciebie.'
-          : 'A separate model call rates actions that need approval: allows obvious ones, denies harmful ones, leaves the rest to you. Payments, publishing and other always-ask actions always come to you.'}</span></span></label>
-      <Field label={pl ? 'Wykonywanie na tym telefonie (terminal)' : 'Execution on this phone (terminal)'}>
+        <span><b>Auto Review</b><br /><span className="text-xs text-zinc-400">{'A separate model call rates actions that need approval: allows obvious ones, denies harmful ones, leaves the rest to you. Payments, publishing and other always-ask actions always come to you.'}</span></span></label>
+      <Field label={'Execution on this phone (terminal)'}>
         <select className={inputCls} value={st.local_execution} onChange={(e) => save({ local_execution: e.target.value })}>
-          <option value="ask">{pl ? 'Pytaj za każdym razem' : 'Ask every time'}</option>
-          <option value="always">{pl ? 'Zawsze zezwalaj' : 'Always allow'}</option>
-          <option value="never">{pl ? 'Nigdy nie zezwalaj' : 'Never allow'}</option>
+          <option value="ask">{'Ask every time'}</option>
+          <option value="always">{'Always allow'}</option>
+          <option value="never">{'Never allow'}</option>
         </select></Field>
       <label className="flex items-start gap-2 text-sm my-3"><input type="checkbox" className="mt-1" checked={st.allow_private_network} onChange={(e) => save({ allow_private_network: e.target.checked })} />
-        <span>{pl ? 'Pozwól botom łączyć się z siecią lokalną (LAN)' : 'Let bots reach your local network (LAN)'}</span></label>
-      <Field label={pl ? 'Strefa czasowa rutyn' : 'Routine time zone'}><input className={inputCls} defaultValue={st.timezone} onBlur={(e) => e.target.value !== st.timezone && save({ timezone: e.target.value })} /></Field>
+        <span>{'Let bots reach your local network (LAN)'}</span></label>
+      <Field label={'Routine time zone'}><input className={inputCls} defaultValue={st.timezone} onBlur={(e) => e.target.value !== st.timezone && save({ timezone: e.target.value })} /></Field>
       {err && <div className="text-xs text-rose-300">{err}</div>}
     </Section>
   );
@@ -209,13 +207,10 @@ function Admin() {
 }
 
 export default function SettingsPanel({ ws }) {
-  const { t, lang, setLang } = useT();
   return (
     <div>
-      <Section title={t('language')}>
-        <div className="flex gap-2"><Button kind={lang === 'pl' ? 'primary' : 'default'} onClick={() => setLang('pl')}>Polski</Button>
-          <Button kind={lang === 'en' ? 'primary' : 'default'} onClick={() => setLang('en')}>English</Button></div>
-        <input className={`${inputCls} mt-2`} placeholder={lang === 'pl' ? 'Twoje imię (inicjał w aplikacji)' : 'Your name (initial shown in the app)'}
+      <Section title="Profile">
+        <input className={inputCls} placeholder={'Your name (initial shown in the app)'}
           defaultValue={typeof window !== 'undefined' ? window.localStorage.getItem('opendots.name') || '' : ''}
           onChange={(e) => window.localStorage.setItem('opendots.name', e.target.value)} />
         {ws.health && <div className="text-xs text-zinc-500 mt-2">schema v{ws.health.schema_version} · {ws.health.timezone} · {ws.health.capabilities.join(', ')} · runs ≤ {ws.health.limits.max_active_runs}, screens ≤ {ws.health.limits.max_active_surfaces}</div>}

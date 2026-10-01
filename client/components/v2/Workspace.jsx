@@ -52,7 +52,7 @@ function SearchPanel({ onOpenConversation, onOpenTask }) {
 }
 
 export default function Workspace() {
-  const [lang, setLangState] = useState('pl');
+  const [lang, setLangState] = useState('en');
   const [authed, setAuthed] = useState(null);
   useEffect(() => { setLangState(detectLang()); }, []);
   const setLang = useCallback((l) => { setLangState(l); window.localStorage.setItem('opendots.lang', l); document.documentElement.lang = l; }, []);

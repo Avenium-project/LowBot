@@ -51,6 +51,9 @@ public final class Core {
         public long retryMaxMs = 300000;
         public String timezone = "Europe/Warsaw";
         public boolean allowPrivateNetwork = false;
+        /** Instead of compacting context: past these limits the bot writes a handoff (agents.md) and starts fresh. */
+        public int handoffMaxMessages = 40;
+        public int handoffMaxChars = 48000;
     }
 
     public Core(Context ctx, String dbName) {

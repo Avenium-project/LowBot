@@ -104,6 +104,17 @@ public final class Router {
             if ("duplicate".equals(sub)) return Response.json(b.bots.duplicate(id));
             if ("export".equals(sub)) return Response.json(b.bots.export(id));
             if ("conversation".equals(sub)) return Response.json(b.tasks.privateConversation(id));
+            if ("mind".equals(sub) && get) { b.bots.require(id); return Response.json(b.mind.all(id)); }
+            if ("mind".equals(sub) && p.length == 4 && (post || patch)) {
+                b.bots.require(id);
+                String what = p[3];
+                if ("soul".equals(what)) b.mind.setSoul(id, body.optString("content"));
+                else if ("agents".equals(what)) b.mind.replaceHandoff(id, body.optString("content"), null, 0, "user");
+                else if ("memories".equals(what)) b.mind.remember(id, body.optString("title"), body.optString("content"));
+                else throw new ApiError(404, "Unknown file.");
+                return Response.json(b.mind.all(id));
+            }
+            if ("mind".equals(sub) && p.length == 5 && del && "memories".equals(p[3])) { b.mind.forget(id, Uri.decode(p[4])); return Response.json(b.mind.all(id)); }
         }
 
         // ------------------------------------------------------ conversations
@@ -233,6 +244,12 @@ public final class Router {
             if ("test-run".equals(sub)) return Response.json(b.routines.testRun(id));
         }
         if (a.equals("hooks")) throw new ApiError(404, "Webhooks are not available on the phone (no public address).");
+
+        // ----------------------------------------------------------- projects
+        if (a.equals("projects")) {
+            if (id == null && get) return Response.json(b.mind.projects());
+            if ("agents".equals(sub) && (post || patch)) { b.mind.setProjectRules(id, body.optString("content")); return Response.json(b.mind.projects()); }
+        }
 
         // ------------------------------------------------------------- skills
         if (a.equals("skills")) {

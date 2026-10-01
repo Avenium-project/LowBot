@@ -237,13 +237,66 @@ public final class Builtin {
             public JSONObject card(JSONObject a) { return Builtin.card("POST to " + a.optString("url"), "sends data to an external system", a.optString("url")); }
         }));
 
-        reg.register(new Spec("memory.save", "Save a durable fact to this bot's memory (scope bot) or team knowledge (scope team).",
-                Tools.obj(props("content", S, "scope", J.obj("enum", new JSONArray().put("bot").put("team"))), "content"), Tools.INTERNAL, "allow", new Tools.Executor() {
+        reg.register(new Spec("memory.save", "Save a small long-term memory as memories/<title>.md in your folder (a durable fact, preference or lesson). "
+                + "scope team also shares it as team knowledge.",
+                Tools.obj(props("title", S, "content", S, "scope", J.obj("enum", new JSONArray().put("bot").put("team"))), "content"), Tools.INTERNAL, "allow", new Tools.Executor() {
             public Object run(Ctx ctx, JSONObject a) throws Exception {
                 String scope = a.optString("scope", "bot");
                 if ("team".equals(scope) && !ctx.bot.optBoolean("team_memory_access")) throw new ToolError("This bot may not write team knowledge.");
+                String title = a.optString("title", "").trim();
+                if (title.isEmpty()) title = J.truncate(a.optString("content").split("\\n")[0], 60).replace("\n…", "");
+                JSONObject f = ctx.b.mind.remember(ctx.bot.optString("id"), title, a.optString("content"));
                 JSONObject m = ctx.b.memory.save(a.optString("content"), scope, ctx.bot.optString("id"), "task:" + ctx.task.optString("id"), "bot:" + ctx.bot.optString("id"));
-                return J.obj("memory_id", m.optString("id"), "scope", scope);
+                return J.obj("memory_id", m.optString("id"), "file", "memories/" + f.optString("name"), "scope", scope);
+            }
+        }));
+        reg.register(new Spec("memory.forget", "Delete one of your small memories (file name from memories/).", Tools.obj(props("name", S), "name"), Tools.INTERNAL, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) {
+                ctx.b.mind.forget(ctx.bot.optString("id"), a.optString("name"));
+                return J.obj("forgotten", a.optString("name"));
+            }
+        }));
+        reg.register(new Spec("handoff.write", "Clear agents.md and replace it with a handoff for your next session (exact goal, done, next steps, open questions, key facts). "
+                + "This replaces context compaction: the conversation continues from this handoff with a fresh context.",
+                Tools.obj(props("content", S), "content"), Tools.INTERNAL, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) {
+                String cid = J.str(ctx.task, "conversation_id", null);
+                long seq = cid == null ? 0 : ctx.b.core.db.count("SELECT COALESCE(MAX(seq), 0) FROM messages WHERE conversation_id = ?", cid);
+                ctx.b.mind.replaceHandoff(ctx.bot.optString("id"), a.optString("content"), cid, seq, "bot");
+                return J.obj("written", "agents.md", "note", "Next turns start from this handoff.");
+            }
+        }));
+        reg.register(new Spec("soul.update", "Rewrite your soul.md (purpose and behaviour). Requires the user's approval.",
+                Tools.obj(props("content", S), "content"), Tools.INTERNAL, "ask", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) {
+                ctx.b.mind.setSoul(ctx.bot.optString("id"), a.optString("content"));
+                return J.obj("written", "soul.md");
+            }
+        }).card(new Tools.Summarize() {
+            public JSONObject card(JSONObject a) { return Builtin.card("Rewrite soul.md (" + a.optString("content").length() + " chars)", "changes who this bot is and how it behaves", "soul.md"); }
+        }));
+        reg.register(new Spec("project.use", "Work on a project: binds this conversation to workspace/<name>/ (created if needed) and returns its AGENTS.md rules.",
+                Tools.obj(props("name", S), "name"), Tools.WORKSPACE, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) throws Exception {
+                String cid = J.str(ctx.task, "conversation_id", null);
+                if (cid == null) throw new ToolError("This task has no conversation.");
+                JSONObject c = ctx.b.tasks.updateConversation(cid, J.obj("project", a.optString("name")));
+                String p = c.optString("project");
+                return J.obj("project", p, "folder", p + "/", "agents_md", ctx.b.mind.projectRules(p));
+            }
+        }));
+        reg.register(new Spec("project.update_rules", "Replace the current project's AGENTS.md: only how an agent should behave while working on this project "
+                + "(conventions, commands, do/don't). Not for task status — use handoff.write for that.",
+                Tools.obj(props("content", S, "project", S), "content"), Tools.WORKSPACE, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) throws Exception {
+                String p = a.optString("project", "");
+                if (p.isEmpty()) {
+                    String cid = J.str(ctx.task, "conversation_id", null);
+                    p = cid == null ? null : ctx.b.core.db.scalar("SELECT project FROM conversations WHERE id = ?", cid);
+                }
+                if (p == null || p.isEmpty()) throw new ToolError("No current project. Call project.use first.");
+                ctx.b.mind.setProjectRules(p, a.optString("content"));
+                return J.obj("written", p + "/AGENTS.md");
             }
         }));
         reg.register(new Spec("memory.search", "Full-text search over memories visible to this bot.",

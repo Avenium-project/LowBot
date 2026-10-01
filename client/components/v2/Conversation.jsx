@@ -16,8 +16,8 @@ function dayLabel(iso, lang) {
   const now = new Date();
   const y = new Date(now); y.setDate(now.getDate() - 1);
   const time = d.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
-  if (d.toDateString() === now.toDateString()) return `${lang === 'pl' ? 'Dzisiaj' : 'Today'} ${time}`;
-  if (d.toDateString() === y.toDateString()) return `${lang === 'pl' ? 'Wczoraj' : 'Yesterday'} ${time}`;
+  if (d.toDateString() === now.toDateString()) return `${'Today'} ${time}`;
+  if (d.toDateString() === y.toDateString()) return `${'Yesterday'} ${time}`;
   return d.toLocaleString(lang, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 }
 
@@ -40,16 +40,16 @@ function SecretCard({ m }) {
   };
   return (
     <div className="lb-rise my-2 rounded-[22px] bg-[#262626] px-4 py-4">
-      <div className="flex items-center gap-2 text-[17px] font-semibold text-white"><FiLock /> {lang === 'pl' ? 'Bezpieczne podanie sekretu' : 'Secure secret request'}</div>
+      <div className="flex items-center gap-2 text-[17px] font-semibold text-white"><FiLock /> {'Secure secret request'}</div>
       <div className="text-[15px] text-zinc-300 mt-1">{req.description} <span className="text-zinc-500">({req.name})</span></div>
-      {state === 'ok' ? <div className="mt-3 rounded-xl py-2.5 text-center bg-emerald-900/40 text-emerald-400">{lang === 'pl' ? 'Zapisano w sejfie telefonu' : 'Saved in the phone vault'}</div> : (
+      {state === 'ok' ? <div className="mt-3 rounded-xl py-2.5 text-center bg-emerald-900/40 text-emerald-400">{'Saved in the phone vault'}</div> : (
         <form onSubmit={save} className="mt-3 flex gap-2">
           <input type="password" autoComplete="off" className="flex-1 min-w-0 rounded-xl bg-black/40 px-3 py-2.5 outline-none text-zinc-100" value={value} onChange={(e) => setValue(e.target.value)}
-            placeholder={lang === 'pl' ? 'Wartość (ukryta przed botem)' : 'Value (hidden from the bot)'} />
-          <button disabled={!value} className="rounded-xl bg-white text-black px-4 font-medium disabled:opacity-50">{lang === 'pl' ? 'Zapisz' : 'Save'}</button>
+            placeholder={'Value (hidden from the bot)'} />
+          <button disabled={!value} className="rounded-xl bg-white text-black px-4 font-medium disabled:opacity-50">{'Save'}</button>
         </form>)}
       {state && state !== 'ok' && <div className="text-xs text-rose-300 mt-2">{state}</div>}
-      <div className="text-[12px] text-zinc-500 mt-2">{lang === 'pl' ? 'Bot zobaczy tylko nazwę, nie wartość.' : 'The bot only sees the name, never the value.'}</div>
+      <div className="text-[12px] text-zinc-500 mt-2">{'The bot only sees the name, never the value.'}</div>
     </div>
   );
 }
@@ -58,10 +58,10 @@ function TakeoverCard({ m, onOpenComputer }) {
   const { lang } = useT();
   return (
     <div className="lb-rise lb-attention my-2 rounded-[22px] bg-[#262626] px-4 py-4">
-      <div className="flex items-center gap-2 text-[17px] font-semibold text-white"><FiMonitor /> {lang === 'pl' ? 'Bot potrzebuje Ciebie przy komputerze' : 'The bot needs you on the computer'}</div>
+      <div className="flex items-center gap-2 text-[17px] font-semibold text-white"><FiMonitor /> {'The bot needs you on the computer'}</div>
       <div className="text-[15px] text-zinc-300 mt-1 whitespace-pre-wrap">{m.text.replace(/^🖥️\s*/, '')}</div>
       <button onClick={() => onOpenComputer(m.meta.takeover_request)} className="mt-3 w-full rounded-xl bg-white text-black py-2.5 font-medium">
-        {lang === 'pl' ? 'Przejmij komputer' : 'Take over the computer'}</button>
+        {'Take over the computer'}</button>
     </div>
   );
 }
@@ -104,16 +104,16 @@ function ApprovalInline({ a, ws, onChanged }) {
     catch (e) { setErr(e.message); }
   };
   const done = {
-    approved: [lang === 'pl' ? 'Zatwierdzono' : 'Approved', 'bg-emerald-900/40 text-emerald-400', FiCheckCircle],
-    consumed: [lang === 'pl' ? 'Zatwierdzono' : 'Approved', 'bg-emerald-900/40 text-emerald-400', FiCheckCircle],
-    denied: [lang === 'pl' ? 'Odrzucono' : 'Denied', 'bg-rose-900/40 text-rose-400', FiXCircle],
-    expired: [lang === 'pl' ? 'Wygasło' : 'Expired', 'bg-zinc-800 text-zinc-400', FiClock],
+    approved: ['Approved', 'bg-emerald-900/40 text-emerald-400', FiCheckCircle],
+    consumed: ['Approved', 'bg-emerald-900/40 text-emerald-400', FiCheckCircle],
+    denied: ['Denied', 'bg-rose-900/40 text-rose-400', FiXCircle],
+    expired: ['Expired', 'bg-zinc-800 text-zinc-400', FiClock],
   }[a.status];
   const Icon = done?.[2];
   const description = `${a.summary}${a.effect ? ` — ${a.effect}` : ''}${a.target ? ` (${a.target})` : ''}`;
   return (
     <div className={cls('lb-rise my-2 rounded-[22px] bg-[#262626] px-4 py-4', !done && 'lb-attention')}>
-      <div className="text-[17px] font-semibold text-white">{lang === 'pl' ? 'Prośba o zgodę' : 'Approval request'}</div>
+      <div className="text-[17px] font-semibold text-white">{'Approval request'}</div>
       <button onClick={() => setOpen(!open)} className={cls('text-left text-[15px] text-zinc-200 mt-1', !open && 'line-clamp-3')}>{description}</button>
       {a.review?.decision && <div className="mt-2 text-[13px] text-sky-300">Auto Review: {a.review.reason}</div>}
       {open && !editing && <pre className="mt-2 text-xs bg-black/30 rounded-xl p-3 whitespace-pre-wrap break-all max-h-48 overflow-y-auto text-zinc-300">{JSON.stringify(a.display, null, 2)}</pre>}
@@ -128,8 +128,8 @@ function ApprovalInline({ a, ws, onChanged }) {
         </div>
       ) : (
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <button onClick={() => decide('approve')} className="lb-press rounded-xl bg-white text-black py-2.5 font-medium">{lang === 'pl' ? 'Zezwól raz' : 'Allow once'}</button>
-          <button onClick={() => decide('always')} className="lb-press rounded-xl bg-[#3a3a3c] py-2.5">{lang === 'pl' ? 'Zawsze zezwalaj' : 'Always allow'}</button>
+          <button onClick={() => decide('approve')} className="lb-press rounded-xl bg-white text-black py-2.5 font-medium">{'Allow once'}</button>
+          <button onClick={() => decide('always')} className="lb-press rounded-xl bg-[#3a3a3c] py-2.5">{'Always allow'}</button>
           <button onClick={() => decide('deny')} className="lb-press rounded-xl bg-[#3a3a3c] py-2.5">{t('deny')}</button>
           <button onClick={() => { setOpen(true); setEditing(true); }} className="lb-press rounded-xl bg-[#3a3a3c] py-2.5">{t('edit')}</button>
         </div>
@@ -221,7 +221,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
     const body = text; const att = attachments;
     setText(''); setAttachments([]);
     try { await sendMessage(conversation.id, body, att); }
-    catch (err) { setError(err.status ? err.message : (lang === 'pl' ? 'Brak sieci — wyślę, gdy wróci połączenie.' : 'Offline — will send when back online.')); }
+    catch (err) { setError(err.status ? err.message : ('Offline — will send when back online.')); }
     load();
   };
 
@@ -248,9 +248,9 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
       return;
     }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { setError(lang === 'pl' ? 'Dyktowanie nie jest dostępne na tym urządzeniu.' : 'Dictation is not available on this device.'); return; }
+    if (!SR) { setError('Dictation is not available on this device.'); return; }
     const r = new SR();
-    r.lang = lang === 'pl' ? 'pl-PL' : 'en-US';
+    r.lang = 'en-US';
     r.onresult = (e) => setText((x) => `${x} ${e.results[0][0].transcript}`.trim());
     r.onend = () => setListening(false);
     setListening(true);
@@ -273,11 +273,11 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
         try {
           const tr = await api('/voice/transcribe', { method: 'POST', body: { artifact_id: art.id, language: lang } });
           setText((x) => `${x} ${tr.text}`.trim());
-        } catch (err) { setError(`${lang === 'pl' ? 'Transkrypcja' : 'Transcription'}: ${err.message}`); }
+        } catch (err) { setError(`${'Transcription'}: ${err.message}`); }
       };
       rec.start();
       setRecording(rec);
-    } catch (err) { setError(`${lang === 'pl' ? 'Brak dostępu do mikrofonu' : 'Microphone unavailable'}: ${err.message}`); }
+    } catch (err) { setError(`${'Microphone unavailable'}: ${err.message}`); }
   };
 
   // Tasks currently parked on a secure secret request or a computer takeover: no plain answer box.
@@ -335,8 +335,8 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
   const pending = pendingOutbox(conversation.id);
   const title = conversation.title || (conversation.kind === 'group' ? members.map((b) => b.name).join(', ') : lead?.name);
   const placeholder = conversation.kind === 'group'
-    ? (lang === 'pl' ? 'Napisz do grupy (@bot)' : 'Message the group (@bot)')
-    : `${lang === 'pl' ? 'Zapytaj' : 'Ask'} ${lead?.name || ''}`;
+    ? ('Message the group (@bot)')
+    : `${'Ask'} ${lead?.name || ''}`;
 
   let lastAt = null;
   let dividerShown = false;
@@ -350,7 +350,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
           <span className="font-semibold text-[17px] truncate">{title}</span>
         </button>
         <span className="flex-1" />
-        {voiceChat && <button onClick={toggleVoiceChat} className="lb-pop lb-attention h-10 shrink-0 rounded-full bg-rose-600 px-4 text-[14px] flex items-center gap-2"><FiHeadphones /> {lang === 'pl' ? 'Zakończ' : 'End'}</button>}
+        {voiceChat && <button onClick={toggleVoiceChat} className="lb-pop lb-attention h-10 shrink-0 rounded-full bg-rose-600 px-4 text-[14px] flex items-center gap-2"><FiHeadphones /> {'End'}</button>}
         <button aria-label={t('computer')} title={t('computer')} onClick={() => onOpenComputer?.(conversation.kind === 'group' ? null : lead)}
           className="h-12 w-12 shrink-0 rounded-full bg-[#2a2a2a]/95 border border-white/10 flex items-center justify-center text-xl"><FiMonitor /></button>
       </header>
@@ -365,7 +365,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
           const prev = timeline[i - 1];
           return (
             <div key={it.kind === 'msg' ? it.m.id : it.a.id}>
-              {showDivider && <div className="lb-rise flex items-center gap-3 my-4"><span className="flex-1 h-px bg-blue-500/50" /><span className="text-[13px] font-semibold tracking-wider text-blue-400">{lang === 'pl' ? 'NOWE' : 'NEW'}</span><span className="flex-1 h-px bg-blue-500/50" /></div>}
+              {showDivider && <div className="lb-rise flex items-center gap-3 my-4"><span className="flex-1 h-px bg-blue-500/50" /><span className="text-[13px] font-semibold tracking-wider text-blue-400">{'NEW'}</span><span className="flex-1 h-px bg-blue-500/50" /></div>}
               {sep && <div className="text-center text-[14px] text-zinc-500 my-4">{dayLabel(it.at, lang)}</div>}
               {it.kind === 'msg'
                 ? <Bubble m={it.m} bot={botsById[it.m.author_id]} onOpenComputer={openComputer} animate={i >= timeline.length - 6} showName={conversation.kind === 'group' && it.m.author_type === 'bot'
@@ -402,7 +402,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); fileRef.current.click(); }}><FiPaperclip /> {t('attach')}</button>
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); setText('/'); }}>⚡ {t('skills')}</button>
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); onOpenComputer?.(lead); }}><FiMonitor /> {t('computer')}</button>
-            {local && <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); toggleVoiceChat(); }}><FiHeadphones /> {lang === 'pl' ? 'Rozmowa głosowa' : 'Voice chat'}</button>}
+            {local && <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); toggleVoiceChat(); }}><FiHeadphones /> {'Voice chat'}</button>}
           </div>
         )}
         {attachments.length > 0 && <div className="text-[13px] text-zinc-400 mb-2">{attachments.map((a) => `📎 ${a.name}`).join('  ')}</div>}
@@ -419,7 +419,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
               <button type="submit" aria-label={t('send')} title={t('send')} className="lb-pop lb-press h-11 w-11 rounded-full bg-white text-black flex items-center justify-center shrink-0 text-xl"><FiArrowUp /></button>
             ) : <>
               <button type="button" aria-label={t('dictate')} title={t('dictate')} onClick={dictate} className={cls('h-11 w-10 flex items-center justify-center shrink-0 text-xl', listening ? 'text-rose-400' : 'text-zinc-400')}><FiMic /></button>
-              <button type="button" aria-label={local ? 'Voice chat' : t('voiceNote')} title={local ? (lang === 'pl' ? 'Rozpocznij rozmowę głosową' : 'Start voice chat') : t('voiceNote')} onClick={local ? toggleVoiceChat : toggleVoice}
+              <button type="button" aria-label={local ? 'Voice chat' : t('voiceNote')} title={local ? ('Start voice chat') : t('voiceNote')} onClick={local ? toggleVoiceChat : toggleVoice}
                 className={cls('h-11 w-14 rounded-full flex items-center justify-center shrink-0', recording || voiceChat ? 'bg-rose-600 text-white' : 'bg-white text-black')}>
                 {recording ? <FiSquare /> : <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor">{[4, 8, 12, 16, 20].map((x, i) => <rect key={x} x={x - 1} y={[9, 5, 3, 6, 9][i]} width="2" height={[6, 14, 18, 12, 6][i]} rx="1" />)}</g></svg>}
               </button>

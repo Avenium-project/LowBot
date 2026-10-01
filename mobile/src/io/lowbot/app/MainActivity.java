@@ -270,7 +270,7 @@ public class MainActivity extends Activity implements Computer.Host {
             });
             return;
         }
-        tts.setLanguage("en".equals(lang) ? java.util.Locale.US : new java.util.Locale("pl", "PL"));
+        tts.setLanguage(java.util.Locale.US);
         tts.speak(text == null ? "" : text, TextToSpeech.QUEUE_FLUSH, null, "lowbot");
     }
 
@@ -477,7 +477,7 @@ public class MainActivity extends Activity implements Computer.Host {
         });
         Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en".equals(lang) ? "en-US" : "pl-PL");
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "pl".equals(lang) ? "pl-PL" : "en-US");
         recognizer.startListening(i);
     }
 

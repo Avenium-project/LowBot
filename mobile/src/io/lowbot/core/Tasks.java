@@ -98,6 +98,11 @@ public final class Tasks {
                 if (d.has("pinned")) db.exec("UPDATE conversations SET pinned = ? WHERE id = ?", J.bool(d, "pinned"), id);
                 if (d.has("hidden")) db.exec("UPDATE conversations SET hidden = ? WHERE id = ?", J.bool(d, "hidden"), id);
                 if (d.has("archived")) db.exec("UPDATE conversations SET archived = ? WHERE id = ?", J.bool(d, "archived"), id);
+                if (d.has("project")) {
+                    String p = d.isNull("project") || d.optString("project").trim().isEmpty() ? null : b.mind.projectDir(d.optString("project")).getName();
+                    if (p != null) b.mind.projectDir(p).mkdirs();
+                    db.exec("UPDATE conversations SET project = ? WHERE id = ?", p, id);
+                }
                 b.core.emit("conversation.updated", id, null, null, null, null);
             }
         });

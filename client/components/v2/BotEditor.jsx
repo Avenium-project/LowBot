@@ -34,19 +34,19 @@ function Label({ children }) { return <div className="px-6 pt-5 pb-2 text-[14px]
 function InstructionsScreen({ f, set, onBack, save, pl }) {
   return (
     <div className="lb-side-in space-y-3">
-      <button onClick={onBack} className="flex items-center gap-1 text-sky-400 text-[15px]"><FiChevronLeft /> {pl ? 'Wróć' : 'Back'}</button>
+      <button onClick={onBack} className="flex items-center gap-1 text-sky-400 text-[15px]"><FiChevronLeft /> {'Back'}</button>
       <div className={cls(card, 'p-4 space-y-3')}>
-        <Field label={pl ? 'Opis roli (jedno zdanie)' : 'Role (one sentence)'}><input className={inputCls} value={f.role_description} onChange={set('role_description')} /></Field>
-        <Field label={pl ? 'Instrukcje' : 'Instructions'} hint={pl ? 'Jak bot ma pracować: cele, styl, czego unikać, kiedy pytać Cię o zgodę.' : 'How the bot should work: goals, style, what to avoid, when to ask you.'}>
+        <Field label={'Role (one sentence)'}><input className={inputCls} value={f.role_description} onChange={set('role_description')} /></Field>
+        <Field label={'Instructions'} hint={'How the bot should work: goals, style, what to avoid, when to ask you.'}>
           <textarea className={`${inputCls} h-64 text-[15px] leading-relaxed`} value={f.instructions} onChange={set('instructions')} /></Field>
-        <Button kind="primary" onClick={save}>{pl ? 'Zapisz' : 'Save'}</Button>
+        <Button kind="primary" onClick={save}>{'Save'}</Button>
       </div>
     </div>
   );
 }
 
 function RoutineForm({ botId, onDone, pl }) {
-  const [r, setR] = useState({ name: '', schedule: pl ? 'w dni robocze o 8:00' : 'every weekday at 8:00 AM', prompt: '' });
+  const [r, setR] = useState({ name: '', schedule: 'every weekday at 8:00 AM', prompt: '' });
   const [preview, setPreview] = useState(null);
   const [err, setErr] = useState('');
   useEffect(() => {
@@ -60,12 +60,12 @@ function RoutineForm({ botId, onDone, pl }) {
   };
   return (
     <div className="lb-rise px-5 py-4 space-y-2 border-t border-white/5">
-      <input className={inputCls} placeholder={pl ? 'Nazwa' : 'Name'} value={r.name} onChange={(e) => setR({ ...r, name: e.target.value })} />
-      <input className={inputCls} placeholder={pl ? 'Kiedy, np. codziennie o 9:00' : 'When, e.g. every day at 9:00'} value={r.schedule} onChange={(e) => setR({ ...r, schedule: e.target.value })} />
-      {preview && <div className="text-xs text-zinc-500">{pl ? 'Następnie' : 'Next'}: {preview.slice(0, 3).join(' · ')}</div>}
-      <textarea className={`${inputCls} h-20`} placeholder={pl ? 'Co ma zrobić?' : 'What should it do?'} value={r.prompt} onChange={(e) => setR({ ...r, prompt: e.target.value })} />
+      <input className={inputCls} placeholder={'Name'} value={r.name} onChange={(e) => setR({ ...r, name: e.target.value })} />
+      <input className={inputCls} placeholder={'When, e.g. every day at 9:00'} value={r.schedule} onChange={(e) => setR({ ...r, schedule: e.target.value })} />
+      {preview && <div className="text-xs text-zinc-500">{'Next'}: {preview.slice(0, 3).join(' · ')}</div>}
+      <textarea className={`${inputCls} h-20`} placeholder={'What should it do?'} value={r.prompt} onChange={(e) => setR({ ...r, prompt: e.target.value })} />
       {err && <div className="text-xs text-rose-300">{err}</div>}
-      <div className="flex gap-2"><Button kind="primary" disabled={!r.prompt || !preview} onClick={save}>{pl ? 'Dodaj' : 'Add'}</Button><Button onClick={onDone}>{pl ? 'Anuluj' : 'Cancel'}</Button></div>
+      <div className="flex gap-2"><Button kind="primary" disabled={!r.prompt || !preview} onClick={save}>{'Add'}</Button><Button onClick={onDone}>{'Cancel'}</Button></div>
     </div>
   );
 }
@@ -80,11 +80,11 @@ function Routines({ bot, pl, tick }) {
       {rows.length ? rows.map((r) => (
         <div key={r.id} className="flex items-center gap-3 px-5 py-3.5 border-b border-white/5">
           <div className="flex-1 min-w-0"><div className="text-[16px] truncate">{r.name}</div>
-            <div className="text-[13px] text-zinc-500 truncate">{r.enabled ? (r.preview?.[0] || r.schedule?.source) : (pl ? 'wstrzymana' : 'paused')}</div></div>
+            <div className="text-[13px] text-zinc-500 truncate">{r.enabled ? (r.preview?.[0] || r.schedule?.source) : ('paused')}</div></div>
           <Toggle on={r.enabled} label={r.name} onChange={(on) => api(`/routines/${r.id}`, { method: 'PATCH', body: { enabled: on } }).then(load)} />
-        </div>)) : <div className="px-5 py-4 text-[16px] text-zinc-500 border-b border-white/5 pl-14">{pl ? 'Nie ma jeszcze rutyn' : 'No routines yet'}</div>}
+        </div>)) : <div className="px-5 py-4 text-[16px] text-zinc-500 border-b border-white/5 pl-14">{'No routines yet'}</div>}
       {adding ? <RoutineForm botId={bot.id} pl={pl} onDone={() => { setAdding(false); load(); }} />
-        : <button onClick={() => setAdding(true)} className="lb-press w-full flex items-center gap-4 px-5 py-4 text-sky-400 text-[17px]"><FiPlus className="text-xl" /> {pl ? 'Dodaj rutynę' : 'Add routine'}</button>}
+        : <button onClick={() => setAdding(true)} className="lb-press w-full flex items-center gap-4 px-5 py-4 text-sky-400 text-[17px]"><FiPlus className="text-xl" /> {'Add routine'}</button>}
     </div>
   );
 }
@@ -94,22 +94,22 @@ function ModelPicker({ f, setF, providers, pl, onCommit }) {
   const models = profile ? Array.from(new Set([...(profile.models || []), ...(profile.last_test?.models || []), profile.default_model].filter(Boolean))) : [];
   return (
     <div className={cls(card, 'p-4 space-y-3')}>
-      <Field label={pl ? 'Dostawca' : 'Provider'}>
+      <Field label={'Provider'}>
         <select className={inputCls} value={f.provider_profile_id} onChange={(e) => { const v = { ...f, provider_profile_id: e.target.value, model: '' }; setF(v); onCommit(v); }}>
-          <option value="">{pl ? 'Domyślny' : 'Default'}{providers.find((p) => p.is_default) ? ` (${providers.find((p) => p.is_default).name})` : ''}</option>
+          <option value="">{'Default'}{providers.find((p) => p.is_default) ? ` (${providers.find((p) => p.is_default).name})` : ''}</option>
           {providers.map((p) => <option key={p.id} value={p.id}>{p.name}{p.is_mock ? ' [mock]' : ''}</option>)}
         </select></Field>
-      <Field label={pl ? 'Model' : 'Model'} hint={models.length ? null : (pl ? 'Lista pojawi się po „Testuj połączenie” w Ustawieniach → Modele. Możesz też wpisać id.' : 'The list appears after Test connection in Settings → Models, or type an id.')}>
+      <Field label={'Model'} hint={models.length ? null : ('The list appears after Test connection in Settings → Models, or type an id.')}>
         {models.length ? (
           <select className={inputCls} value={models.includes(f.model) ? f.model : (f.model ? '__custom' : '')}
             onChange={(e) => { if (e.target.value === '__custom') return; const v = { ...f, model: e.target.value }; setF(v); onCommit(v); }}>
-            <option value="">{pl ? 'Domyślny dostawcy' : 'Provider default'}{profile?.default_model ? ` (${profile.default_model})` : ''}</option>
+            <option value="">{'Provider default'}{profile?.default_model ? ` (${profile.default_model})` : ''}</option>
             {models.map((m) => <option key={m} value={m}>{m}</option>)}
             {f.model && !models.includes(f.model) && <option value="__custom">{f.model}</option>}
           </select>
         ) : <input className={inputCls} value={f.model} placeholder={profile?.default_model || 'model id'} onChange={(e) => setF({ ...f, model: e.target.value })} onBlur={() => onCommit(f)} />}
       </Field>
-      {profile && <div className="text-xs text-zinc-500">{pl ? 'Narzędzia' : 'Tools'}: {String(profile.capabilities?.tools ?? '?')} · {pl ? 'obrazy' : 'vision'}: {String(profile.capabilities?.vision ?? '?')}{profile.is_mock ? ' · mock' : ''}</div>}
+      {profile && <div className="text-xs text-zinc-500">{'Tools'}: {String(profile.capabilities?.tools ?? '?')} · {'vision'}: {String(profile.capabilities?.vision ?? '?')}{profile.is_mock ? ' · mock' : ''}</div>}
     </div>
   );
 }
@@ -118,7 +118,7 @@ function Advanced({ f, set, ws, bot, pl, onSave }) {
   const { t } = useT();
   return (
     <details className={cls(card, 'p-4')}>
-      <summary className="cursor-pointer text-[15px] text-zinc-300">{pl ? 'Zaawansowane' : 'Advanced'}</summary>
+      <summary className="cursor-pointer text-[15px] text-zinc-300">{'Advanced'}</summary>
       <div className="space-y-2 mt-3">
         <Field label={t('tools')}><input className={inputCls} value={f.tools} onChange={set('tools')} /></Field>
         <div className="grid grid-cols-2 gap-2">
@@ -127,11 +127,85 @@ function Advanced({ f, set, ws, bot, pl, onSave }) {
           <Field label={t('computerMode')}><select className={inputCls} value={f.computer_mode} onChange={set('computer_mode')}><option value="shared">{t('shared')}</option><option value="isolated">{t('isolated')}</option></select></Field>
           <Field label={t('budget')}><input className={inputCls} type="number" step="0.01" value={f.budget} onChange={set('budget')} /></Field>
         </div>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.can_create_bots} onChange={set('can_create_bots')} /> {pl ? 'może tworzyć boty' : 'can create bots'}</label>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.team_memory_access} onChange={set('team_memory_access')} /> {pl ? 'dostęp do wiedzy zespołu' : 'team knowledge access'}</label>
-        {onSave && <Button kind="primary" onClick={onSave}><FiCpu /> {pl ? 'Zapisz' : 'Save'}</Button>}
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.can_create_bots} onChange={set('can_create_bots')} /> {'can create bots'}</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.team_memory_access} onChange={set('team_memory_access')} /> {'team knowledge access'}</label>
+        {onSave && <Button kind="primary" onClick={onSave}><FiCpu /> {'Save'}</Button>}
       </div>
     </details>
+  );
+}
+
+// ------------------------------------------------------------- memory files
+function FileScreen({ title, hint, value, onSave, onBack, extra }) {
+  const [v, setV] = useState(value || '');
+  const [err, setErr] = useState('');
+  useEffect(() => { setV(value || ''); }, [value]);
+  return (
+    <div className="lb-side-in space-y-3">
+      <button onClick={onBack} className="flex items-center gap-1 text-sky-400 text-[15px]"><FiChevronLeft /> Back</button>
+      <div className={cls(card, 'p-4 space-y-3')}>
+        <div className="font-mono text-[15px] text-zinc-200">{title}</div>
+        {hint && <div className="text-[13px] text-zinc-500">{hint}</div>}
+        <textarea className={`${inputCls} h-80 font-mono text-[13px] leading-relaxed`} value={v} onChange={(e) => setV(e.target.value)} />
+        {err && <div className="text-xs text-rose-300">{err}</div>}
+        <div className="flex gap-2 flex-wrap">
+          <Button kind="primary" onClick={() => onSave(v).then(onBack).catch((e) => setErr(e.message))}>Save</Button>
+          {extra}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MemoryFiles({ bot, tick, open }) {
+  const [m, setM] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [n, setN] = useState({ title: '', content: '' });
+  const load = useCallback(() => api(`/bots/${bot.id}/mind`).then(setM).catch(() => {}), [bot.id]);
+  useEffect(() => { load(); }, [load, tick]);
+  if (!m) return null;
+  const firstLine = (s) => (s || '').replace(/<!--.*?-->/g, '').trim().split('\n').find((x) => x.trim()) || '';
+  return (
+    <>
+      <div className={cls(card, 'overflow-hidden')}>
+        <button onClick={() => open({ kind: 'soul', value: m.soul, reload: load })} className="lb-press w-full flex items-center gap-4 px-5 py-4 text-left border-b border-white/5">
+          <span className="text-xl">🫀</span><span className="flex-1 min-w-0"><span className="block text-[17px]">soul.md</span>
+            <span className="block text-[13px] text-zinc-500 truncate">Purpose and behaviour · {firstLine(m.soul) || 'empty'}</span></span><FiChevronRight className="text-zinc-500" /></button>
+        <button onClick={() => open({ kind: 'agents', value: m.agents, reload: load })} className="lb-press w-full flex items-center gap-4 px-5 py-4 text-left">
+          <span className="text-xl">🔁</span><span className="flex-1 min-w-0"><span className="block text-[17px]">agents.md</span>
+            <span className="block text-[13px] text-zinc-500 truncate">Handoff for the next session · {firstLine(m.agents) || 'no handoff yet'}</span></span><FiChevronRight className="text-zinc-500" /></button>
+      </div>
+      <Caption>The handoff is never compacted: when a conversation gets long, the bot clears agents.md, writes the exact goal and next steps, and continues from it with a fresh context.</Caption>
+
+      <Label>Small memories</Label>
+      <div className={cls(card, 'overflow-hidden lb-stagger')}>
+        {m.memories.length ? m.memories.map((x) => (
+          <div key={x.name} className="flex items-start gap-3 px-5 py-3 border-b border-white/5">
+            <div className="flex-1 min-w-0"><div className="text-[15px]">{x.title}</div><div className="text-[13px] text-zinc-500 line-clamp-2">{x.content}</div></div>
+            <button aria-label={`forget ${x.title}`} onClick={() => api(`/bots/${bot.id}/mind/memories/${encodeURIComponent(x.name)}`, { method: 'DELETE' }).then(setM)} className="text-zinc-500 hover:text-rose-300 px-2">✕</button>
+          </div>)) : <div className="px-5 py-4 text-zinc-500 border-b border-white/5">No memories yet — the bot adds them as it learns.</div>}
+        {adding ? (
+          <div className="lb-rise px-5 py-4 space-y-2">
+            <input className={inputCls} placeholder="Title" value={n.title} onChange={(e) => setN({ ...n, title: e.target.value })} />
+            <textarea className={`${inputCls} h-20`} placeholder="What to remember" value={n.content} onChange={(e) => setN({ ...n, content: e.target.value })} />
+            <div className="flex gap-2"><Button kind="primary" disabled={!n.title || !n.content}
+              onClick={() => api(`/bots/${bot.id}/mind/memories`, { method: 'POST', body: n }).then((x) => { setM(x); setAdding(false); setN({ title: '', content: '' }); })}>Add</Button>
+              <Button onClick={() => setAdding(false)}>Cancel</Button></div>
+          </div>
+        ) : <button onClick={() => setAdding(true)} className="lb-press w-full flex items-center gap-4 px-5 py-4 text-sky-400 text-[17px]"><FiPlus className="text-xl" /> Add memory</button>}
+      </div>
+      <Caption>{'Stored as memories/*.md in the bot\'s folder.'}</Caption>
+
+      <Label>Projects</Label>
+      <div className={cls(card, 'overflow-hidden')}>
+        {m.projects.length ? m.projects.map((p) => (
+          <button key={p.name} onClick={() => open({ kind: 'project', name: p.name, value: p.agents_md, reload: load })} className="lb-press w-full flex items-center gap-4 px-5 py-3.5 text-left border-b border-white/5">
+            <span className="text-xl">📁</span><span className="flex-1 min-w-0"><span className="block text-[16px]">{p.name}/AGENTS.md</span>
+              <span className="block text-[13px] text-zinc-500 truncate">{firstLine(p.agents_md) || 'no rules yet'}</span></span><FiChevronRight className="text-zinc-500" /></button>))
+          : <div className="px-5 py-4 text-zinc-500">No projects yet. Ask the bot to work on a project, or bind a chat to one.</div>}
+      </div>
+      <Caption>Project AGENTS.md holds only how an agent should behave while working on that project.</Caption>
+    </>
   );
 }
 
@@ -153,7 +227,7 @@ function MediaTabs({ tab, conversationId, pl, tick }) {
   }, [msgs]);
   const images = arts.filter((a) => a.mime.startsWith('image/') || a.mime.startsWith('video/') || a.mime.startsWith('audio/'));
   const files = arts.filter((a) => !images.includes(a));
-  const empty = <div className="text-center text-zinc-500 py-12">{pl ? 'Nic tu jeszcze nie ma' : 'Nothing here yet'}</div>;
+  const empty = <div className="text-center text-zinc-500 py-12">{'Nothing here yet'}</div>;
   if (tab === 'links') return links.length ? <div className={cls(card, 'lb-stagger overflow-hidden')}>{links.map(([u, at]) => (
     <a key={u} href={u} onClick={(e) => { if (window.LowBotNative?.openExternal?.(u)) e.preventDefault(); }} target="_blank" rel="noopener noreferrer"
       className="block px-5 py-3 border-b border-white/5 text-sky-400 text-[15px] truncate">{u}<div className="text-[12px] text-zinc-500">{shortTime(at)}</div></a>))}</div> : empty;
@@ -192,7 +266,7 @@ export function BotEditor({ ws, bot: initial, onDone }) {
     const b = bot && (ws.bots.find((x) => x.id === bot.id) || bot);
     if (b) setF({ ...EMPTY, ...b, label: b.label || '', tools: (b.tools || []).join(', '), provider_profile_id: b.provider_profile_id || '',
       model: b.model || '', org_role: b.org_role || '', reports_to: b.reports_to || '', budget: b.budget?.max_cost_per_day ?? '', notify: b.notify !== false });
-    else setF({ ...EMPTY, name: pl ? 'Nowy bot' : 'New bot', avatar: `shape:${Object.keys(SHAPES)[Math.floor(Math.random() * 8)]}:${AVATAR_COLORS[2 + Math.floor(Math.random() * 8)]}` });
+    else setF({ ...EMPTY, name: 'New bot', avatar: `shape:${Object.keys(SHAPES)[Math.floor(Math.random() * 8)]}:${AVATAR_COLORS[2 + Math.floor(Math.random() * 8)]}` });
   }, [bot?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
 
@@ -225,19 +299,19 @@ export function BotEditor({ ws, bot: initial, onDone }) {
   };
   const av = parseAvatar(f.avatar) || { shape: 'pill', color: bot ? colorFor(bot.id) : AVATAR_COLORS[9] };
   const conv = bot && ws.conversations.find((c) => c.kind === 'private' && c.default_bot_id === bot.id);
-  const tabs = [['info', 'Info'], ['links', pl ? 'Linki' : 'Links'], ['media', pl ? 'Multimedia' : 'Media'], ['files', pl ? 'Pliki' : 'Files']];
+  const tabs = [['info', 'Info'], ['links', 'Links'], ['media', 'Media'], ['files', 'Files']];
 
   return (
     <div className="fixed inset-0 z-40 bg-[#141414] flex flex-col lb-page-in">
       <header className="flex items-center justify-between px-4 pb-2 shrink-0" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
         <button aria-label="back" onClick={onDone} className="lb-press h-12 w-12 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center text-2xl"><FiChevronLeft /></button>
-        {saved && <span className="lb-pop text-[13px] text-emerald-400">{pl ? 'Zapisano' : 'Saved'}</span>}
+        {saved && <span className="lb-pop text-[13px] text-emerald-400">{'Saved'}</span>}
         {bot && <div className="flex gap-3 relative">
-          <button aria-label={pl ? 'Udostępnij' : 'Share'} onClick={shareTemplate} className="lb-press h-12 w-12 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center text-xl"><FiShare /></button>
+          <button aria-label={'Share'} onClick={shareTemplate} className="lb-press h-12 w-12 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center text-xl"><FiShare /></button>
           <button aria-label="more" onClick={() => setMenu(!menu)} className="lb-press h-12 w-12 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center text-xl"><FiMoreHorizontal /></button>
           {menu && <div className="lb-rise lb-stagger absolute right-0 top-14 z-10 min-w-[220px] rounded-2xl bg-[#262626] border border-white/10 shadow-2xl overflow-hidden text-[15px]">
             {[[bot.pinned ? t('unpin') : t('pin'), () => api(`/bots/${bot.id}`, { method: 'PATCH', body: { pinned: !bot.pinned } }).then((b) => { setBot(b); setMenu(false); ws.reload(); })],
-              [bot.hidden ? t('unhide') : (pl ? 'Ukryj z listy' : 'Hide from sidebar'), () => api(`/bots/${bot.id}`, { method: 'PATCH', body: { hidden: !bot.hidden } }).then((b) => { setBot(b); setMenu(false); ws.reload(); })],
+              [bot.hidden ? t('unhide') : ('Hide from sidebar'), () => api(`/bots/${bot.id}`, { method: 'PATCH', body: { hidden: !bot.hidden } }).then((b) => { setBot(b); setMenu(false); ws.reload(); })],
               [bot.paused ? t('resume_bot') : t('pause_bot'), () => action(bot.paused ? '/resume' : '/pause')],
               [t('duplicate'), () => action('/duplicate')],
             ].map(([label, fn]) => <button key={label} onClick={fn} className="block w-full text-left px-4 py-3 hover:bg-white/5">{label}</button>)}
@@ -247,12 +321,22 @@ export function BotEditor({ ws, bot: initial, onDone }) {
       </header>
 
       <div className="flex-1 overflow-y-auto min-h-0 px-4" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }} onClick={() => menu && setMenu(false)}>
-        {screen === 'instructions' ? <InstructionsScreen f={f} set={set} pl={pl} onBack={() => setScreen(null)} save={() => { commit(); setScreen(null); }} /> : <>
+        {screen && typeof screen === 'object' ? (
+          <FileScreen title={screen.kind === 'project' ? `${screen.name}/AGENTS.md` : `${screen.kind}.md`}
+            hint={{ soul: 'Who this bot is: purpose, personality and how it works. Sent first in every prompt.',
+              agents: 'Handoff from the last session: exact goal, done, next steps, open questions. Saving replaces the whole file.',
+              project: 'Only how an agent should behave while working on this project (conventions, commands, do/don’t).' }[screen.kind]}
+            value={screen.value} onBack={() => { screen.reload?.(); setScreen(null); }}
+            onSave={(v) => (screen.kind === 'project'
+              ? api(`/projects/${encodeURIComponent(screen.name)}/agents`, { method: 'POST', body: { content: v } })
+              : api(`/bots/${bot.id}/mind/${screen.kind}`, { method: 'POST', body: { content: v } }))}
+            extra={screen.kind === 'agents' ? <Button onClick={() => api(`/bots/${bot.id}/mind/agents`, { method: 'POST', body: { content: '' } }).then(() => { screen.reload?.(); setScreen(null); })}>Clear</Button> : null} />
+        ) : screen === 'instructions' ? <InstructionsScreen f={f} set={set} pl={pl} onBack={() => setScreen(null)} save={() => { commit(); setScreen(null); }} /> : <>
           <div className="flex justify-center py-4"><span key={f.avatar} className="lb-pop"><ShapeIcon shape={av.shape} color={av.color} size={150} /></span></div>
           <div className={cls(card, 'overflow-hidden')}>
             <input aria-label={t('name')} value={f.name} onChange={set('name')} onBlur={() => bot && f.name.trim() && commit()}
               className="w-full bg-transparent text-center text-[26px] font-semibold py-4 outline-none" />
-            {local && <input aria-label={pl ? 'Tytuł' : 'Title'} value={f.label} onChange={set('label')} onBlur={() => bot && commit()} placeholder={pl ? 'Tytuł (opcjonalnie)' : 'Title (optional)'}
+            {local && <input aria-label={'Title'} value={f.label} onChange={set('label')} onBlur={() => bot && commit()} placeholder={'Title (optional)'}
               className="w-full bg-transparent text-center text-[17px] text-zinc-300 placeholder:text-zinc-500 py-3.5 border-t border-white/10 outline-none" />}
           </div>
 
@@ -264,7 +348,7 @@ export function BotEditor({ ws, bot: initial, onDone }) {
           </nav>}
 
           {(tab === 'info' || !bot) ? <div key="info" className="lb-rise">
-            <Label>{pl ? 'Postać' : 'Character'}</Label>
+            <Label>{'Character'}</Label>
             <div className={cls(card, 'p-5')}>
               <div className="grid grid-cols-4 gap-y-4 justify-items-center">
                 {Object.keys(SHAPES).map((s) => (
@@ -278,30 +362,31 @@ export function BotEditor({ ws, bot: initial, onDone }) {
                     className={cls('lb-press h-11 w-11 rounded-full transition', av.color.toLowerCase() === c ? 'ring-2 ring-offset-2 ring-offset-[#1f1f1f] ring-zinc-300' : '')} style={{ background: c }} />))}
               </div>
               <div className="border-t border-white/10 mt-5 pt-4">
-                <button onClick={() => update({ avatar: '🤖' })} className="text-sky-400 text-[17px]">{pl ? 'Przywróć domyślne' : 'Reset to default'}</button></div>
+                <button onClick={() => update({ avatar: '🤖' })} className="text-sky-400 text-[17px]">{'Reset to default'}</button></div>
             </div>
-            <Caption>{pl ? 'Jak znak tego Bota wygląda wszędzie' : 'How this Bot looks everywhere'}</Caption>
+            <Caption>{'How this Bot looks everywhere'}</Caption>
 
-            <Label>{pl ? 'Model' : 'Model'}</Label>
+            <Label>{'Model'}</Label>
             <ModelPicker f={f} setF={setF} providers={providers} pl={pl} onCommit={(v) => commit(v)} />
 
-            <div className="mt-5"><Row icon={<FiFileText />} label={pl ? 'Instrukcje' : 'Instructions'} onClick={() => setScreen('instructions')} /></div>
+            {!(bot && local) && <div className="mt-5"><Row icon={<FiFileText />} label="Instructions" onClick={() => setScreen('instructions')} /></div>}
+            {bot && local && <><Label>Memory</Label><MemoryFiles bot={bot} tick={ws.tick} open={setScreen} /></>}
 
-            {bot && <><Label>{pl ? 'Rutyny' : 'Routines'}</Label><Routines bot={bot} pl={pl} tick={ws.tick} /></>}
+            {bot && <><Label>{'Routines'}</Label><Routines bot={bot} pl={pl} tick={ws.tick} /></>}
 
             {bot && local && <>
               <div className={cls(card, 'mt-5 flex items-center justify-between px-5 py-4')}>
-                <span className="text-[17px]">{pl ? 'Powiadomienia' : 'Notifications'}</span>
+                <span className="text-[17px]">{'Notifications'}</span>
                 <Toggle on={f.notify} label="notify" onChange={(on) => update({ notify: on })} />
               </div>
-              <Caption>{pl ? 'Otrzymuj powiadomienia, gdy ten Bot skończy lub będzie potrzebować odpowiedzi' : 'Get notified when this Bot finishes or needs an answer'}</Caption>
+              <Caption>{'Get notified when this Bot finishes or needs an answer'}</Caption>
             </>}
 
-            {bot && <div className="mt-5"><Row icon={<FiShare className="text-sky-400" />} label={<span className="text-sky-400">{pl ? 'Udostępnij jako szablon' : 'Share as template'}</span>} onClick={shareTemplate} right={<span />} /></div>}
+            {bot && <div className="mt-5"><Row icon={<FiShare className="text-sky-400" />} label={<span className="text-sky-400">{'Share as template'}</span>} onClick={shareTemplate} right={<span />} /></div>}
 
             <div className="mt-5"><Advanced f={f} set={set} ws={ws} bot={bot} pl={pl} onSave={bot ? () => commit() : null} /></div>
 
-            {!bot && <button onClick={create} className="lb-press mt-6 w-full rounded-full bg-white text-black py-4 text-[17px] font-semibold">{pl ? 'Utwórz bota' : 'Create bot'}</button>}
+            {!bot && <button onClick={create} className="lb-press mt-6 w-full rounded-full bg-white text-black py-4 text-[17px] font-semibold">{'Create bot'}</button>}
             {err && <div className="text-sm text-rose-300 mt-3">{err}</div>}
           </div> : <div key={tab} className="lb-rise mt-4"><MediaTabs tab={tab} conversationId={conv?.id} pl={pl} tick={ws.tick} /></div>}
         </>}

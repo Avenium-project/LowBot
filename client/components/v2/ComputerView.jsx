@@ -70,10 +70,10 @@ function LiveSurface({ s, ws }) {
       {err && <div className="text-xs text-rose-300">{err}</div>}
       {local && !human && s.recorded_steps > 0 && (
         <div className="mt-2 space-y-2 rounded-xl bg-black/30 p-3">
-          <div className="text-sm">{lang === 'pl' ? `Nagrano ${s.recorded_steps} kroków. Utwórz z nich skill (szkic do przejrzenia):` : `${s.recorded_steps} steps recorded. Turn them into a draft skill:`}</div>
-          <div className="flex gap-2"><input className={inputCls} value={skillName} onChange={(e) => setSkillName(e.target.value)} placeholder={lang === 'pl' ? 'Nazwa skilla' : 'Skill name'} />
-            <Button small kind="primary" onClick={teach}>{lang === 'pl' ? 'Naucz' : 'Teach'}</Button></div>
-          {taught && <div className="text-xs text-emerald-300">{lang === 'pl' ? 'Utworzono' : 'Created'} {taught}</div>}
+          <div className="text-sm">{`${s.recorded_steps} steps recorded. Turn them into a draft skill:`}</div>
+          <div className="flex gap-2"><input className={inputCls} value={skillName} onChange={(e) => setSkillName(e.target.value)} placeholder={'Skill name'} />
+            <Button small kind="primary" onClick={teach}>{'Teach'}</Button></div>
+          {taught && <div className="text-xs text-emerald-300">{'Created'} {taught}</div>}
         </div>
       )}
       {human && !local && (
@@ -104,12 +104,11 @@ export default function ComputerView({ ws, botId }) {
   if (!data) return <Empty>…</Empty>;
   const openOwn = () => api('/computers/open', { method: 'POST', body: { bot_id: botId } }).then(() => ws.reload()).catch((e) => setErr(e.message));
   return (
-    <Section title={`${t('computer')} — ${local ? (lang === 'pl' ? 'ten telefon' : 'this phone') : data.kind}`}>
+    <Section title={`${t('computer')} — ${local ? ('this phone') : data.kind}`}>
       <div className="text-xs text-zinc-500 mb-2">{local
-        ? (lang === 'pl' ? 'Boty używają przeglądarki w telefonie (wspólne ciasteczka). „Przejmij” pokazuje prawdziwą stronę: zaloguj się sam, potem „Oddaj sterowanie”. Zaznacz „Nagrywaj”, aby nauczyć bota zadania.'
-          : 'Bots use a browser inside this phone (shared cookies). Take over shows the real page: sign in yourself, then Give back control. Tick Record to teach a task.')
+        ? ('Bots use a browser inside this phone (shared cookies). Take over shows the real page: sign in yourself, then Give back control. Tick Record to teach a task.')
         : `max ${data.max_active_surfaces} active surfaces`}</div>
-      {local && botId && <Button kind="primary" onClick={openOwn}>{lang === 'pl' ? 'Otwórz przeglądarkę bota' : "Open the bot's browser"}</Button>}
+      {local && botId && <Button kind="primary" onClick={openOwn}>{"Open the bot's browser"}</Button>}
       {(() => {
         const list = botId ? data.surfaces.filter((s) => s.bot_id === botId) : data.surfaces;
         return list.length ? list.map((s) => <LiveSurface key={s.id} s={s} ws={ws} />) : <Empty>{t('noSurfaces')}</Empty>;

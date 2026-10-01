@@ -96,8 +96,8 @@ export default function TasksPanel({ ws }) {
   );
   return (
     <div>
-      <Section title={`${lang === 'pl' ? 'Aktywne' : 'Active'} (${active.length})`}>{active.length ? active.map(row) : <Empty />}</Section>
-      <Section title={lang === 'pl' ? 'Ostatnie' : 'Recent'}>{recent.length ? recent.map(row) : <Empty />}</Section>
+      <Section title={`${'Active'} (${active.length})`}>{active.length ? active.map(row) : <Empty />}</Section>
+      <Section title={'Recent'}>{recent.length ? recent.map(row) : <Empty />}</Section>
     </div>
   );
 }
