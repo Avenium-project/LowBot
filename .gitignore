@@ -46,3 +46,4 @@ desktop/src-tauri/gen/
 desktop/node_modules/
 mobile/node_modules/
 deploy/.env
+/LowBot.apk
