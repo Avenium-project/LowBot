@@ -1,5 +1,5 @@
 'use client';
-// Open Dots v2 client (LowBot extension).
+// LowBot client (v2 API).
 //
 // Two auth modes:
 //  * web    – same-site HttpOnly session cookie created by /api/v1/auth/login
@@ -26,12 +26,12 @@ function defaultServer() {
 
 export function isNative() {
   if (typeof window === 'undefined') return false;
-  return Boolean(window.Capacitor?.isNativePlatform?.() || window.__TAURI_INTERNALS__ || window.__TAURI__);
+  return Boolean(window.LowBotNative || window.__TAURI_INTERNALS__ || window.__TAURI__);
 }
 
 export function platform() {
   if (typeof window === 'undefined') return 'web';
-  if (window.Capacitor?.getPlatform?.() === 'android') return 'android';
+  if (window.LowBotNative) return 'android';
   if (window.__TAURI_INTERNALS__ || window.__TAURI__) return 'windows';
   return 'web';
 }
@@ -102,6 +102,38 @@ export async function pairDevice(server, code, name) {
   await secureStore.set('device_token', data.token);
   setConfig({ server, mode: 'device' });
   return data;
+}
+
+// Native apps can sign in with the owner token once: it is used only to mint a
+// one-time pairing code, exchanged for a revocable device token, and then
+// forgotten. Only the device token is stored (OS keystore).
+export async function pairWithOwnerToken(server, ownerToken, name) {
+  const base = server.replace(/\/+$/, '');
+  const res = await fetch(`${base}/api/v2/pair/code`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, res.status === 401 ? 'Wrong owner token' : (data.detail || 'Pairing failed'));
+  return pairDevice(base, data.code, name);
+}
+
+export async function saveBlob(blob, name) {
+  if (window.LowBotNative?.saveFile) {
+    const b64 = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(',')[1] || '');
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+    return window.LowBotNative.saveFile(name || 'file', blob.type || 'application/octet-stream', b64);
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name || 'file'; a.click();
+  return true;
+}
+
+export async function downloadPath(path, name) {
+  const res = await api(path, { raw: true });
+  if (!res.ok) throw new ApiError(res.status, 'download failed');
+  return saveBlob(await res.blob(), name);
 }
 
 export async function signOutDevice() {

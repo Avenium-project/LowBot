@@ -1,7 +1,7 @@
 'use client';
 // First-run wizard: instance -> pairing / sign-in -> model -> test -> first bot.
 import { useEffect, useState } from 'react';
-import { api, getConfig, isNative, pairDevice, setConfig, webLogin } from '../../lib/v2/api';
+import { api, getConfig, isNative, pairDevice, pairWithOwnerToken, setConfig, webLogin } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Card, Field, inputCls } from './ui';
 import { CodexConnect } from './Integrations';
@@ -44,7 +44,8 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
   });
 
   const authenticate = () => run(async () => {
-    if (native || code) await pairDevice(server, code, native ? 'LowBot (Android)' : 'Browser');
+    if (code) await pairDevice(server, code, native ? 'LowBot (Android)' : 'Browser');
+    else if (native) await pairWithOwnerToken(server, token, 'LowBot (Android)');
     else await webLogin(token);
     const [d, bots] = await Promise.all([api('/providers'), api('/bots')]);
     if (bots.length) { onReady(); return; } // existing install: straight to the chats
@@ -80,9 +81,11 @@ export default function SetupWizard({ onReady, startAt = 0 }) {
           <Button kind="primary" disabled={busy || !server} onClick={checkServer}>{t('next')}</Button>
         </>}
         {step === 1 && <>
-          {native || !token ? <Field label={t('pairingCode')} hint={lang === 'pl' ? 'Wygeneruj kod w Ustawienia → Urządzenia na zalogowanym urządzeniu. Kod jest jednorazowy i wygasa.' : 'Create a code in Settings → Devices on a signed-in device. One-time, expires.'}>
+          {!token ? <Field label={t('pairingCode')} hint={lang === 'pl' ? 'Wygeneruj kod w Ustawienia → Urządzenia na zalogowanym urządzeniu. Kod jest jednorazowy i wygasa.' : 'Create a code in Settings → Devices on a signed-in device. One-time, expires.'}>
             <input className={`${inputCls} font-mono tracking-widest`} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="ABCD-EFGH" /></Field> : null}
-          {!native && <Field label={t('ownerToken')} hint={lang === 'pl' ? 'Albo: token właściciela z serwera (DATA_DIR/.auth-token) — tylko przeglądarka; zostaje wymieniony na sesję HttpOnly.' : 'Or the owner token (browser only; exchanged for an HttpOnly session).'}>
+          {!code && <Field label={t('ownerToken')} hint={native
+              ? (lang === 'pl' ? 'Albo token właściciela (DATA_DIR/.auth-token). Aplikacja użyje go jednorazowo do utworzenia własnego, odwoływalnego tokenu urządzenia i go nie zapisze.' : 'Or the owner token; used once to create a revocable device token, never stored.')
+              : (lang === 'pl' ? 'Albo: token właściciela z serwera (DATA_DIR/.auth-token); zostaje wymieniony na sesję HttpOnly.' : 'Or the owner token (exchanged for an HttpOnly session).')}>
             <input className={inputCls} type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} /></Field>}
           <div className="flex gap-2"><Button onClick={() => setStep(0)}>{t('back')}</Button><Button kind="primary" disabled={busy || (!code && !token)} onClick={authenticate}>{t('next')}</Button></div>
         </>}

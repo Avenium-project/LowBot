@@ -26,6 +26,17 @@ Statusy: **wykonany ✅**, **nieudany ❌**, **pominięty ⏭**, **nieweryfikowa
 | `docker compose -f deploy/docker-compose.yml up` | ❔ nie uruchomiono (wymaga domeny/HTTPS) |
 | `python scripts/bench.py --bots 50 --tasks 50 --idle 30` | ✅ wyniki niżej |
 
+## Aktualizacja: LowBot, ChatGPT/Codex, OpenCode Go, APK (2026-10-01)
+
+| Komenda | Wynik |
+|---|---|
+| `python -m pytest -q tests/v2/test_agent_cli.py` | ✅ 5 passed — prawdziwe `codex-cli 0.159.3` i `opencode 1.18.34` przeciw lokalnemu fałszywemu serwerowi modelu; logowanie ChatGPT na atrapie CLI |
+| `python -m pytest -q tests/e2e` | ✅ 2 passed (telefon 360 px + ścieżka Androida z symulowanym mostem `LowBotNative`) |
+| `mobile/build-apk.sh test` | ✅ `LowBot-2.0.0-test.apk`, `apksigner verify` v2+v3 OK, `aapt dump badging`: io.lowbot.app, minSdk 26, targetSdk 35 |
+| Instalacja APK na urządzeniu/emulatorze | ❔ tylko w CI (`android.yml`), nie tutaj |
+| `docker build` (WITH_AGENT_CLIS=1) + `docker run --read-only` | ✅ health zgłasza `codex`, `opencode`; `/integrations` działa |
+| Logowanie ChatGPT / wywołanie OpenCode Go na żywo | ⏭ auth.openai.com i opencode.ai zablokowane w tym środowisku |
+
 ## Testy akceptacyjne (brief §13)
 
 | Test | Plik / test | Status |

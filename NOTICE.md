@@ -1,5 +1,7 @@
 # Notice
 
+The product name is **LowBot**.
+
 LowBot / Open Dots v2 is based on **Open Dots** by Anil-matcha
 (https://github.com/Anil-matcha/open-dots), MIT License, Copyright (c) 2026
 Anil-matcha. Imported unmodified at upstream commit
@@ -13,7 +15,7 @@ are released under the same MIT license. They are concentrated in:
   browser broker, device pairing (new)
 - `server/tests/v2/`, `server/tests/e2e/` — tests (new)
 - `client/components/v2/`, `client/lib/v2/`, `client/app/bots/` — new UI
-- `desktop/` (Tauri, Windows), `mobile/` (Capacitor, Android), `deploy/`,
+- `desktop/` (Tauri, Windows), `mobile/` (natywna aplikacja LowBot dla Androida), `deploy/`,
   `Dockerfile`, `.github/workflows/` (new)
 - small, commented edits to upstream files: `server/app/main.py`,
   `server/app/services/auth_service.py`, `client/next.config.mjs`,

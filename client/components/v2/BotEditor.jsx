@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/v2/api';
+import { api, saveBlob } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Field, Section, inputCls } from './ui';
 
@@ -67,7 +67,7 @@ export function BotEditor({ ws, bot, onDone }) {
           <Button small onClick={() => api(`/bots/${bot.id}`, { method: 'PATCH', body: { hidden: !bot.hidden } }).then(() => { ws.reload(); onDone?.(); })}>{bot.hidden ? t('unhide') : t('hide')}</Button>
           <Button small onClick={() => api(`/bots/${bot.id}`, { method: 'PATCH', body: { pinned: !bot.pinned } }).then(() => { ws.reload(); onDone?.(); })}>{bot.pinned ? t('unpin') : t('pin')}</Button>
           <Button small onClick={() => action('/duplicate')}>{t('duplicate')}</Button>
-          <Button small onClick={() => api(`/bots/${bot.id}/export`).then((x) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(x, null, 2)])); a.download = `${bot.handle}.bot.json`; a.click(); })}>{t('export')}</Button>
+          <Button small onClick={() => api(`/bots/${bot.id}/export`).then((x) => saveBlob(new Blob([JSON.stringify(x, null, 2)], { type: 'application/json' }), `${bot.handle}.bot.json`))}>{t('export')}</Button>
           <Button small kind="danger" onClick={() => confirm(`${t('delete')} ${bot.name}?`) && action('', 'DELETE')}>{t('delete')}</Button>
         </div>}
       </div>

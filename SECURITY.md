@@ -37,6 +37,17 @@ dla wielu użytkowników ani do uruchamiania wrogiego kodu.**
 - **Pobieranie plików**: autoryzowane, `Content-Security-Policy: sandbox`, `nosniff`.
 - **Audyt**: kto/kiedy/zadanie/decyzja/wynik w `audit_log` (zredagowany), eksport JSONL, retencja.
 
+- **ChatGPT (Codex CLI) i OpenCode**: uruchamiane jako osobne procesy z oczyszczonym środowiskiem
+  (bez `APP_AUTH_TOKEN` ani innych sekretów serwera), z własnym `CODEX_HOME`/`HOME` w `DATA_DIR/cli`
+  (0700). Logowanie ChatGPT odbywa się na stronie OpenAI (kod urządzenia) — LowBot nie widzi hasła
+  i nie kopiuje ciasteczek; tokeny Codex leżą w `DATA_DIR/cli/codex`. Klucz OpenCode Go jest
+  szyfrowany i przekazywany tylko procesowi `opencode`. `codex.run`/`opencode.run` domyślnie wymagają
+  zgody (wysyłają zadanie i pliki workspace do zewnętrznej usługi). Codex działa w swoim sandboxie
+  (`read-only` domyślnie); OpenCode nie ma sandboxu OS, dlatego zawsze ma zablokowane `bash` i `webfetch`.
+- **Aplikacja Android**: ładuje wyłącznie własne zasoby z `https://appassets.androidplatform.net`;
+  inne adresy otwierają się w przeglądarce systemowej; most JS odmawia, gdy WebView nie jest na tym
+  originie; token urządzenia szyfrowany kluczem z Android Keystore; brak cleartext i kopii zapasowych.
+
 ## Granice — czego NIE gwarantujemy
 
 - **Tryb shared to nie granica bezpieczeństwa.** Boty w trybie shared współdzielą profil przeglądarki

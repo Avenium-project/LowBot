@@ -1,4 +1,4 @@
-# LowBot — Open Dots v2: trwali współpracownicy AI
+# LowBot — trwali współpracownicy AI
 
 Samodzielnie hostowany system wielu **trwałych botów**: piszesz do nich jak w komunikatorze, a one
 naprawdę pracują — używają narzędzi i przeglądarki, delegują sobie zadania, pamiętają, działają według
@@ -18,9 +18,16 @@ pamięć z wyszukiwaniem · skille · rutyny w strefie Europe/Warsaw (z obsług�
 adaptery OpenAI Responses / Chat Completions / xAI / OpenRouter / lokalny · UI po polsku i angielsku,
 dopasowane do telefonu · parowanie urządzeń kodem/QR.
 
+**ChatGPT i OpenCode Go:** zaloguj się kontem ChatGPT (oficjalne logowanie Codex CLI kodem
+urządzenia) albo wklej klucz OpenCode Go w *Menu → Ustawienia → Integracje*. Bot może odpowiadać przez
+ChatGPT/Codex, działać na modelach OpenCode Go z pełnymi narzędziami LowBot, albo delegować zadania
+programistyczne narzędziami `codex.run` / `opencode.run` (zawsze po Twojej zgodzie).
+
+**Android:** `LowBot-2.0.0-test.apk` — zob. [`mobile/README.md`](mobile/README.md).
+
 **Czego jeszcze nie ma:** pełny pulpit (tylko przeglądarka), Team Bots dla wielu ludzi, Slack, push,
-real-time voice, lokalny backend w kliencie Windows, PostgreSQL. APK i EXE są budowane w CI
-(nie mogły zostać zbudowane w środowisku, w którym powstał kod) — zob. [`BUILD.md`](BUILD.md).
+real-time voice, lokalny backend w kliencie Windows, PostgreSQL. EXE jest budowany w CI
+(nie mógł zostać zbudowany w środowisku, w którym powstał kod); APK buduje `mobile/build-apk.sh` — zob. [`BUILD.md`](BUILD.md).
 
 ## Szybki start
 

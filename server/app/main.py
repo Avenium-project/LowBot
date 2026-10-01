@@ -21,7 +21,7 @@ from app.v2.runtime import Runtime
 # Bearer requests; cookie-authenticated requests must come from CORS_ORIGINS.
 NATIVE_ORIGINS = {
     o.strip() for o in os.getenv(
-        "NATIVE_ORIGINS", "capacitor://localhost,http://localhost,https://localhost,tauri://localhost,http://tauri.localhost"
+        "NATIVE_ORIGINS", "https://appassets.androidplatform.net,tauri://localhost,http://tauri.localhost"
     ).split(",") if o.strip()
 }
 

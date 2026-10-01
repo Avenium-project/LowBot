@@ -1,6 +1,7 @@
-# Open Dots server image: API + durable worker + scheduler + built web UI.
-# docker build -t open-dots .            (with browser surfaces)
-# docker build --build-arg WITH_BROWSER=0 -t open-dots .   (smaller, no browser)
+# LowBot server image: API + durable worker + scheduler + built web UI,
+# optional Chromium (browser surfaces) and optional Codex / OpenCode CLIs.
+# docker build -t lowbot .
+# docker build --build-arg WITH_BROWSER=0 --build-arg WITH_AGENT_CLIS=0 -t lowbot .   (smallest)
 
 # BASE_REGISTRY lets you use a mirror (e.g. mirror.gcr.io/library).
 ARG BASE_REGISTRY=docker.io/library
@@ -14,11 +15,19 @@ RUN --mount=type=secret,id=extra_ca,required=false \
 COPY client/ ./
 RUN npm run build:export
 
+# ChatGPT (Codex CLI) + OpenCode CLI, installed from npm into /opt/agent-clis.
+FROM ${BASE_REGISTRY}/node:22-bookworm-slim AS clis
+ARG WITH_AGENT_CLIS=1
+RUN --mount=type=secret,id=extra_ca,required=false \
+    if [ -f /run/secrets/extra_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/extra_ca; fi; \
+    mkdir -p /opt/agent-clis/bin && \
+    if [ "$WITH_AGENT_CLIS" = "1" ]; then npm install -g --prefix /opt/agent-clis --no-audit --no-fund @openai/codex opencode-ai; fi
+
 FROM ${BASE_REGISTRY}/python:3.11-slim-bookworm
 ARG WITH_BROWSER=1
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     DATA_DIR=/data UI_DIST=/app/ui HOST=0.0.0.0 PORT=8000 \
-    PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+    PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers PATH=/opt/agent-clis/bin:$PATH
 RUN useradd --system --uid 10001 --home /data opendots && mkdir -p /data /opt/pw-browsers && chown opendots /data
 WORKDIR /app/server
 COPY server/requirements*.txt ./
@@ -30,6 +39,8 @@ RUN --mount=type=secret,id=extra_ca,required=false \
 COPY server/ ./
 COPY LICENSE NOTICE.md /app/
 COPY --from=ui /src/client/out /app/ui
+COPY --from=clis /usr/local/bin/node /usr/local/bin/node
+COPY --from=clis /opt/agent-clis /opt/agent-clis
 USER opendots
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

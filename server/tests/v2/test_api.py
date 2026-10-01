@@ -80,10 +80,10 @@ def test_pairing_device_token_and_native_origin(client):
     assert "opendots://pair" in code["qr_payload"] and auth_service.token not in code["qr_payload"]
     anon = TestClient(app)
     tok = anon.post("/api/v2/pair/exchange", json={"code": code["code"], "name": "Phone", "platform": "android"}).json()
-    hdr = {"Authorization": f"Bearer {tok['token']}", "Origin": "capacitor://localhost"}
+    hdr = {"Authorization": f"Bearer {tok['token']}", "Origin": "https://appassets.androidplatform.net"}
     assert anon.get("/api/v2/bots", headers=hdr).status_code == 200
     # A cookie-style request from the native origin (no bearer) is rejected.
-    assert anon.get("/api/v2/bots", headers={"Origin": "capacitor://localhost"}).status_code == 403
+    assert anon.get("/api/v2/bots", headers={"Origin": "https://appassets.androidplatform.net"}).status_code == 403
     assert anon.post("/api/v2/pair/exchange", json={"code": code["code"], "name": "x"}).status_code == 401
     client.delete(f"/api/v2/devices/{tok['device_id']}")
     assert anon.get("/api/v2/bots", headers=hdr).status_code == 401

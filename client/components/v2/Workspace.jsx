@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FiBookOpen, FiCheckSquare, FiChevronLeft, FiClock, FiFile, FiInbox, FiMonitor, FiPlus, FiSettings, FiUsers, FiZap } from 'react-icons/fi';
 import ChatList from './ChatList';
-import { api, fetchBlobUrl } from '../../lib/v2/api';
+import { api, downloadPath } from '../../lib/v2/api';
 import { DICT, LangContext, detectLang, useT } from '../../lib/v2/i18n';
 import { BotEditor, GroupCreator } from './BotEditor';
 import Conversation from './Conversation';
@@ -18,7 +18,7 @@ import { useWorkspace } from './useWorkspace';
 function FilesPanel({ ws, conversationId }) {
   const [rows, setRows] = useState([]);
   useEffect(() => { api(`/artifacts${conversationId ? `?conversation_id=${conversationId}` : ''}`).then(setRows); }, [conversationId, ws.tick]);
-  const dl = async (a) => { const u = await fetchBlobUrl(`/artifacts/${a.id}/download`); const l = document.createElement('a'); l.href = u; l.download = a.name; l.click(); };
+  const dl = (a) => downloadPath(`/artifacts/${a.id}/download`, a.name);
   return (
     <Section title="Files">
       {rows.length ? rows.map((a) => (
@@ -196,6 +196,17 @@ function Shell() {
       <SheetItem icon={<FiUsers />} label={t('newGroup')} onClick={() => { setSheet(null); setPage({ kind: 'group' }); }} />
     </Sheet>
   );
+
+  // Android Back button: close the top-most layer; false = let the app go to background.
+  useEffect(() => {
+    window.__lowbotBack = () => {
+      if (sheet) { setSheet(null); return true; }
+      if (page) { setPage(null); return true; }
+      if (active && !wide) { setActive(null); return true; }
+      return false;
+    };
+    return () => { delete window.__lowbotBack; };
+  }, [sheet, page, active, wide]);
 
   const list = <ChatList ws={ws} activeId={active} onOpen={openConv} onProfile={() => setSheet('menu')} onNew={() => setSheet('new')}
     attention={attention} compact={wide} />;

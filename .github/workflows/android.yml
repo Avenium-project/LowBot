@@ -2,13 +2,15 @@ name: android-apk
 on:
   workflow_dispatch:
   push:
+    branches: ["**"]
     tags: ["v*"]
+    paths: ["mobile/**", "client/**", ".github/workflows/android.yml"]
 
 jobs:
   apk:
     runs-on: ubuntu-latest
     env:
-      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      KEYSTORE_B64: ${{ secrets.LOWBOT_KEYSTORE_BASE64 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,51 +18,51 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "21" }
       - uses: android-actions/setup-android@v3
-      - name: Build UI and sync Capacitor
-        run: |
-          npm --prefix client ci
-          npm --prefix client run build:export
-          npm --prefix mobile ci
-          cd mobile && npx cap sync android
-      - name: Debug APK (test signing key only)
-        working-directory: mobile/android
+        with: { packages: "platforms;android-35 build-tools;35.0.0" }
+      - name: Build web UI
+        run: npm --prefix client ci && npm --prefix client run build:export
+      - name: Test APK (local test signing key)
         env: { VERSION_CODE: "${{ github.run_number }}" }
-        run: ./gradlew --no-daemon assembleDebug
-      - uses: actions/upload-artifact@v4
-        with: { name: open-dots-debug-apk, path: mobile/android/app/build/outputs/apk/debug/*.apk }
+        run: mobile/build-apk.sh test
       - name: Release APK (production key from secrets; skipped if absent)
         if: ${{ env.KEYSTORE_B64 != '' }}
-        working-directory: mobile/android
         env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          LOWBOT_KEYSTORE_PASSWORD: ${{ secrets.LOWBOT_KEYSTORE_PASSWORD }}
+          LOWBOT_KEY_ALIAS: ${{ secrets.LOWBOT_KEY_ALIAS }}
+          LOWBOT_KEY_PASSWORD: ${{ secrets.LOWBOT_KEY_PASSWORD }}
           VERSION_CODE: "${{ github.run_number }}"
         run: |
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
-          ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/release.jks" ./gradlew --no-daemon assembleRelease
+          cp mobile/build/LowBot-*-test.apk "$RUNNER_TEMP/" || true
+          LOWBOT_KEYSTORE="$RUNNER_TEMP/release.jks" mobile/build-apk.sh release
+          cp "$RUNNER_TEMP"/LowBot-*-test.apk mobile/build/ || true
           rm -f "$RUNNER_TEMP/release.jks"
       - uses: actions/upload-artifact@v4
-        if: ${{ hashFiles('mobile/android/app/build/outputs/apk/release/*.apk') != '' }}
-        with: { name: open-dots-release-apk, path: mobile/android/app/build/outputs/apk/release/*.apk }
+        with: { name: LowBot-apk, path: "mobile/build/LowBot-*.apk" }
 
   install-test:
-    # Installs the debug APK on an emulator and checks the app process starts.
+    # Installs the APK on an Android 15 emulator, launches it and captures a screenshot.
     needs: apk
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
-        with: { name: open-dots-debug-apk, path: apk }
+        with: { name: LowBot-apk, path: apk }
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 35
+          target: google_apis
           arch: x86_64
           script: |
-            adb install -r apk/*.apk
-            adb shell monkey -p io.lowbot.opendots.debug -c android.intent.category.LAUNCHER 1
-            sleep 10
-            adb shell pidof io.lowbot.opendots.debug
+            adb install -r apk/LowBot-*-test.apk
+            adb shell am start -W -n io.lowbot.app/.MainActivity
+            sleep 15
+            adb shell pidof io.lowbot.app
+            adb exec-out screencap -p > lowbot-launch.png
+            adb logcat -d | grep -iE "chromium|lowbot|AndroidRuntime" | tail -50 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: LowBot-emulator-screenshot, path: lowbot-launch.png }

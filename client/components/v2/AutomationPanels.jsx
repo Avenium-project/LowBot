@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/v2/api';
+import { api, saveBlob } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Card, Empty, Field, Section, TaskBadge, fmtTime, inputCls } from './ui';
 
@@ -132,7 +132,7 @@ export function SkillsPanel({ ws, skills, reloadSkills }) {
           <Card key={s.id} className="mb-2">
             <div className="flex justify-between flex-wrap gap-2"><div><b>/{s.slug}</b> — {s.name} · v{s.version} · {s.source}</div>
               <div className="flex gap-1">
-                <Button small onClick={() => api(`/skills/${s.id}/export`).then((x) => { const blob = new Blob([JSON.stringify(x, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${s.slug}.skill.json`; a.click(); })}>{t('export')}</Button>
+                <Button small onClick={() => api(`/skills/${s.id}/export`).then((x) => saveBlob(new Blob([JSON.stringify(x, null, 2)], { type: 'application/json' }), `${s.slug}.skill.json`))}>{t('export')}</Button>
                 <Button small onClick={() => { const v = prompt('Instructions', s.instructions); if (v != null) api(`/skills/${s.id}`, { method: 'PATCH', body: { instructions: v } }).then(reloadSkills); }}>{t('edit')}</Button>
                 <Button small kind="danger" onClick={() => api(`/skills/${s.id}`, { method: 'DELETE' }).then(reloadSkills)}>{t('delete')}</Button>
               </div></div>

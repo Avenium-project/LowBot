@@ -76,7 +76,7 @@ Legenda **Status**: ✅ zrobione i przetestowane · 🟡 częściowo · ⛔ brak
 | 57 | Artefakty z wersją, zadaniem, autoryzowanym pobraniem | G | brief §10 | `artifacts.py`, CSP sandbox przy pobieraniu | — | API | ✅ |
 | 58 | Dyktowanie, notatki głosowe z transkrypcją, TTS | G | brief §10 | Web Speech (urządzenie), STT/TTS przez `/audio/*` | real-time voice: **niedostępne** | `test_voice` (mock HTTP) | 🟡 |
 | 59 | Skrzynka powiadomień jako źródło prawdy, push jako dodatek | G | brief §10 | `notifications`; `push_status=not_configured` | brak Web Push/FCM | — | 🟡 |
-| 60 | Android APK | G | brief §11 | `mobile/` Capacitor 7 + workflow | **APK nie zbudowany tutaj** (dl.google.com zablokowane) | N | 🔒 |
+| 60 | Android APK | G | brief §11 | `mobile/`: natywny shell (WebView, Keystore, mikrofon, pliki, deep link), `build-apk.sh` | APK zbudowany i podpisany tutaj; instalacja na emulatorze tylko w CI | N | 🟡 |
 | 61 | Windows EXE | G | brief §11 | `desktop/` Tauri 2 (+ keyring), workflow NSIS/MSI | **EXE nie zbudowany tutaj**; `cargo check` na `x86_64-pc-windows-msvc` przechodzi | N | 🔒 |
 | 62 | Kreator: instancja → parowanie → model → test → pierwszy bot | G | brief §11 | `SetupWizard.jsx` | — | M | ✅ |
 | 63 | Lokalny backend w kliencie Windows | R | brief §11 | — (klient łączy się ze zdalnym/self-hosted serwerem) | brak | — | ⛔ |
@@ -84,6 +84,8 @@ Legenda **Status**: ✅ zrobione i przetestowane · 🟡 częściowo · ⛔ brak
 | 65 | Team Bots (wielu ludzi), Slack, publikacja w zespole | G | brief §12 | — (jeden właściciel) | cały etap 5 | O | ⛔ |
 | 66 | Polityki administracyjne, klucze sprzętowe, routing przez lokalny komputer | G | brief §12 (niezweryf.) | — | brak | — | ⛔ |
 | 67 | Wybór modelu per bot, duże grupy, pełna edycja routines na telefonie | R | brief §12 | zrobione | — | M | ✅ |
+| 69 | ChatGPT przez Codex CLI (logowanie kodem urządzenia, `codex exec --json`) | R | brief §7 | `agents_cli.py`, profil `codex_cli`, narzędzie `codex.run` | narzędzia LowBot niedostępne dla bota na profilu Codex; logowanie tylko na serwerze z Codex CLI | `test_agent_cli.py` (prawdziwy CLI, fałszywy serwer modelu) | 🟡 |
+| 70 | OpenCode Go | R | katalog OpenCode 1.18.34 (`opencode-go`: `@ai-sdk/openai-compatible`, `https://opencode.ai/zen/go/v1`) | preset `opencode_go` (pełne narzędzia LowBot), `opencode_cli`, `opencode.run` | endpoint nieosiągalny stąd — brak testu na żywo | `test_agent_cli.py` | 🟡 |
 | 68 | PostgreSQL | T | brief §3 | SQL przenośny poza FTS5; brak adaptera | adapter | — | ⛔ |
 
 **Nie deklaruję pełnej zgodności z Grok Bot.** Pozycje ⛔/🔒/🟡 są otwarte.

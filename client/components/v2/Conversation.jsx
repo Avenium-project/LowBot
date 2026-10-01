@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { FiArrowUp, FiCheckCircle, FiChevronLeft, FiClock, FiMic, FiMonitor, FiPaperclip, FiPlus, FiSquare, FiStopCircle, FiXCircle } from 'react-icons/fi';
-import { api, fetchBlobUrl, pendingOutbox, sendMessage } from '../../lib/v2/api';
+import { api, downloadPath, pendingOutbox, sendMessage } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { ElicitationCard } from './InboxPanel';
 import { BotBlob, cls } from './ui';
@@ -22,11 +22,7 @@ function dayLabel(iso, lang) {
 }
 
 function Attachment({ a }) {
-  const open = async () => {
-    const u = await fetchBlobUrl(`/artifacts/${a.artifact_id}/download`);
-    const link = document.createElement('a');
-    link.href = u; link.download = a.name || 'file'; link.click();
-  };
+  const open = () => downloadPath(`/artifacts/${a.artifact_id}/download`, a.name || 'file');
   if (!a.artifact_id) return null;
   return <button onClick={open} className="mt-1 mr-2 inline-flex items-center gap-1 rounded-full bg-black/30 px-3 py-1 text-[13px] text-sky-300">📎 {a.name || 'file'}</button>;
 }
@@ -187,6 +183,18 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
 
   // Dictation: browser/OS speech recognition, only after an explicit tap.
   const dictate = () => {
+    if (window.LowBotNative?.startDictation) { // Android shell: native speech recognizer
+      const onEv = (e) => {
+        const d = e.detail || {};
+        if (d.type === 'result') setText((x) => `${x} ${d.text}`.trim());
+        if (d.type === 'error') setError(d.text);
+        if (d.type !== 'listening') { setListening(false); window.removeEventListener('lowbot:dictation', onEv); }
+      };
+      window.addEventListener('lowbot:dictation', onEv);
+      setListening(true);
+      window.LowBotNative.startDictation(lang);
+      return;
+    }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { setError(lang === 'pl' ? 'Dyktowanie nie jest dostępne na tym urządzeniu.' : 'Dictation is not available on this device.'); return; }
     const r = new SR();

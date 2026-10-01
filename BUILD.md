@@ -36,6 +36,9 @@ UI_DIST=$PWD/out python -m uvicorn app.main:app ...   # serwer podaje UI pod /bo
 
 ## 3. Docker / Compose (self-hosted) — ✅ obraz, 📄 Compose
 
+Obraz zawiera też Codex CLI i OpenCode CLI (`WITH_AGENT_CLIS=1`, domyślnie) — zweryfikowane w kontenerze
+(`/api/v2/integrations` zgłasza oba jako zainstalowane, read-only rootfs).
+
 ```bash
 docker build -t open-dots .                                  # z Chromium
 docker build --build-arg WITH_BROWSER=0 -t open-dots .       # mniejszy, bez przeglądarki
@@ -51,22 +54,26 @@ end-to-end (wymaga domeny i portów 80/443).
 
 **Nie wystawiaj `uvicorn` ani `next dev` bezpośrednio do internetu** — tylko przez proxy HTTPS.
 
-## 4. Android APK — 🔒 tutaj, 📄 w CI
+## 4. Android APK (LowBot) — ✅ zbudowany tutaj, 📄 test na emulatorze w CI
+
+Aplikacja Android to mały natywny „shell” bez AndroidX/Gradle (`mobile/`), więc buduje się bez
+dostępu do Google Maven:
 
 ```bash
 npm --prefix client ci && npm --prefix client run build:export
-cd mobile && npm ci && npx cap sync android
-cd android && ./gradlew assembleDebug                         # app/build/outputs/apk/debug/*.apk
-# release (klucz produkcyjny tylko z sekretów/zmiennych środowiska):
-ANDROID_KEYSTORE_PATH=... ANDROID_KEYSTORE_PASSWORD=... ANDROID_KEY_ALIAS=... ANDROID_KEY_PASSWORD=... ./gradlew assembleRelease
+ANDROID_HOME=~/Android/Sdk mobile/build-apk.sh test       # APK podpisany kluczem testowym
+LOWBOT_KEYSTORE=… LOWBOT_KEYSTORE_PASSWORD=… LOWBOT_KEY_ALIAS=… mobile/build-apk.sh release
 ```
 
-Wykonano tutaj: `npx cap add android` (projekt wygenerowany i skonfigurowany). **Nie zbudowano APK**:
-`dl.google.com` (Android SDK: platforms, build-tools) jest zablokowane przez politykę egress tego
-środowiska. Workflow `.github/workflows/android.yml` buduje debug APK (testowy klucz debug), opcjonalnie
-release APK (sekrety `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
-`ANDROID_KEY_PASSWORD`) i instaluje APK na emulatorze API 34. Wymagany serwer z ważnym certyfikatem HTTPS
-(aplikacja nie zezwala na cleartext).
+Wykonano tutaj (2026-10-01): `mobile/build-apk.sh test` z `android.jar` API 35 (kompilacja Java),
+`android.jar` API 29 do linkowania zasobów (aapt2 2.19 z Ubuntu nie czyta tabeli zasobów API 35),
+`dalvik-exchange` (dx) jako dexer, `zipalign` i `apksigner` z Ubuntu → `LowBot-2.0.0-test.apk`
+(~410 KB): `io.lowbot.app`, minSdk 26, targetSdk 35, podpis v2+v3 zweryfikowany przez
+`apksigner verify`. **Nie uruchomiono go na urządzeniu ani emulatorze** (brak obrazów systemu —
+dl.google.com zablokowane). Workflow `.github/workflows/android.yml` buduje ten sam APK na oficjalnym
+SDK (d8, aapt2 35), instaluje go na emulatorze Android 15 i zapisuje zrzut ekranu po uruchomieniu.
+Klucz testowy jest generowany lokalnie (`mobile/.keystore/`, nie trafia do repozytorium); APK z innym
+kluczem wymaga odinstalowania poprzedniej wersji.
 
 ## 5. Windows EXE — 🔒 tutaj, 📄 w CI
 

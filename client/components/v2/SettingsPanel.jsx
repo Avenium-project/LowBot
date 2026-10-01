@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { api, fetchBlobUrl } from '../../lib/v2/api';
+import { api, downloadPath } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Card, Empty, Field, Section, fmtTime, inputCls } from './ui';
 import Integrations from './Integrations';
@@ -168,7 +168,7 @@ function Admin() {
   const [usage, setUsage] = useState(null);
   const load = () => { api('/admin/backups').then(setB); api('/usage').then(setUsage); };
   useEffect(() => { load(); }, []);
-  const exportAudit = async () => { const u = await fetchBlobUrl('/audit/export'); const a = document.createElement('a'); a.href = u; a.download = 'opendots-audit.jsonl'; a.click(); };
+  const exportAudit = () => downloadPath('/audit/export', 'lowbot-audit.jsonl');
   return (
     <Section title={t('backup')} actions={<><Button small onClick={() => api('/admin/backup', { method: 'POST' }).then(load)}>{t('create')}</Button><Button small onClick={exportAudit}>Audit export</Button></>}>
       {b && <div className="text-xs text-zinc-400 space-y-1">{b.backups.map((x) => <div key={x.name}>{x.name} · {(x.size / 1024).toFixed(0)} KB</div>)}<div>{b.restore}</div><div className="text-amber-300">{b.note}</div></div>}

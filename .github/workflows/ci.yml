@@ -15,6 +15,7 @@ jobs:
         run: |
           pip install -r requirements-dev.txt
           python -m playwright install --with-deps chromium
+          npm install -g @openai/codex opencode-ai   # real CLIs for the integration tests
       - name: Unit + acceptance tests (deterministic, scripted mock provider)
         working-directory: server
         run: python -m pytest -q tests tests/v2

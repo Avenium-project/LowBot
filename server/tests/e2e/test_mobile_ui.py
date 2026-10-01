@@ -166,3 +166,47 @@ def test_M_phone_flow(server):
         page.get_by_role("button", name="Oddaj sterowanie").click()
         expect(page.get_by_role("button", name="Przejmij sterowanie")).to_be_visible(timeout=10000)
         browser.close()
+
+
+BRIDGE_MOCK = """
+window.__store = {};
+window.__saved = [];
+window.LowBotNative = {
+  platform: () => 'android', appVersion: () => 'test',
+  secretGet: (k) => window.__store[k] || null,
+  secretSet: (k, v) => { if (k !== 'device_token') return false; window.__store[k] = v; return true; },
+  secretRemove: (k) => { delete window.__store[k]; },
+  saveFile: (n, m, b) => { window.__saved.push(n); return true; },
+  openExternal: () => true, startDictation: () => {}, exitApp: () => {},
+};
+"""
+
+
+def test_android_bridge_code_path(server):
+    """Runs the web app as the LowBot Android shell would (simulated bridge).
+    Not a substitute for the emulator test in .github/workflows/android.yml."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 360, "height": 740}, is_mobile=True, locale="pl-PL")
+        ctx.add_init_script(BRIDGE_MOCK)
+        page = ctx.new_page()
+        seen_auth = []
+        page.on("request", lambda r: seen_auth.append(r.headers.get("authorization", "")) if "/api/v2/bots" in r.url else None)
+        page.goto(f"{server}/bots/")
+        page.get_by_role("textbox", name="Adres serwera").fill(server)
+        page.get_by_role("button", name="Dalej").click()
+        page.get_by_role("textbox", name="Token właściciela").fill(TOKEN)
+        page.get_by_role("button", name="Dalej").click()
+        expect(page.get_by_role("button", name="Menu")).to_be_visible(timeout=15000)  # existing bots -> chat list
+        token = page.evaluate("() => window.__store.device_token")
+        assert token and token.startswith("odd_") and token != TOKEN          # only a device token is kept
+        assert page.evaluate("() => Object.keys(localStorage).join(',')").find(TOKEN) == -1
+        assert any(h == f"Bearer {token}" for h in seen_auth)                 # API calls use the device token
+        devices = api(server, "/devices")
+        assert any(d["platform"] == "android" and d["name"] == "LowBot (Android)" for d in devices)
+        # Android Back: open a conversation, Back closes it, Back again leaves the app (not handled).
+        page.get_by_text("Asystent").first.click()
+        assert page.evaluate("() => window.__lowbotBack()") is True
+        expect(page.get_by_role("button", name="Menu")).to_be_visible()
+        assert page.evaluate("() => window.__lowbotBack()") is False
+        browser.close()
