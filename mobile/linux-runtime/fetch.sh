@@ -6,7 +6,7 @@
 #   - the current Alpine Linux minirootfs pinned by URL + SHA-256 (mobile/linux-runtime/alpine.json),
 #     which the phone downloads on first use and verifies against that hash.
 # Each .deb is checked against the SHA-256 in the repository index. Licences: proot GPL-2.0,
-# talloc LGPL-3.0 (sources: github.com/termux/proot, talloc.samba.org).
+# talloc LGPL-3.0, libandroid-shmem BSD-3-Clause (sources: github.com/termux/proot, talloc.samba.org).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 JNI="$HERE/../jniLibs"
@@ -36,11 +36,14 @@ for pair in "aarch64:arm64-v8a" "x86_64:x86_64"; do
   curl -fsSL "$REPO/dists/stable/main/binary-$arch/Packages" -o "$WORK/$arch/Packages"
   fetch_deb "$arch" proot
   fetch_deb "$arch" libtalloc
+  fetch_deb "$arch" libandroid-shmem
   P="$WORK/$arch/root/data/data/com.termux/files/usr"
   cp "$P/bin/proot" "$JNI/$abi/libproot.so"
   cp "$P/libexec/proot/loader" "$JNI/$abi/libproot-loader.so"
   if [ -f "$P/libexec/proot/loader32" ]; then cp "$P/libexec/proot/loader32" "$JNI/$abi/libproot-loader32.so"; fi
   cp -L "$P/lib/libtalloc.so.2" "$JNI/$abi/libtalloc.so"
+  cp -L "$P/lib/libandroid-shmem.so" "$JNI/$abi/libandroid-shmem.so"
+  patchelf --remove-rpath "$JNI/$abi/libandroid-shmem.so" || true
   # Android only installs files named lib*.so: point proot at libtalloc.so and drop Termux's rpath.
   patchelf --replace-needed libtalloc.so.2 libtalloc.so "$JNI/$abi/libproot.so"
   patchelf --remove-rpath "$JNI/$abi/libproot.so" || true
@@ -50,7 +53,7 @@ for pair in "aarch64:arm64-v8a" "x86_64:x86_64"; do
     needed="$(readelf -d "$f" 2>/dev/null | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p' | tr '\n' ' ')"
     echo "$abi $(basename "$f"): ${needed:-static}"
     for n in $needed; do
-      case "$n" in libc.so|libdl.so|libm.so|liblog.so|libtalloc.so) ;; *) echo "unexpected dependency $n in $f"; exit 1;; esac
+      case "$n" in libc.so|libdl.so|libm.so|liblog.so|libtalloc.so|libandroid-shmem.so) ;; *) echo "unexpected dependency $n in $f"; exit 1;; esac
     done
   done
 done
