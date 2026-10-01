@@ -201,6 +201,9 @@ public final class Linux {
             env.put("PROOT_LOADER", lib("libproot-loader.so").getPath());
             if (lib("libproot-loader32.so").isFile()) env.put("PROOT_LOADER_32", lib("libproot-loader32.so").getPath());
             env.put("PROOT_TMP_DIR", tmp.getPath());
+            // x86_64 Android blocks the fork syscall musl uses there (arm64 has only clone); without proot's
+            // seccomp acceleration every syscall goes through ptrace, which lets proot handle it.
+            if ("x86_64".equals(arch())) env.put("PROOT_NO_SECCOMP", "1");
             env.put("LD_LIBRARY_PATH", app.getApplicationInfo().nativeLibraryDir);
             env.put("HOME", "/root");
             env.put("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
