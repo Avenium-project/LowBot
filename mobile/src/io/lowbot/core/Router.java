@@ -39,6 +39,9 @@ public final class Router {
         JSONObject log(String botId);
         void reset(String botId);
         JSONObject run(String botId, String command, int timeoutS) throws Exception;
+        JSONArray watchers();
+        void stopWatcher(String id, boolean delete);
+        String watcherLog(String id);
     }
 
     public static final class Response {
@@ -494,6 +497,13 @@ public final class Router {
             if (id == null && get) return Response.json(l.status());
             if ("install".equals(id) && post) return Response.json(l.install());
             if (id == null && del) { l.remove(); return Response.json(l.status()); }
+            if ("watchers".equals(id)) {
+                if (sub == null && get) return Response.json(J.obj("watchers", l.watchers()));
+                String op = p.length > 3 ? p[3] : null;
+                if (sub != null && "log".equals(op) && get) return Response.json(J.obj("log", l.watcherLog(sub)));
+                if (sub != null && "stop".equals(op) && post) { l.stopWatcher(sub, false); return Response.json(J.obj("watchers", l.watchers())); }
+                if (sub != null && op == null && del) { l.stopWatcher(sub, true); return Response.json(J.obj("watchers", l.watchers())); }
+            }
             if ("sessions".equals(id) && sub != null) {
                 // The owner's view of a bot's terminal. Commands typed here by the owner (the person holding the
                 // phone, like any terminal app) run directly and are recorded in the audit log; bots' commands

@@ -93,6 +93,11 @@ podatności w publicznym issue.
   z Linuxa **nie** przechodzi przez filtr SSRF/LAN LowBota. Dlatego polecenia botów podlegają zgodom
   („Execution on this phone”), a obraz Alpine jest przypięty sumą SHA-256. Polecenia wpisane przez
   właściciela w Computer → Terminals wykonują się od razu i są zapisywane w dzienniku audytu.
+- Watchery (`watcher.start`) to programy bota działające w tle w tym samym Linuksie — ta sama zgoda co
+  `linux.run`, te same ograniczenia (bez piaskownicy, sieć poza filtrem). Każdy bot ma własny folder
+  pingów (`/lowbot/pings`), więc program budzi tylko swojego bota; bot jest ustalany po folderze, nie po
+  treści pliku. Tekst pinga trafia do modelu jako niezaufane dane, z limitem częstotliwości na watcher;
+  logi są czyszczone z sekretów. Limity: 3 na bota, 8 łącznie, maks. 5 restartów/h.
 - Boty nie wpisują haseł (pola `password` są odrzucane) — logowanie, 2FA i CAPTCHA robisz sam po
   „Przejmij”. Nagrywanie „Naucz zadania” zapisuje etykiety elementów i wpisany tekst (bez haseł) tylko
   gdy zaznaczysz „Nagrywaj”; strona otwarta w przeglądarce bota może w tym czasie dopisać własne kroki

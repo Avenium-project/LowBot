@@ -55,6 +55,7 @@ public class SelfTest extends BroadcastReceiver {
             b.start();
             b = scenario(ctx, b);
             browser(ctx, b);
+            watchers(ctx, b);
             linux(ctx, b);
             String r = "LOWBOT_SELFTEST PASS " + passed.size() + " " + passed;
             write(ctx, r);
@@ -198,7 +199,7 @@ public class SelfTest extends BroadcastReceiver {
         api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "my key is sk-proj-abcdefghijklmnopqrstuvwxyz123456 thanks"));
         b.engine.drain(20000);
         check(b.core.db.count("SELECT COUNT(*) FROM messages WHERE text LIKE '%sk-proj-abcdef%'") == 0
-                && b.core.db.count("SELECT COUNT(*) FROM messages WHERE text LIKE '%{{secret:PASTED_KEY_1}}%'") == 1
+                && b.core.db.count("SELECT COUNT(*) FROM messages WHERE author_type = 'user' AND text LIKE '%{{secret:PASTED_KEY_1}}%'") == 1
                 && b.core.secretIdByName("user:PASTED_KEY_1") != null, "a key pasted into the chat moves to the vault");
 
         // 6. delegation with wait
@@ -385,6 +386,49 @@ public class SelfTest extends BroadcastReceiver {
         try { io.lowbot.tools.Net.vet("http://192.168.1.1/", false); } catch (io.lowbot.tools.Net.Denied e) { blocked = true; }
         check(blocked, "LAN blocked by default");
         return b2;
+    }
+
+    /** Watchers: a ping file in a bot's own folder starts a task for that bot; forged or too-frequent pings do not. */
+    static void watchers(Context ctx, Backend b) throws Exception {
+        Linux l = new Linux(ctx, b);
+        Watchers w = new Watchers(b, l);
+        java.util.List<JSONObject> all = b.bots.list(true);
+        JSONObject bot = all.get(0);
+        String bid = bot.optString("id");
+        w.pings = new File(ctx.getCacheDir(), "selftest-pings");
+        File[] stale = w.pings.listFiles();
+        if (stale != null) for (File d : stale) { File[] fs = d.listFiles(); if (fs != null) for (File f : fs) f.delete(); }
+        String wid = J.id("wch");
+        b.core.kvSet("linux_watchers", new JSONArray().put(J.obj("id", wid, "bot_id", bid, "name", "btc", "command", "python3 btc.py",
+                "min_interval_s", 3600, "enabled", false, "pings", 0)).toString());
+        long before = b.core.db.count("SELECT COUNT(*) FROM tasks WHERE requester_type = 'watcher'");
+        write(new File(dir(w.pings, bid), "ping-1.json"), J.obj("bot", bid, "watcher", wid, "message", "BTC fell to 59800", "data", J.obj("price", 59800)).toString());
+        check(w.processPings() == 1 && b.core.db.count("SELECT COUNT(*) FROM tasks WHERE requester_type = 'watcher' AND bot_id = ? AND instructions LIKE '%59800%'", bid) == before + 1,
+                "watcher ping starts a task for its bot");
+        check(new File(dir(w.pings, bid), "ping-1.json").exists() == false, "ping file consumed");
+        write(new File(dir(w.pings, bid), "ping-2.json"), J.obj("watcher", wid, "message", "again").toString());
+        check(w.processPings() == 0 && w.find(bid, "btc").optInt("dropped") == 1, "watcher pings faster than min_interval are dropped");
+        write(new File(dir(w.pings, "bot_doesnotexist"), "ping-3.json"), J.obj("bot", bid, "message", "forged").toString());
+        check(w.processPings() == 0, "a ping from an unknown bot folder is ignored (bot comes from the folder, not the file)");
+        b.engine.drain(20000);
+        JSONObject bare = b.bots.create(J.obj("name", "NoTerm", "tools", new JSONArray().put("web.fetch").put("-linux.*")), null);
+        java.util.Map<String, io.lowbot.engine.Tools.Spec> tools = b.tools.forBot(b.bots.get(bare.optString("id")), null, null);
+        check(!tools.containsKey("watcher.start") && !tools.containsKey("linux.run"), "terminal off also switches watchers off");
+        b.bots.delete(bare.optString("id"));
+        if (!l.installed()) {
+            boolean refused = false;
+            try { w.start(bid, "x", "true", 60); } catch (io.lowbot.engine.Tools.ToolError e) { refused = e.getMessage().contains("not installed"); }
+            check(refused, "watcher.start refuses without Linux");
+        }
+        b.core.kvSet("linux_watchers", "[]");
+    }
+
+    static File dir(File root, String name) { File d = new File(root, name); d.mkdirs(); return d; }
+
+    static void write(File f, String text) throws Exception {
+        java.io.FileOutputStream o = new java.io.FileOutputStream(f);
+        o.write(text.getBytes("UTF-8"));
+        o.close();
     }
 
     /** The bots' Linux: install the pinned Alpine through proot, run commands in a persistent shell. */

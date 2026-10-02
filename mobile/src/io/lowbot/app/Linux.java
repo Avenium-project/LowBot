@@ -19,6 +19,9 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -200,24 +203,7 @@ public final class Linux {
         Session(String botId, File workspace) throws Exception {
             this.botId = botId;
             tmp.mkdirs();
-            ProcessBuilder pb = new ProcessBuilder(lib("libproot.so").getPath(), "--kill-on-exit", "--link2symlink", "-0",
-                    "-r", rootfs.getPath(), "-b", "/dev", "-b", "/proc", "-b", "/sys", "-b", workspace.getPath() + ":/workspace",
-                    "-w", "/workspace", "/bin/sh");
-            pb.redirectErrorStream(true);
-            Map<String, String> env = pb.environment();
-            env.clear();
-            env.put("PROOT_LOADER", lib("libproot-loader.so").getPath());
-            if (lib("libproot-loader32.so").isFile()) env.put("PROOT_LOADER_32", lib("libproot-loader32.so").getPath());
-            env.put("PROOT_TMP_DIR", tmp.getPath());
-            // x86_64 Android blocks the fork syscall musl uses there (arm64 has only clone); without proot's
-            // seccomp acceleration every syscall goes through ptrace, which lets proot handle it.
-            if ("x86_64".equals(arch())) env.put("PROOT_NO_SECCOMP", "1");
-            env.put("LD_LIBRARY_PATH", app.getApplicationInfo().nativeLibraryDir);
-            env.put("HOME", "/root");
-            env.put("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
-            env.put("TERM", "dumb");
-            env.put("LANG", "C.UTF-8");
-            env.put("PS1", "");
+            ProcessBuilder pb = prootBuilder(workspace, botId, null, "/bin/sh");
             p = pb.start();
             stdin = p.getOutputStream();
             final InputStream out = p.getInputStream();
@@ -246,6 +232,77 @@ public final class Linux {
         }
 
         void kill() { p.destroy(); try { p.destroyForcibly(); } catch (Throwable ignored) { } }
+    }
+
+    /** Root of the per-bot ping folders. */
+    File pingDir() { File d = new File(base, "pings"); d.mkdirs(); return d; }
+
+    /** A bot's own folder (bound at /lowbot/pings) where `lowbot-ping` drops a JSON file to wake it. Bots never
+     *  see each other's folders, so a program can only wake the bot that runs it. */
+    File pingDir(String botId) {
+        File d = new File(pingDir(), botId == null ? "_" : botId.replaceAll("[^A-Za-z0-9_-]", "_"));
+        d.mkdirs();
+        return d;
+    }
+
+    static final String PING_SH = "#!/bin/sh\n# lowbot-ping \"message\" ['{\"json\":\"data\"}'] — wakes your bot with this message.\n"
+            + "[ -z \"$1\" ] && { echo 'usage: lowbot-ping \"message\" [json]' >&2; exit 2; }\n"
+            + "f=/lowbot/pings/.$$.$(date +%s).tmp\n"
+            + "python3 -c 'import json,sys,os,time;print(json.dumps({\"bot\":os.environ.get(\"LOWBOT_BOT\",\"\"),\"watcher\":os.environ.get(\"LOWBOT_WATCHER\",\"\"),\"message\":sys.argv[1],\"data\":sys.argv[2] if len(sys.argv)>2 else None,\"time\":time.time()}))' \"$1\" \"$2\" > \"$f\" 2>/dev/null \\\n"
+            + "  || printf '{\"bot\":\"%s\",\"watcher\":\"%s\",\"message\":\"%s\"}' \"$LOWBOT_BOT\" \"$LOWBOT_WATCHER\" \"$(printf %s \"$1\" | tr -d '\"\\\\' | head -c 2000)\" > \"$f\"\n"
+            + "mv \"$f\" \"/lowbot/pings/ping-$$-$(date +%s%N 2>/dev/null || date +%s).json\" && echo 'pinged'\n";
+
+    static final String PING_PY = "\"\"\"LowBot: wake your bot from a program.\n\n    from lowbot import ping\n    ping('BTC fell below 60000', {'price': 59800})\n\"\"\"\n"
+            + "import json, os, time, uuid\n\n"
+            + "def ping(message, data=None):\n"
+            + "    d = '/lowbot/pings'\n"
+            + "    tmp = os.path.join(d, '.%s.tmp' % uuid.uuid4().hex)\n"
+            + "    with open(tmp, 'w') as f:\n"
+            + "        json.dump({'bot': os.environ.get('LOWBOT_BOT', ''), 'watcher': os.environ.get('LOWBOT_WATCHER', ''),\n"
+            + "                   'message': str(message)[:2000], 'data': data, 'time': time.time()}, f, default=str)\n"
+            + "    os.replace(tmp, os.path.join(d, 'ping-%s.json' % uuid.uuid4().hex))\n"
+            + "    return True\n";
+
+    /** Installs lowbot-ping and the Python `lowbot` module into the Linux (idempotent). */
+    void installHelpers() {
+        try {
+            File sh = new File(rootfs, "usr/local/bin/lowbot-ping");
+            if (!sh.isFile() || !read(sh).equals(PING_SH)) { write(sh, PING_SH); Os.chmod(sh.getPath(), 0755); }
+            File py = new File(rootfs, "opt/lowbot/lowbot.py");
+            if (!py.isFile() || !read(py).equals(PING_PY)) write(py, PING_PY);
+            new File(rootfs, "lowbot/pings").mkdirs();
+        } catch (Exception ignored) { }
+    }
+
+    /** proot command line shared by the bots' shells and their watcher programs. */
+    ProcessBuilder prootBuilder(File workspace, String botId, String watcherId, String... cmd) {
+        tmp.mkdirs();
+        installHelpers();
+        List<String> args = new ArrayList<String>(Arrays.asList(lib("libproot.so").getPath(), "--kill-on-exit", "--link2symlink", "-0",
+                "-r", rootfs.getPath(), "-b", "/dev", "-b", "/proc", "-b", "/sys", "-b", workspace.getPath() + ":/workspace",
+                "-b", pingDir(botId).getPath() + ":/lowbot/pings", "-w", "/workspace"));
+        args.addAll(Arrays.asList(cmd));
+        ProcessBuilder pb = new ProcessBuilder(args);
+        pb.redirectErrorStream(true);
+        Map<String, String> env = pb.environment();
+        env.clear();
+        env.put("PROOT_LOADER", lib("libproot-loader.so").getPath());
+        if (lib("libproot-loader32.so").isFile()) env.put("PROOT_LOADER_32", lib("libproot-loader32.so").getPath());
+        env.put("PROOT_TMP_DIR", tmp.getPath());
+        // x86_64 Android blocks the fork syscall musl uses there (arm64 has only clone); without proot's
+        // seccomp acceleration every syscall goes through ptrace, which lets proot handle it.
+        if ("x86_64".equals(arch())) env.put("PROOT_NO_SECCOMP", "1");
+        env.put("LD_LIBRARY_PATH", app.getApplicationInfo().nativeLibraryDir);
+        env.put("HOME", "/root");
+        env.put("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+        env.put("TERM", "dumb");
+        env.put("LANG", "C.UTF-8");
+        env.put("PS1", "");
+        env.put("PYTHONPATH", "/opt/lowbot");
+        env.put("PYTHONUNBUFFERED", "1");
+        env.put("LOWBOT_BOT", botId);
+        if (watcherId != null) env.put("LOWBOT_WATCHER", watcherId);
+        return pb;
     }
 
     Session session(String botId, File workspace) throws ToolError {

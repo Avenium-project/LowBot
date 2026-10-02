@@ -101,10 +101,13 @@ public final class Backend {
         }
     }
 
+    /** Background programs (bot watchers) that should keep the work service alive. */
+    public volatile int backgroundJobs = 0;
+
     public void wake() {
         engine.wake();
         Platform p = platform;
-        if (p != null) p.workStateChanged(engine.activeCount(), (int) queuedCount());
+        if (p != null) p.workStateChanged(engine.activeCount(), (int) queuedCount() + backgroundJobs);
     }
 
     public long queuedCount() {
@@ -113,7 +116,7 @@ public final class Backend {
 
     public void onRunFinished() {
         Platform p = platform;
-        if (p != null) p.workStateChanged(engine.activeCount(), (int) queuedCount());
+        if (p != null) p.workStateChanged(engine.activeCount(), (int) queuedCount() + backgroundJobs);
     }
 
     public void scheduleAlarm() {

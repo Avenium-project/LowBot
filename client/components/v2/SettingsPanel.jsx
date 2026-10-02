@@ -206,7 +206,46 @@ function Terminal({ tick }) {
         <Label>Network</Label>
         <div className={group}><Row label="Local network (LAN)" right={<Toggle on={cfg.allow_private_network} label="Local network" onChange={(v) => save({ allow_private_network: v })} />} /></div>
       </>}
+      {st?.installed && <Watchers tick={tick} />}
       {err && <div className="text-[13px] text-rose-400 px-2 mt-2">{err}</div>}
+    </>
+  );
+}
+
+function Watchers({ tick }) {
+  const [list, setList] = useState(null);
+  const [open, setOpen] = useState(null);
+  const [log, setLog] = useState('');
+  const load = () => api('/linux/watchers').then((d) => setList(d.watchers)).catch(() => setList([]));
+  useEffect(() => { load(); }, [tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const show = (w) => {
+    if (open === w.id) { setOpen(null); return; }
+    setOpen(w.id); setLog('…');
+    api(`/linux/watchers/${w.id}/log`).then((d) => setLog(d.log || 'No output yet')).catch((e) => setLog(e.message));
+  };
+  if (!list) return null;
+  const state = (w) => (w.running ? (w.status === 'restarting' ? 'restarting' : 'running') : w.status || 'stopped');
+  return (
+    <>
+      <Label>Watchers</Label>
+      <div className={group}>
+        {list.length ? list.map((w) => (
+          <div key={w.id}>
+            <Row label={w.name} value={`${w.bot} · ${state(w)}${w.pings ? ` · ${w.pings} ping${w.pings === 1 ? '' : 's'}` : ''}`} onClick={() => show(w)}
+              right={<span className={cls('h-2 w-2 rounded-full', w.running ? 'bg-emerald-400' : w.status === 'failed' ? 'bg-rose-400' : 'bg-zinc-600')} />} />
+            {open === w.id && (
+              <div className="lb-rise px-5 pb-4 space-y-2">
+                <div className="font-mono text-[12px] text-zinc-400 break-all">$ {w.command}</div>
+                {w.error && <div className="text-[13px] text-rose-400">{w.error}</div>}
+                {w.last_ping_at && <div className="text-[13px] text-zinc-500">Last ping {fmtTime(w.last_ping_at)}{w.dropped ? ` · ${w.dropped} dropped (too frequent)` : ''}</div>}
+                <pre className="max-h-[260px] overflow-auto rounded-xl bg-black/60 p-3 font-mono text-[11px] leading-snug text-zinc-300 whitespace-pre-wrap break-all">{log}</pre>
+                <div className="flex gap-2">
+                  {w.running && <Button small onClick={() => api(`/linux/watchers/${w.id}/stop`, { method: 'POST' }).then((d) => setList(d.watchers))}>Stop</Button>}
+                  <Button small kind="danger" onClick={async () => { if (await askConfirm({ title: `Delete “${w.name}”?`, message: 'The program stops and its log is deleted. Its files stay in the workspace.', confirmLabel: 'Delete', danger: true })) api(`/linux/watchers/${w.id}`, { method: 'DELETE' }).then((d) => { setOpen(null); setList(d.watchers); }); }}>Delete</Button>
+                </div>
+              </div>)}
+          </div>)) : <Row label={<span className="text-zinc-500">None — ask a bot to watch something for you</span>} right={null} />}
+      </div>
     </>
   );
 }

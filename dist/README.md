@@ -2,11 +2,18 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **3.4.0** — secrets: every bot can show a secure field (one or several values, e.g. API key + secret) that
+- Version **3.5.0** — watchers: a bot can write a small program (usually Python) and run it in the background in its
+  Linux; the program wakes the bot with `from lowbot import ping; ping('BTC fell to 59800', {...})` or `lowbot-ping "msg"`
+  (new email, price drop, page change…). Each ping starts a task for that bot (the ping text is treated as data, not
+  instructions); pings faster than the watcher's min interval are dropped; up to 3 watchers per bot, 8 in total; they
+  restart after a crash (max 5×/hour) and keep LowBot's work notification on. Starting one asks for approval like a
+  Linux command; Settings → Terminal → Watchers shows status, pings and logs (Stop / Delete). Turning a bot's Terminal
+  off also turns its watchers off. Needs Linux installed; not yet tried on a real phone.
+  SHA-256: `6e0b73602879e1156ebfc988b7d67e84f9bf63be3b98f8ff8120f6a8bf88abc5`
+- 3.4.0 — secrets: every bot can show a secure field (one or several values, e.g. API key + secret) that
   stores them encrypted on the phone; bots only get {{secret:NAME}} placeholders and are told never to ask for keys in
   chat; any stored secret value that shows up in tool output, a reply or the terminal log is replaced by its placeholder;
   a key pasted straight into the chat moves to the vault automatically; Settings → Safety lists secrets (delete).
-  SHA-256: `23f12e61664de9c2eb64d2569db440a3fb437981b804b856289e563c624070e8`
 - 3.3.1 — Markdown formatting really works now (lists with bullets/numbers, headings, spacing — the
   typography styles were missing), single line breaks are kept, code blocks scroll instead of breaking lines and have
   a Copy button.

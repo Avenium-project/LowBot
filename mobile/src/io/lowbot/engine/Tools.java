@@ -206,11 +206,16 @@ public final class Tools {
     /** Available to every bot: its memory files, managing the team (create/update/delete still ask the user),
      *  its own role, and — once Linux is installed — its Linux terminal (each command asks the user). */
     static final List<String> ALWAYS = new java.util.ArrayList<String>(MIND_TOOLS);
-    static { ALWAYS.addAll(java.util.Arrays.asList("bot.*", "self.set_role", "linux.*", "widget.*", "secret.request")); }
+    static { ALWAYS.addAll(java.util.Arrays.asList("bot.*", "self.set_role", "linux.*", "watcher.*", "widget.*", "secret.request")); }
 
     /** "-linux.*" in a bot's tool list switches that tool off for the bot. */
     public static boolean excluded(List<String> allowed, String name) {
-        for (String a : allowed) if (a.startsWith("-") && J.glob(a.substring(1), name)) return true;
+        for (String a : allowed) {
+            if (!a.startsWith("-")) continue;
+            if (J.glob(a.substring(1), name)) return true;
+            // Watchers run in the bot's Linux, so switching the terminal off switches them off too.
+            if (a.equals("-linux.*") && name.startsWith("watcher.")) return true;
+        }
         return false;
     }
 }

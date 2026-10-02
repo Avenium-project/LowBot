@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import io.lowbot.tools.Builtin;
@@ -38,6 +39,7 @@ public class LowBotApp extends Application {
     Router router;
     Computer computer;
     Linux linux;
+    Watchers watchers;
     final List<Core.EventListener> uiListeners = new CopyOnWriteArrayList<Core.EventListener>();
     final Handler main = new Handler(Looper.getMainLooper());
 
@@ -53,6 +55,8 @@ public class LowBotApp extends Application {
         computer.register(backend.tools);
         linux = new Linux(this, backend);
         linux.register(backend.tools);
+        watchers = new Watchers(backend, linux);
+        watchers.register(backend.tools);
         router.linux = new Router.LinuxApi() {
             public JSONObject status() { return linux.status(); }
             public JSONObject install() { return linux.install(); }
@@ -62,6 +66,9 @@ public class LowBotApp extends Application {
             public JSONObject run(String botId, String command, int timeoutS) throws Exception {
                 return linux.run(botId, Builtin.rootFor(backend, backend.bots.require(botId)), command, timeoutS, "user", null);
             }
+            public JSONArray watchers() { return watchers.list(); }
+            public void stopWatcher(String id, boolean delete) { watchers.stop(id, delete); }
+            public String watcherLog(String id) { return watchers.logs(id, 200); }
         };
         final Mcp mcp = new Mcp(backend);
         backend.tools.addProvider(new Tools.DynamicProvider() {
@@ -94,6 +101,7 @@ public class LowBotApp extends Application {
             }
         });
         backend.start();
+        watchers.restore();
         backend.scheduleAlarm();
         backend.wake();
     }
