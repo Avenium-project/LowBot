@@ -2,10 +2,12 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **2.9.5** — bot profile is a plain list: Character, Model, Routines, Notifications, Workspaces (switch per
+- Version **2.9.6** — Settings again has your name, Safety & permissions (Auto Review, tool rules), MCP servers and
+  Backup & audit export, in the same plain list style.
+  SHA-256: `3c8d405e4e74494f96093c1c8447bb85f6a66660f413966ed4591967ebb37180`
+- 2.9.5 — bot profile is a plain list: Character, Model, Routines, Notifications, Workspaces (switch per
   workspace), Terminal — no captions, tabs, memory files, template sharing or Advanced section (pin/hide/pause/duplicate/delete
   stay in the ⋯ menu).
-  SHA-256: `9a20bb5d274a77209638ced1b1bed9247de4c4e41020eeba273b6d47739cd773`
 - 2.9.4 — Settings is a short list without explanations: Appearance (text size, animations, previews),
   Model (ChatGPT account, providers), Routines, Notifications (per bot), Workspaces, Terminal (Linux, bot commands, LAN).
 - 2.9.3 — Markdown in replies: tables, headings, lists, checklists, quotes, links; every bot can always

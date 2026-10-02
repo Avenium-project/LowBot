@@ -5,7 +5,7 @@ import { api, downloadPath, isLocal } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Card, Empty, Field, Section, askConfirm, fmtTime, inputCls } from './ui';
 import Integrations, { ChatGptPhone } from './Integrations';
-import { FiBell, FiChevronLeft, FiChevronRight, FiClock, FiCpu, FiEye, FiFolder, FiSmartphone, FiTerminal } from 'react-icons/fi';
+import { FiArchive, FiBell, FiChevronLeft, FiChevronRight, FiClock, FiCpu, FiEye, FiFolder, FiLink, FiShield, FiSmartphone, FiTerminal } from 'react-icons/fi';
 import WorkspacesPanel from './WorkspacesPanel';
 import { RoutinesPanel } from './AutomationPanels';
 import { BotBlob, Toggle, cls } from './ui';
@@ -223,6 +223,131 @@ function RoutinesPage({ ws }) {
   );
 }
 
+
+function Profile() {
+  const [name, setName] = useState(() => { try { return window.localStorage.getItem('opendots.name') || ''; } catch { return ''; } });
+  return (
+    <div className={group}>
+      <div className="flex items-center gap-4 px-5 min-h-[56px]">
+        <span className="text-[17px]">Name</span>
+        <input className="flex-1 min-w-0 bg-transparent text-right text-[17px] text-zinc-300 outline-none placeholder:text-zinc-600" value={name} placeholder="Your name"
+          onChange={(e) => { setName(e.target.value); try { window.localStorage.setItem('opendots.name', e.target.value); } catch { /* storage unavailable */ } }} />
+      </div>
+    </div>
+  );
+}
+
+function Safety({ ws }) {
+  const [cfg, setCfg] = useState(null);
+  const [pol, setPol] = useState(null);
+  const [rule, setRule] = useState({ tool: '', effect: 'ask', bot_id: '' });
+  const [adding, setAdding] = useState(false);
+  const [err, setErr] = useState('');
+  const loadPol = () => api('/policies').then(setPol).catch((e) => setErr(e.message));
+  useEffect(() => { if (isLocal()) api('/settings').then(setCfg).catch(() => {}); loadPol(); }, []);
+  const save = (patch) => api('/settings', { method: 'POST', body: patch }).then(setCfg).catch((e) => setErr(e.message));
+  const add = () => api('/policies', { method: 'POST', body: { ...rule, bot_id: rule.bot_id || null } })
+    .then(() => { setAdding(false); setRule({ tool: '', effect: 'ask', bot_id: '' }); loadPol(); }).catch((e) => setErr(e.message));
+  const botName = (id) => ws.bots.find((b) => b.id === id)?.name;
+  return (
+    <>
+      {cfg && <div className={group}><Row label="Auto Review" right={<Toggle on={cfg.auto_review} label="Auto Review" onChange={(v) => save({ auto_review: v })} />} /></div>}
+      {pol && <>
+        <Label>Tool permissions</Label>
+        <div className={group}>
+          {pol.rules.map((r) => (
+            <Row key={r.id} label={<span className="font-mono text-[15px]">{r.tool_pattern}</span>} value={`${r.effect}${r.bot_id ? ` · ${botName(r.bot_id) || 'bot'}` : ''}`}
+              right={<button type="button" aria-label="Remove rule" onClick={() => api(`/policies/${r.id}`, { method: 'DELETE' }).then(loadPol)} className="lb-press text-zinc-500 px-1">✕</button>} />))}
+          {!adding && <Row label={<span className="text-sky-400">+ Add rule</span>} onClick={() => setAdding(true)} right={null} />}
+        </div>
+        {adding && (
+          <div className="lb-rise mt-3 rounded-[22px] bg-[#1f1f1f] p-4 space-y-3">
+            <input className={cls(inputCls, 'font-mono')} placeholder="tool, e.g. http.* or linux.run" value={rule.tool} onChange={(e) => setRule({ ...rule, tool: e.target.value })} />
+            <Segmented value={rule.effect} onChange={(effect) => setRule({ ...rule, effect })} options={[['allow', 'Allow'], ['ask', 'Ask'], ['deny', 'Deny']]} />
+            <select className={inputCls} value={rule.bot_id} onChange={(e) => setRule({ ...rule, bot_id: e.target.value })} aria-label="Bot">
+              <option value="">All bots</option>{ws.bots.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
+            <div className="flex gap-2"><Button kind="primary" disabled={!rule.tool.trim()} onClick={add}>Add</Button><Button onClick={() => setAdding(false)}>Cancel</Button></div>
+          </div>)}
+      </>}
+      {err && <div className="text-[13px] text-rose-400 px-2 mt-2">{err}</div>}
+    </>
+  );
+}
+
+function McpServers() {
+  const [rows, setRows] = useState([]);
+  const [form, setForm] = useState({ name: '', url: '', auth_token: '' });
+  const [adding, setAdding] = useState(false);
+  const [open, setOpen] = useState(null);
+  const [err, setErr] = useState('');
+  const load = () => api('/mcp/connections').then(setRows).catch((e) => setErr(e.message));
+  useEffect(() => { load(); }, []);
+  const save = async () => {
+    setErr('');
+    try {
+      await api('/mcp/connections', { method: 'POST', body: { name: form.name, transport: 'http', url: form.url, auth_token: form.auth_token || undefined, args: [] } });
+      setAdding(false); setForm({ name: '', url: '', auth_token: '' }); load();
+    } catch (e) { setErr(e.message); }
+  };
+  return (
+    <>
+      <div className={group}>
+        {rows.map((c) => (
+          <div key={c.id}>
+            <Row label={c.name} value={c.last_status || `${c.tools.length} tools`} onClick={() => setOpen(open === c.id ? null : c.id)}
+              right={<FiChevronRight className={cls('text-zinc-500 transition-transform', open === c.id && 'rotate-90')} />} />
+            {open === c.id && (
+              <div className="lb-rise px-5 pb-4 space-y-2">
+                <div className="text-[13px] text-zinc-500 break-all">{c.url || `${c.command} ${c.args.join(' ')}`}</div>
+                {c.tools.length > 0 && <div className="text-[13px] text-zinc-400">{c.tools.map((x) => x.name).join(', ')}</div>}
+                <div className="flex gap-2"><Button small onClick={() => api(`/mcp/connections/${c.id}/test`, { method: 'POST' }).then(load)}>Test</Button>
+                  <Button small kind="danger" onClick={async () => { if (await askConfirm({ title: `Remove ${c.name}?`, confirmLabel: 'Remove', danger: true })) api(`/mcp/connections/${c.id}`, { method: 'DELETE' }).then(load); }}>Remove</Button></div>
+              </div>)}
+          </div>))}
+        {!adding && <Row label={<span className="text-sky-400">+ Add server</span>} onClick={() => setAdding(true)} right={null} />}
+      </div>
+      {adding && (
+        <div className="lb-rise mt-3 rounded-[22px] bg-[#1f1f1f] p-4 space-y-3">
+          <input className={inputCls} placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <input className={inputCls} placeholder="https://server/mcp" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
+          <input className={inputCls} type="password" autoComplete="off" placeholder="Token (optional)" value={form.auth_token} onChange={(e) => setForm({ ...form, auth_token: e.target.value })} />
+          <div className="flex gap-2"><Button kind="primary" disabled={!form.name || !form.url} onClick={save}>Add</Button><Button onClick={() => setAdding(false)}>Cancel</Button></div>
+        </div>)}
+      {err && <div className="text-[13px] text-rose-400 px-2 mt-2">{err}</div>}
+    </>
+  );
+}
+
+function Backup() {
+  const [b, setB] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const load = () => api('/admin/backups').then(setB).catch((e) => setErr(e.message));
+  useEffect(() => { load(); }, []);
+  const make = async () => {
+    setBusy(true); setErr('');
+    try {
+      const r = await api('/admin/backup', { method: 'POST' });
+      if (r.artifact_id) await downloadPath(`/artifacts/${r.artifact_id}/download`, r.name);
+      load();
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
+  return (
+    <>
+      <div className={group}>
+        <Row label={<span className="text-sky-400">{busy ? 'Creating backup…' : 'Create backup'}</span>} onClick={busy ? undefined : make} right={null} />
+        <Row label={<span className="text-sky-400">Export audit log</span>} onClick={() => downloadPath('/audit/export', 'lowbot-audit.jsonl')} right={null} />
+      </div>
+      {b?.backups?.length > 0 && <>
+        <Label>Backups</Label>
+        <div className={group}>{b.backups.map((x) => <Row key={x.name} label={<span className="text-[15px]">{x.name}</span>} value={fmtBytes(x.size)} />)}</div>
+      </>}
+      {err && <div className="text-[13px] text-rose-400 px-2 mt-2">{err}</div>}
+    </>
+  );
+}
+
 const PAGES = [
   ['appearance', 'Appearance', <FiEye key="i" />],
   ['models', 'Model', <FiCpu key="i" />],
@@ -231,12 +356,17 @@ const PAGES = [
   ['workspaces', 'Workspaces', <FiFolder key="i" />],
   ['terminal', 'Terminal', <FiTerminal key="i" />],
 ];
+const MORE = [
+  ['safety', 'Safety & permissions', <FiShield key="i" />],
+  ['mcp', 'MCP servers', <FiLink key="i" />],
+  ['backup', 'Backup & audit', <FiArchive key="i" />],
+];
 
 export default function SettingsPanel({ ws, onOpenConversation }) {
   const [page, setPage] = useState(null);
   useEffect(() => { window.scrollTo?.(0, 0); }, [page]);
   if (page) {
-    const title = PAGES.find((p) => p[0] === page)?.[1] || 'Devices';
+    const title = [...PAGES, ...MORE].find((p) => p[0] === page)?.[1] || 'Devices';
     return (
       <div key={page} className="lb-side-in">
         <button type="button" onClick={() => setPage(null)} className="lb-press flex items-center gap-1 px-1 pb-2 text-[16px] text-sky-400"><FiChevronLeft /> Settings</button>
@@ -248,13 +378,18 @@ export default function SettingsPanel({ ws, onOpenConversation }) {
         {page === 'workspaces' && <WorkspacesPanel ws={ws} onOpenConversation={onOpenConversation} />}
         {page === 'terminal' && <Terminal tick={ws.tick} />}
         {page === 'devices' && <Devices />}
+        {page === 'safety' && <Safety ws={ws} />}
+        {page === 'mcp' && <McpServers />}
+        {page === 'backup' && <Backup />}
       </div>
     );
   }
   const pages = PAGES.filter(([k]) => isLocal() || (k !== 'terminal' && k !== 'workspaces'));
   return (
     <div className="lb-rise">
+      <div className="mb-4"><Profile /></div>
       <div className={group}>{pages.map(([k, l, icon]) => <Row key={k} icon={icon} label={l} onClick={() => setPage(k)} />)}</div>
+      <div className={cls(group, 'mt-4')}>{MORE.map(([k, l, icon]) => <Row key={k} icon={icon} label={l} onClick={() => setPage(k)} />)}</div>
       {!isLocal() && <div className={cls(group, 'mt-4')}><Row icon={<FiSmartphone />} label="Devices" onClick={() => setPage('devices')} /></div>}
     </div>
   );
