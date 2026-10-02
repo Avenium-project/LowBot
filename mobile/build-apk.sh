@@ -20,7 +20,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 OUT="$HERE/build"
 VERSION_NAME="${VERSION_NAME:-2.0.0}"
-VERSION_CODE="${VERSION_CODE:-1}"
+# Keep the new build series above previous APKs (CI codes 1–51).
+# Each CI run increases the code; explicit overrides remain available locally.
+VERSION_CODE="${VERSION_CODE:-$((1000 + ${GITHUB_RUN_NUMBER:-0}))}"
 MIN_SDK=26
 TARGET_SDK=35
 
