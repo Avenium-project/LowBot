@@ -87,6 +87,14 @@
             </intent-filter>
         </receiver>
         <receiver android:name=".ActionReceiver" android:exported="false" />
+        <receiver android:name=".BotsWidget" android:exported="false" android:label="@string/widget_bots">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_bots_info" />
+        </receiver>
+        <receiver android:name=".CardWidget" android:exported="false" android:label="@string/widget_card">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_card_info" />
+        </receiver>
         <provider android:name=".FilesProvider" android:authorities="io.lowbot.app.files"
             android:exported="false" android:grantUriPermissions="true" />
         <!-- On-device acceptance test for CI: only the shell/system hold DUMP, apps cannot trigger it.

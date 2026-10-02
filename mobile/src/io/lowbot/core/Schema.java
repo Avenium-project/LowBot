@@ -93,4 +93,10 @@ final class Schema {
     static final String[] V2 = {
         "ALTER TABLE conversations ADD COLUMN project TEXT",
     };
+
+    /** v3: widgets bots make for the user's home screens. */
+    static final String[] V3 = {
+        "CREATE TABLE widgets (id TEXT PRIMARY KEY, bot_id TEXT, title TEXT NOT NULL, content TEXT NOT NULL DEFAULT '', "
+            + "on_home INTEGER NOT NULL DEFAULT 0, routine_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+    };
 }

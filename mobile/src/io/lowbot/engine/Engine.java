@@ -334,6 +334,7 @@ public final class Engine {
         Model.Request req = new Model.Request();
         req.model = res.model;
         if (steps.isEmpty()) maybeRotate(run, task, bot, res);
+        final String requestedAt = J.nowIso(); // steering sent after this moment is not in this request
         req.messages = transcript(task, bot, steps, vision, dropped);
         if (dropped[0]) notes.add("Attached images were NOT sent: the model's vision capability test failed.");
         req.system = systemPrompt(bot, task, skill, notes);
@@ -384,7 +385,7 @@ public final class Engine {
             String now = J.nowIso();
             db.insert("run_steps", J.obj("id", sid, "run_id", run.optString("id"), "seq", seq, "kind", "model", "status", "completed",
                     "input_json", J.obj("model", res.model, "provider", res.profile.optString("kind"), "mock", res.profile.optBoolean("is_mock")).toString(),
-                    "output_json", J.obj("text", resp.text, "tool_calls", J.arr(calls), "usage", new JSONArray().put(resp.inputTokens).put(resp.outputTokens)).toString(),
+                    "output_json", J.obj("text", resp.text, "tool_calls", J.arr(calls), "usage", new JSONArray().put(resp.inputTokens).put(resp.outputTokens), "requested_at", requestedAt).toString(),
                     "created_at", now, "updated_at", now));
             for (int i = 0; i < calls.size(); i++) {
                 JSONObject c = calls.get(i);
@@ -883,6 +884,9 @@ public final class Engine {
         parts.add(bot.optString("role_description").trim().isEmpty()
                 ? "You have no role yet. As soon as the user's requests show what you are for, call self.set_role with one short line (in the user's language)."
                 : "Your role: " + bot.optString("role_description") + ". If the user's requests clearly change what you do, update it with self.set_role.");
+        if (b.capabilities().contains("widgets"))
+            parts.add("Widgets: when the user asks for a widget (e.g. 'a mail widget'), make it with widget.create — a short title and compact Markdown "
+                    + "content; if it should stay current, pass refresh + schedule so your routine updates it with widget.update.");
         parts.add("Formatting: reply in Markdown — headings, bullet lists, **bold**, `code`, fenced code blocks and tables (| a | b | with a header separator row) "
                 + "render nicely in the app. Put each table row on its own line.");
         parts.add("Team management: you can see the team (bot.list), write to another bot (bot.message), hand it work (task.delegate), "
@@ -915,6 +919,10 @@ public final class Engine {
                     .append(" → ").append(r.optString("status")).append(": ").append(J.truncate(J.redact(res), 240));
         }
         return sb.toString();
+    }
+
+    static JSONObject steerMessage(JSONObject m) {
+        return J.obj("role", "user", "content", "[The user wrote this while you were working — take it into account from now on]: " + m.optString("text"));
     }
 
     static JSONObject screenshotMessage(JSONArray images) {
@@ -986,10 +994,14 @@ public final class Engine {
         int shots = 0, seen = 0;
         for (JSONObject s : steps) if ("tool".equals(s.optString("kind")) && J.parse(s.optString("output_json")).has("image_artifact_id")) shots++;
         JSONArray pendingImages = new JSONArray();
+        // Messages the user sent while this task was running ("steering"), placed where they arrived.
+        java.util.LinkedList<JSONObject> steer = new java.util.LinkedList<JSONObject>(b.tasks.steerMessages(task.optString("id")));
         for (JSONObject s : steps) {
             JSONObject out = J.parse(s.optString("output_json"));
             if ("model".equals(s.optString("kind"))) {
                 if (pendingImages.length() > 0) { merged.add(screenshotMessage(pendingImages)); pendingImages = new JSONArray(); }
+                String asked = out.optString("requested_at", s.optString("created_at"));
+                while (!steer.isEmpty() && steer.peek().optString("created_at").compareTo(asked) < 0) merged.add(steerMessage(steer.poll()));
                 JSONArray tcs = new JSONArray();
                 JSONArray calls = out.optJSONArray("tool_calls");
                 if (calls != null) for (int i = 0; i < calls.length(); i++) {
@@ -1008,6 +1020,7 @@ public final class Engine {
             }
         }
         if (pendingImages.length() > 0) merged.add(screenshotMessage(pendingImages));
+        while (!steer.isEmpty()) merged.add(steerMessage(steer.poll()));
         return merged;
     }
 

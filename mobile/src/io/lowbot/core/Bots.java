@@ -326,6 +326,7 @@ public final class Bots {
                 db.exec("DELETE FROM bots WHERE id = ?", id);
                 b.core.emit("bot.deleted", null, null, null, id, null);
                 b.mind.deleteAll(id);
+                db.exec("DELETE FROM widgets WHERE bot_id = ?", id);
                 b.core.audit("bot.delete", "user", null, null, null, null, null, null, J.obj("bot_id", id));
             }
         });

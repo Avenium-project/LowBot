@@ -98,6 +98,10 @@ public class SelfTest extends BroadcastReceiver {
         check("ok".equals(api(r, "GET", "/api/v2/health", null).optString("status")), "health");
 
         JSONArray script = new JSONArray()
+                .put(J.obj("when", "take it into account", "reply", "steered: {{last}}"))
+                .put(J.obj("when", "mail widget", "call", J.obj("name", "widget.create", "arguments",
+                        J.obj("title", "Mail", "content", "- 2 new messages", "refresh", "Check my inbox", "schedule", "every hour"))))
+                .put(J.obj("after_tool", "widget.create", "reply", "widget made"))
                 .put(J.obj("when", "say nothing", "reply", ""))
                 .put(J.obj("when", "Write the new handoff now", "reply", "## Goal\nKeep testing LowBot.\n## Next steps\n- continue"))
                 .put(J.obj("when", "write a file", "call", J.obj("name", "workspace.write", "arguments", J.obj("path", "notes/a.txt", "content", "hello phone"))))
@@ -213,6 +217,37 @@ public class SelfTest extends BroadcastReceiver {
         b.engine.drain(30000);
         check(b.core.db.count("SELECT COUNT(*) FROM messages WHERE text = '(no response)'") == 0
                 && b.core.db.count("SELECT COUNT(*) FROM messages WHERE author_type = 'system' AND text LIKE '%empty answer%'") == 1, "empty answer reported, not '(no response)'");
+
+        // 7c2. Steering: a message to a bot that is still working joins its run instead of starting another
+        JSONObject tSteer = api(r, "POST", "/api/v2/conversations/" + cidEmpty + "/messages", J.obj("text", "post it now")).optJSONArray("tasks").getJSONObject(0);
+        b.engine.drain(20000);
+        check("waiting_approval".equals(runStatus(b, tSteer.optString("id"))), "steer setup: run is waiting");
+        long before = b.core.db.count("SELECT COUNT(*) FROM tasks WHERE conversation_id = ?", cidEmpty);
+        JSONObject steerRes = api(r, "POST", "/api/v2/conversations/" + cidEmpty + "/messages", J.obj("text", "add a footnote"));
+        check(steerRes.optJSONArray("tasks").length() == 0 && tSteer.optString("id").equals(steerRes.optString("steered_task"))
+                && b.core.db.count("SELECT COUNT(*) FROM tasks WHERE conversation_id = ?", cidEmpty) == before, "message while working steers the run (no second task)");
+        JSONObject aSteer = b.approvals.list("pending").get(0);
+        b.approvals.decide(aSteer.optString("id"), "deny", aSteer.optString("args_hash"));
+        b.engine.drain(20000);
+        check(lastBotMessage(b, cidEmpty).optString("text").contains("add a footnote"), "the bot sees the steering message in its next step");
+
+        // 7c3. Widgets made by a bot (on by default; the user can switch it off)
+        api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "make me a mail widget"));
+        b.engine.drain(20000);
+        JSONObject wList = api(r, "GET", "/api/v2/widgets", null);
+        JSONObject wMade = wList.optJSONArray("widgets").optJSONObject(0);
+        check(wMade != null && "Mail".equals(wMade.optString("title")) && !wMade.isNull("routine_id")
+                && b.core.db.count("SELECT COUNT(*) FROM routines WHERE id = ?", wMade.optString("routine_id")) == 1, "bot makes a widget with a refresh routine");
+        check(b.core.db.count("SELECT COUNT(*) FROM messages WHERE meta_json LIKE ?", "%" + wMade.optString("id") + "%") == 1, "widget card posted in the chat");
+        check(api(r, "PATCH", "/api/v2/widgets/" + wMade.optString("id"), J.obj("on_home", true)).optBoolean("on_home"), "widget added to home");
+        api(r, "POST", "/api/v2/widgets/settings", J.obj("bots_may_create", false));
+        check(!b.tools.forBot(b.bots.get(bot.optString("id")), null, b.capabilities()).containsKey("widget.create"), "widgets switch off removes the tool");
+        api(r, "POST", "/api/v2/widgets/settings", J.obj("bots_may_create", true));
+        for (String sh : new String[]{"circle", "blob", "square", "pill", "triangle", "hexagon", "cloud", "drop"}) {
+            android.graphics.Bitmap bm = BotSprites.draw("shape:" + sh + ":#ef2b3c", "x", 112, BotSprites.AWAKE, 10);
+            int px = bm.getPixel(56, (int) (bm.getHeight() * 0.62f));
+            check(android.graphics.Color.alpha(px) > 0, "widget sprite draws " + sh);
+        }
 
         // 7d. Team: shared workspace, a bot creates and deletes another bot (with the user's approval)
         api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "set up team space"));

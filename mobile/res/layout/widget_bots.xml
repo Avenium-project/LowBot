@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal"
+    android:background="@drawable/widget_bg" android:paddingLeft="8dp" android:paddingRight="8dp" android:paddingTop="6dp"
+    android:paddingBottom="8dp" android:gravity="center">
+    <TextView android:id="@+id/empty" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center"
+        android:text="Open LowBot to create a bot" android:textColor="#A1A1AA" android:textSize="13sp" android:visibility="gone" />
+    <LinearLayout android:id="@+id/slot0" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+        android:orientation="vertical" android:gravity="center" android:visibility="gone">
+        <ImageView android:id="@+id/bot0" android:layout_width="56dp" android:layout_height="73dp" android:scaleType="fitCenter"
+            android:contentDescription="@null" />
+        <TextView android:id="@+id/name0" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#E4E4E7" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" android:maxWidth="72dp" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/slot1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+        android:orientation="vertical" android:gravity="center" android:visibility="gone">
+        <ImageView android:id="@+id/bot1" android:layout_width="56dp" android:layout_height="73dp" android:scaleType="fitCenter"
+            android:contentDescription="@null" />
+        <TextView android:id="@+id/name1" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#E4E4E7" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" android:maxWidth="72dp" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/slot2" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+        android:orientation="vertical" android:gravity="center" android:visibility="gone">
+        <ImageView android:id="@+id/bot2" android:layout_width="56dp" android:layout_height="73dp" android:scaleType="fitCenter"
+            android:contentDescription="@null" />
+        <TextView android:id="@+id/name2" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#E4E4E7" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" android:maxWidth="72dp" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/slot3" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+        android:orientation="vertical" android:gravity="center" android:visibility="gone">
+        <ImageView android:id="@+id/bot3" android:layout_width="56dp" android:layout_height="73dp" android:scaleType="fitCenter"
+            android:contentDescription="@null" />
+        <TextView android:id="@+id/name3" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#E4E4E7" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" android:maxWidth="72dp" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/slot4" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+        android:orientation="vertical" android:gravity="center" android:visibility="gone">
+        <ImageView android:id="@+id/bot4" android:layout_width="56dp" android:layout_height="73dp" android:scaleType="fitCenter"
+            android:contentDescription="@null" />
+        <TextView android:id="@+id/name4" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#E4E4E7" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" android:maxWidth="72dp" />
+    </LinearLayout>
+</LinearLayout>

@@ -5,8 +5,9 @@ import { api, downloadPath, isLocal } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Button, Card, Empty, Field, Section, askConfirm, fmtTime, inputCls } from './ui';
 import Integrations, { ChatGptPhone } from './Integrations';
-import { FiArchive, FiBell, FiChevronLeft, FiChevronRight, FiClock, FiCpu, FiEye, FiFolder, FiLink, FiShield, FiSmartphone, FiTerminal } from 'react-icons/fi';
+import { FiArchive, FiBell, FiChevronLeft, FiChevronRight, FiClock, FiCpu, FiEye, FiFolder, FiGrid, FiLink, FiShield, FiSmartphone, FiTerminal } from 'react-icons/fi';
 import WorkspacesPanel from './WorkspacesPanel';
+import { WidgetsSettings } from './Widgets';
 import { RoutinesPanel } from './AutomationPanels';
 import { BotBlob, Toggle, cls } from './ui';
 import { applyAppearance, loadAppearance, saveAppearance } from '../../lib/v2/appearance';
@@ -354,6 +355,7 @@ const PAGES = [
   ['routines', 'Routines', <FiClock key="i" />],
   ['notifications', 'Notifications', <FiBell key="i" />],
   ['workspaces', 'Workspaces', <FiFolder key="i" />],
+  ['widgets', 'Widgets', <FiGrid key="i" />],
   ['terminal', 'Terminal', <FiTerminal key="i" />],
 ];
 const MORE = [
@@ -377,6 +379,7 @@ export default function SettingsPanel({ ws, onOpenConversation }) {
         {page === 'notifications' && <Notifications ws={ws} />}
         {page === 'workspaces' && <WorkspacesPanel ws={ws} onOpenConversation={onOpenConversation} />}
         {page === 'terminal' && <Terminal tick={ws.tick} />}
+        {page === 'widgets' && <WidgetsSettings ws={ws} />}
         {page === 'devices' && <Devices />}
         {page === 'safety' && <Safety ws={ws} />}
         {page === 'mcp' && <McpServers />}
@@ -384,7 +387,7 @@ export default function SettingsPanel({ ws, onOpenConversation }) {
       </div>
     );
   }
-  const pages = PAGES.filter(([k]) => isLocal() || (k !== 'terminal' && k !== 'workspaces'));
+  const pages = PAGES.filter(([k]) => isLocal() || !['terminal', 'workspaces', 'widgets'].includes(k));
   return (
     <div className="lb-rise">
       <div className="mb-4"><Profile /></div>

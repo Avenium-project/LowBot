@@ -2,10 +2,14 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **3.0.0** — files from bots open and download again (file names with Polish letters broke the download
+- Version **3.1.0** — phone home-screen widget "Your bots" (working bots hop one after another, idle ones sleep,
+  tap to open the chat); bots make widgets on request (Settings → Widgets to switch off): a card in the chat with
+  "Add to home" (LowBot's home) and "Add to phone"; a widget can refresh itself through the bot's routine. Messages sent
+  while a bot works now steer that run (no second task, one "is working" line).
+  SHA-256: `bbc33b10c1b08cdf25f677c84fda9c83d45381fee0de1e2725a36c7085cf23bf`
+- 3.0.0 — files from bots open and download again (file names with Polish letters broke the download
   silently); new file viewer (images, text, Markdown with tables) with Open in another app, Save to Downloads/LowBot and
   Share; Menu → Files is a simple explorer: "From bots" and the shared "Workspace" folder.
-  SHA-256: `1b8d59ce4b4c58726bf69204ef1946a13398e3f84020f527811ac790beea7a5e`
 - 2.9.6 — Settings again has your name, Safety & permissions (Auto Review, tool rules), MCP servers and
   Backup & audit export, in the same plain list style.
 - 2.9.5 — bot profile is a plain list: Character, Model, Routines, Notifications, Workspaces (switch per

@@ -38,6 +38,7 @@ public final class Backend {
     public final Routines routines;
     public final ChatGpt chatgpt;
     public final Mind mind;
+    public final Widgets widgets;
     public final Tools tools = new Tools();
     public final Engine engine;
     public volatile Platform platform;
@@ -73,6 +74,7 @@ public final class Backend {
         routines = new Routines(this);
         chatgpt = new ChatGpt(this);
         mind = new Mind(this);
+        widgets = new Widgets(this);
         Builtin.register(tools);
         engine = new Engine(this);
         String tz = core.kvGet("timezone");
@@ -125,6 +127,7 @@ public final class Backend {
         Platform p = platform;
         if (p != null && p.browserAvailable()) caps.add("browser");
         caps.add("terminal");
+        if (widgets.botsMayCreate()) caps.add("widgets");
         return caps;
     }
 

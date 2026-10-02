@@ -189,17 +189,36 @@ public final class Tasks {
         final JSONObject[] out = new JSONObject[1];
         db.tx(new Runnable() {
             @Override public void run() {
-                JSONObject msg = insertMessage(cid, "user", Core.OWNER, text, mentions, null, clientMsgId, threadRoot, attachments, null);
+                // Steering: a message to a bot that is already working on this chat's request joins that run
+                // (the bot sees it before its next step) instead of starting a second task.
+                String steerTask = null;
+                if (targets.size() == 1 && skill == null) steerTask = activeUserTask(cid, targets.get(0).optString("id"));
+                JSONObject msg = insertMessage(cid, "user", Core.OWNER, text, mentions, null, clientMsgId, threadRoot, attachments,
+                        steerTask == null ? null : J.obj("steer", steerTask));
                 JSONArray tasks = new JSONArray();
-                for (JSONObject bot : targets) {
+                if (steerTask == null) for (JSONObject bot : targets) {
                     tasks.put(createTask(bot.optString("id"), cid, "user", Core.OWNER, text, J.truncate(text, 80), "",
                             null, PRIORITY_USER, msg.optString("id"), skill, null));
                 }
-                out[0] = J.obj("message_id", msg.optString("id"), "seq", msg.optLong("seq"), "tasks", tasks, "duplicate", false);
+                else b.core.emit("task.steered", cid, steerTask, null, targets.get(0).optString("id"), J.obj("message_id", msg.optString("id")));
+                out[0] = J.obj("message_id", msg.optString("id"), "seq", msg.optLong("seq"), "tasks", tasks, "duplicate", false, "steered_task", steerTask);
             }
         });
         b.wake();
         return out[0];
+    }
+
+    /** The bot's in-progress task for a user request in this chat (not one parked on a question). */
+    String activeUserTask(String cid, String botId) {
+        return db.scalar("SELECT t.id FROM tasks t JOIN runs r ON r.task_id = t.id WHERE t.conversation_id = ? AND t.bot_id = ? "
+                + "AND t.requester_type = 'user' AND r.status IN ('queued','running','retry_scheduled','waiting_approval','waiting_dependency') "
+                + "ORDER BY t.created_at DESC LIMIT 1", cid, botId);
+    }
+
+    /** Steering messages for a task, oldest first. */
+    public List<JSONObject> steerMessages(String taskId) {
+        return db.all("SELECT id, text, created_at, attachments_json FROM messages WHERE author_type = 'user' AND meta_json LIKE ? ORDER BY seq",
+                "%\"steer\":\"" + taskId + "\"%");
     }
 
     List<JSONObject> route(JSONObject conv, List<String> mentions) {
@@ -432,6 +451,17 @@ public final class Tasks {
                         J.truncate(result != null ? result : error == null ? "" : error, 400), task.optString("id"), null, cid, task.optString("bot_id"));
         }
         propagate(task, status, result, error);
+        // Steering that arrived after the bot's last model call was never seen: answer it as a new request.
+        String lastModel = null;
+        for (JSONObject st : db.all("SELECT s.output_json, s.created_at FROM run_steps s JOIN runs r ON r.id = s.run_id WHERE r.task_id = ? AND s.kind = 'model'", task.optString("id"))) {
+            String at = J.parse(st.optString("output_json")).optString("requested_at", st.optString("created_at"));
+            if (lastModel == null || at.compareTo(lastModel) > 0) lastModel = at;
+        }
+        if (!"cancelled".equals(status)) for (JSONObject m : steerMessages(task.optString("id"))) {
+            if (lastModel != null && m.optString("created_at").compareTo(lastModel) < 0) continue;
+            createTask(task.optString("bot_id"), cid, "user", Core.OWNER, m.optString("text"), J.truncate(m.optString("text"), 80), "",
+                    null, PRIORITY_USER, m.optString("id"), null, null);
+        }
         if (J.str(task, "routine_run_id", null) != null)
             db.exec("UPDATE routine_runs SET status = ?, error = ? WHERE id = ?", status, error, task.optString("routine_run_id"));
     }

@@ -463,6 +463,19 @@ public final class Router {
             return Response.json(rows);
         }
 
+        // ------------------------------------------------------------ widgets
+        if (a.equals("widgets")) {
+            if (id == null && get) return Response.json(J.obj("bots_may_create", b.widgets.botsMayCreate(), "widgets", Db.toArray(b.widgets.list())));
+            if ("settings".equals(id) && post) { b.widgets.setBotsMayCreate(J.bool(body, "bots_may_create")); return Response.json(J.obj("bots_may_create", b.widgets.botsMayCreate())); }
+            if (id != null && sub == null && get) return Response.json(b.widgets.require(id));
+            if (id != null && sub == null && patch) {
+                if (body.has("on_home")) b.widgets.setHome(id, J.bool(body, "on_home"));
+                if (body.has("title") || body.has("content")) b.widgets.update(id, J.str(body, "title", null), J.str(body, "content", null));
+                return Response.json(b.widgets.require(id));
+            }
+            if (id != null && sub == null && del) { b.widgets.delete(id); return Response.json(J.obj("deleted", id)); }
+        }
+
         // -------------------------------------------------------------- linux
         if (a.equals("linux")) {
             LinuxApi l = linux;

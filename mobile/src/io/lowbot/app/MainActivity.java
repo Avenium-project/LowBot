@@ -406,11 +406,31 @@ public class MainActivity extends Activity implements Computer.Host {
             }
         }
         String conv = intent.getStringExtra("open_conversation");
-        if (conv != null) {
-            try {
-                runJs("window.dispatchEvent(new CustomEvent('lowbot:open',{detail:" + new JSONObject().put("conversation_id", conv) + "}))");
-            } catch (Exception ignored) { }
+        if (conv != null) openConversation(conv);
+        final String bot = intent.getStringExtra("open_bot");
+        if (bot != null) {
+            // From the home-screen widget: the bot's private chat (created on first use).
+            new Thread(new Runnable() { public void run() {
+                try { openConversation(LowBotApp.of(MainActivity.this).backend.tasks.privateConversation(bot).optString("id")); }
+                catch (Exception ignored) { }
+            } }).start();
         }
+    }
+
+    private volatile String pendingOpen;
+
+    /** Kept until the web UI takes it, so a cold start (UI not loaded yet) still opens the chat. */
+    void openConversation(String conv) {
+        pendingOpen = conv;
+        try {
+            runJs("window.dispatchEvent(new CustomEvent('lowbot:open',{detail:" + new JSONObject().put("conversation_id", conv) + "}))");
+        } catch (Exception ignored) { }
+    }
+
+    String consumeOpen() {
+        String c = pendingOpen;
+        pendingOpen = null;
+        return c;
     }
 
     void requestNotificationPermission() {

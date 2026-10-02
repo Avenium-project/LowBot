@@ -489,6 +489,67 @@ public final class Builtin {
             }
         }));
 
+        reg.register(new Spec("widget.create", "Make a widget for the user's home screen: a small card with a title and short Markdown content "
+                + "(e.g. 'Mail' with the latest messages, 'Today' with the agenda). To keep it fresh, give refresh (what to do) and schedule "
+                + "(e.g. 'every hour', 'every day at 8:00'): a routine of yours will run it and call widget.update. The user adds it to the home screen.",
+                Tools.obj(props("title", S, "content", S, "refresh", S, "schedule", S), "title", "content"), Tools.INTERNAL, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) throws Exception {
+                if (!ctx.b.widgets.botsMayCreate()) throw new ToolError("The user switched off widgets made by bots (Settings → Widgets).");
+                JSONObject w;
+                try { w = ctx.b.widgets.create(ctx.bot.optString("id"), a.optString("title"), a.optString("content"), null); }
+                catch (io.lowbot.core.ApiError e) { throw new ToolError(e.getMessage()); }
+                String routine = null;
+                if (!a.optString("refresh").trim().isEmpty() && !a.optString("schedule").trim().isEmpty()) {
+                    try {
+                        JSONObject r = ctx.b.routines.create(ctx.bot.optString("id"), "Widget: " + w.optString("title"),
+                                "Refresh widget " + w.optString("id") + " (\"" + w.optString("title") + "\"): " + a.optString("refresh")
+                                        + "\nThen call widget.update with widget=" + w.optString("id") + " and the new short Markdown content.",
+                                a.optString("schedule"), null, null, null, "skip", "latest", true);
+                        routine = r.optString("id");
+                        ctx.b.core.db.exec("UPDATE widgets SET routine_id = ? WHERE id = ?", routine, w.optString("id"));
+                    } catch (io.lowbot.core.ApiError e) {
+                        return J.obj("widget_id", w.optString("id"), "refresh", "not scheduled: " + e.getMessage());
+                    }
+                }
+                final String cid = J.str(ctx.task, "conversation_id", null);
+                if (cid != null) {
+                    final Ctx c2 = ctx; final String wid = w.optString("id"), title = w.optString("title");
+                    ctx.b.core.db.tx(new Runnable() { public void run() {
+                        c2.b.tasks.insertMessage(cid, "system", null, "Widget “" + title + "” is ready", null, c2.task.optString("id"), null, null, null, J.obj("widget_id", wid));
+                    } });
+                }
+                return J.obj("widget_id", w.optString("id"), "routine_id", routine, "note", "The user can add it to the home screen from the card in the chat.");
+            }
+        }).needs("widgets"));
+        reg.register(new Spec("widget.update", "Replace the content (and optionally the title) of one of your widgets.",
+                Tools.obj(props("widget", S, "content", S, "title", S), "widget", "content"), Tools.INTERNAL, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) throws Exception {
+                JSONObject w = ctx.b.widgets.get(a.optString("widget"));
+                if (w == null || !ctx.bot.optString("id").equals(w.optString("bot_id"))) throw new ToolError("No widget of yours with that id (see widget.list).");
+                try { ctx.b.widgets.update(w.optString("id"), J.str(a, "title", null), a.optString("content")); }
+                catch (io.lowbot.core.ApiError e) { throw new ToolError(e.getMessage()); }
+                return J.obj("updated", w.optString("id"));
+            }
+        }).needs("widgets"));
+        reg.register(new Spec("widget.list", "List your widgets (id, title, whether it is on the home screen, last update).",
+                Tools.obj(props()), Tools.READ, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) {
+                JSONArray out = new JSONArray();
+                for (JSONObject w : ctx.b.widgets.list()) if (ctx.bot.optString("id").equals(w.optString("bot_id")))
+                    out.put(J.obj("id", w.optString("id"), "title", w.optString("title"), "on_home", w.optBoolean("on_home"), "updated_at", w.optString("updated_at")));
+                return J.obj("widgets", out);
+            }
+        }).needs("widgets"));
+        reg.register(new Spec("widget.delete", "Delete one of your widgets (and its refresh routine).",
+                Tools.obj(props("widget", S), "widget"), Tools.INTERNAL, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) throws Exception {
+                JSONObject w = ctx.b.widgets.get(a.optString("widget"));
+                if (w == null || !ctx.bot.optString("id").equals(w.optString("bot_id"))) throw new ToolError("No widget of yours with that id.");
+                ctx.b.widgets.delete(w.optString("id"));
+                return J.obj("deleted", w.optString("id"));
+            }
+        }).needs("widgets"));
+
         reg.register(new Spec("bot.update", "Change another bot's profile (the user approves): name, role, model or its soul.md. (Its character sprite is chosen at random.) Tools and permissions cannot be changed by bots.",
                 Tools.obj(props("bot", S, "name", S, "role_description", S, "model", S, "soul", S), "bot"), Tools.INTERNAL, "ask", new Tools.Executor() {
             public Object run(Ctx ctx, JSONObject a) throws Exception {

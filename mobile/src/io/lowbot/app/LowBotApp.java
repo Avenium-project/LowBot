@@ -86,7 +86,12 @@ public class LowBotApp extends Application {
             public void show(JSONObject n) { notifyOs(n); }
         };
         backend.core.listeners.add(new Core.EventListener() {
-            public void onEvent(JSONObject e) { for (Core.EventListener l : uiListeners) l.onEvent(e); }
+            public void onEvent(JSONObject e) {
+                for (Core.EventListener l : uiListeners) l.onEvent(e);
+                String t = e.optString("type");
+                if (t.startsWith("run.") || t.startsWith("task.") || t.startsWith("bot.") || t.startsWith("approval.")) BotsWidget.requestRefresh(LowBotApp.this);
+                if (t.startsWith("widget.") || t.startsWith("bot.")) main.post(new Runnable() { public void run() { CardWidget.refreshAll(LowBotApp.this); } });
+            }
         });
         backend.start();
         backend.scheduleAlarm();

@@ -12,4 +12,7 @@
     <string name="record_teach">Record (teach)</string>
     <string name="you_control">You\'re in control of %1$s\'s browser</string>
     <string name="share_label">Send to a bot</string>
+    <string name="widget_bots">Your bots</string>
+    <string name="widget_bots_desc">Your bots: working ones hop, idle ones sleep. Tap one to chat.</string>
+    <string name="widget_card">Bot widget</string>
 </resources>

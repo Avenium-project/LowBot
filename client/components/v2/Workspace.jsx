@@ -161,8 +161,11 @@ function Shell() {
   useEffect(() => {
     if (!isLocal()) return undefined;
     const take = () => { const x = window.LowBotNative.consumeShare?.(); if (x) setShare(x); };
-    const open = (e) => { if (e.detail?.conversation_id) { setActive(null); setTimeout(() => openConv(e.detail.conversation_id), 0); } };
+    const go = (id) => { setActive(null); ws.reload(); setTimeout(() => openConv(id), 0); };
+    const open = (e) => { window.LowBotNative.consumeOpen?.(); if (e.detail?.conversation_id) go(e.detail.conversation_id); };
     take();
+    const pending = window.LowBotNative.consumeOpen?.();
+    if (pending) go(pending);
     window.addEventListener('lowbot:share', take);
     window.addEventListener('lowbot:open', open);
     return () => { window.removeEventListener('lowbot:share', take); window.removeEventListener('lowbot:open', open); };

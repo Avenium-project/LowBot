@@ -7,6 +7,7 @@ import { BsPin, BsPinAngle } from 'react-icons/bs';
 import { api, downloadPath } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { BotBlob, RoundButton, askConfirm, cls, shortTime } from './ui';
+import { HomeWidgets } from './Widgets';
 
 const BUSY = ['working', 'queued', 'retrying', 'waiting'];
 const ATTN = ['needs_approval', 'needs_input', 'needs_resolution'];
@@ -263,6 +264,7 @@ export default function ChatList({ ws, activeId, onOpen, onProfile, onNew, atten
             {!hidden.length && <div className="text-center text-zinc-500 text-[15px] mt-16">No hidden chats</div>}
           </div>
         ) : <>
+          {!q && <HomeWidgets ws={ws} onOpenBot={(bot) => { const r = rows.find((x) => x.bot?.id === bot.id); if (r) open(r); }} />}
           {pinned.length > 0 && <div className="grid grid-cols-3 gap-x-2 gap-y-3 px-3 pt-2 pb-4 lb-stagger">{pinned.map((r, i) => <Tile key={r.key} r={r} i={i} compact={compact} menuKey={menu?.row.key} onLong={(row, at) => setMenu({ row, at })} onOpen={open} />)}</div>}
           {sections.map((s) => (
             <div key={s.id} className="mb-2">

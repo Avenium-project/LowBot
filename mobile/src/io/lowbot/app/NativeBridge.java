@@ -235,6 +235,28 @@ final class NativeBridge {
         return trusted() ? activity.consumeShare() : null;
     }
 
+    /** Ask the launcher to put a bot-made widget on the phone's home screen. */
+    @JavascriptInterface
+    public boolean pinWidget(String widgetId) {
+        if (!trusted() || widgetId == null) return false;
+        return CardWidget.pin(activity, widgetId);
+    }
+
+    /** Ask the launcher to add the "Your bots" widget to the home screen. */
+    @JavascriptInterface
+    public boolean pinBotsWidget() {
+        if (!trusted() || Build.VERSION.SDK_INT < 26) return false;
+        android.appwidget.AppWidgetManager mgr = android.appwidget.AppWidgetManager.getInstance(activity);
+        if (!mgr.isRequestPinAppWidgetSupported()) return false;
+        return mgr.requestPinAppWidget(new android.content.ComponentName(activity, BotsWidget.class), null, null);
+    }
+
+    /** Chat to open from a widget or notification tap, consumed once. */
+    @JavascriptInterface
+    public String consumeOpen() {
+        return trusted() ? activity.consumeOpen() : null;
+    }
+
     @JavascriptInterface
     public void requestNotifications() {
         if (!trusted()) return;

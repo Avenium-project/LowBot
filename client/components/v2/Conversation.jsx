@@ -7,6 +7,7 @@ import { api, downloadPath, fetchBlobUrl, isLocal, pendingOutbox, sendMessage } 
 import { useT } from '../../lib/v2/i18n';
 import { ElicitationCard } from './InboxPanel';
 import { FileIcon, FileViewer, fmtSize } from './Files';
+import { WidgetChatCard } from './Widgets';
 import { BotBlob, cls } from './ui';
 
 const BUSY = ['working', 'queued', 'retrying', 'waiting'];
@@ -107,10 +108,11 @@ function TakeoverCard({ m, onOpenComputer }) {
   );
 }
 
-function Bubble({ m, bot, showName, onOpenComputer, animate }) {
+function Bubble({ m, bot, showName, onOpenComputer, animate, ws }) {
   if (m.meta?.secret_request && m.author_type === 'bot') return <SecretCard m={m} />;
   if (m.meta?.takeover_request && m.author_type === 'bot') return <TakeoverCard m={m} onOpenComputer={onOpenComputer} />;
   if (m.author_type === 'system' && m.meta?.handoff && /^🔁/.test(m.text || '')) return null; // old "wrote a handoff" notices
+  if (m.author_type === 'system' && m.meta?.widget_id && ws) return <WidgetChatCard id={m.meta.widget_id} ws={ws} />;
   if (m.author_type === 'system') {
     return <div className={cls('text-center text-[13px] text-zinc-500 my-2 px-8 whitespace-pre-wrap', animate && 'lb-rise')}>{m.text}</div>;
   }
@@ -229,7 +231,14 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
   const botsById = useMemo(() => Object.fromEntries(ws.bots.map((b) => [b.id, b])), [ws.bots]);
   const members = conversation.bot_ids.map((id) => botsById[id]).filter(Boolean);
   const lead = members[0];
-  const activeTasks = ws.tasks.filter((x) => x.conversation_id === conversation.id && !['completed', 'failed', 'cancelled'].includes(x.status));
+  const activeAll = ws.tasks.filter((x) => x.conversation_id === conversation.id && !['completed', 'failed', 'cancelled'].includes(x.status));
+  // One "is working" line per bot: a task waiting on the user wins, otherwise the newest.
+  const activeTasks = Object.values(activeAll.reduce((acc, x) => {
+    const cur = acc[x.bot_id];
+    const needs = (t) => ['waiting_input', 'waiting_approval', 'unknown_outcome'].includes(t.run_status);
+    if (!cur || (needs(x) && !needs(cur))) acc[x.bot_id] = x;
+    return acc;
+  }, {}));
   const convTaskIds = new Set(ws.tasks.filter((x) => x.conversation_id === conversation.id).map((x) => x.id));
   const elicitations = ws.elicitations.filter((e) => convTaskIds.has(e.task_id));
 
@@ -388,7 +397,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
               {showDivider && <div className="lb-rise flex items-center gap-3 my-4"><span className="flex-1 h-px bg-blue-500/50" /><span className="text-[13px] font-semibold tracking-wider text-blue-400">{'NEW'}</span><span className="flex-1 h-px bg-blue-500/50" /></div>}
               {sep && <div className="text-center text-[14px] text-zinc-500 my-4">{dayLabel(it.at, lang)}</div>}
               {it.kind === 'msg'
-                ? <Bubble m={it.m} bot={botsById[it.m.author_id]} onOpenComputer={openComputer} animate={i >= timeline.length - 6} showName={conversation.kind === 'group' && it.m.author_type === 'bot'
+                ? <Bubble m={it.m} ws={ws} bot={botsById[it.m.author_id]} onOpenComputer={openComputer} animate={i >= timeline.length - 6} showName={conversation.kind === 'group' && it.m.author_type === 'bot'
                     && !(prev?.kind === 'msg' && prev.m.author_id === it.m.author_id && !sep)} />
                 : <ApprovalInline a={it.a} ws={ws} onChanged={load} />}
             </div>
