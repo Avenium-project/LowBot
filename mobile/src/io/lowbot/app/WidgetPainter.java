@@ -38,10 +38,10 @@ final class WidgetPainter {
     interface Done { void bitmap(Bitmap b); }
 
     static final Handler main = new Handler(Looper.getMainLooper());
-    static final Map<String, Bitmap> htmlCache = new LinkedHashMap<String, Bitmap>() {
+    static final Map<String, Bitmap> htmlCache = java.util.Collections.synchronizedMap(new LinkedHashMap<String, Bitmap>() {
         @Override protected boolean removeEldestEntry(Map.Entry<String, Bitmap> e) { return size() > 8; }
-    };
-    static final java.util.Set<String> pending = new java.util.HashSet<String>();
+    });
+    static final java.util.Set<String> pending = java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
 
     private WidgetPainter() { }
 

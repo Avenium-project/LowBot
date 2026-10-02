@@ -100,7 +100,7 @@ public final class Watchers {
 
     // ------------------------------------------------------------------ processes
     public JSONObject start(String botId, String name, String command, int minIntervalS) throws ToolError {
-        if (!linux.available() || !linux.installed()) throw new ToolError("Linux is not installed. Ask the user to install it in Settings → Terminal.");
+        if (!linux.available() || !linux.installed()) throw new ToolError("Linux is not installed yet. Call linux.install first (the user approves), then try again.");
         String n = name == null ? "" : name.trim().replaceAll("[^A-Za-z0-9 _.-]", "_");
         if (n.isEmpty()) throw new ToolError("Give the watcher a short name.");
         if (command == null || command.trim().isEmpty()) throw new ToolError("Give the command to run, e.g. python3 /workspace/watchers/btc.py");

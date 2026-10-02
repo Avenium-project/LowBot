@@ -23,16 +23,35 @@ public final class WidgetVisual {
     // ------------------------------------------------------------------ validation
     /** Builds the stored visual from tool arguments (chart | stat | image | html), or null when none is given. */
     public static JSONObject fromArgs(JSONObject a, File workspaceRoot, File mediaDir, String widgetId) {
+        String code = !a.optString("code").trim().isEmpty() ? a.optString("code") : a.optString("html");
         int n = (a.optJSONObject("chart") != null ? 1 : 0) + (a.optJSONObject("stat") != null ? 1 : 0)
-                + (a.optString("image").trim().isEmpty() ? 0 : 1) + (a.optString("html").trim().isEmpty() ? 0 : 1);
+                + (a.optString("image").trim().isEmpty() ? 0 : 1) + (code.trim().isEmpty() ? 0 : 1);
         if (n == 0) return null;
-        if (n > 1) throw new ApiError(422, "Give only one of chart, stat, image or html.");
+        if (n > 1) throw new ApiError(422, "Give only one of code, chart, stat or image.");
         if (a.optJSONObject("chart") != null) return chart(a.optJSONObject("chart"));
         if (a.optJSONObject("stat") != null) return stat(a.optJSONObject("stat"));
         if (!a.optString("image").trim().isEmpty()) return image(a.optString("image").trim(), workspaceRoot, mediaDir, widgetId);
-        String html = a.optString("html");
-        if (html.length() > HTML_MAX) throw new ApiError(422, "html is too long (max " + HTML_MAX + " characters).");
-        return J.obj("type", "html", "html", html, "height", clampInt(a.optInt("height", 180), 80, 420));
+        if (code.length() > HTML_MAX) throw new ApiError(422, "code is too long (max " + HTML_MAX + " characters).");
+        // Files the code uses ("workspace:charts/btc.png") are copied now and inlined when shown (the widget has no network).
+        JSONObject files = new JSONObject();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("workspace:/?([A-Za-z0-9_./-]+\\.(?:png|jpe?g|webp|gif|svg))", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(code);
+        int k = 0;
+        long total = 0;
+        while (m.find()) {
+            String ref = m.group(0);
+            if (files.has(ref)) continue;
+            if (++k > 8) throw new ApiError(422, "At most 8 workspace files per widget.");
+            File f = workspaceFile(m.group(1), workspaceRoot);
+            total += f.length();
+            if (total > IMAGE_MAX * 2L) throw new ApiError(422, "The files a widget uses can be 3 MB in total.");
+            String name = f.getName().toLowerCase(Locale.ROOT), ext = name.substring(name.lastIndexOf('.') + 1);
+            mediaDir.mkdirs();
+            File out = new File(mediaDir, widgetId + "-" + k + "." + ext);
+            try { java.nio.file.Files.copy(f.toPath(), out.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING); }
+            catch (java.io.IOException e) { throw new ApiError(500, "Could not store " + m.group(1)); }
+            J.put(files, ref, out.getName());
+        }
+        return J.obj("type", "html", "html", code, "files", files, "height", clampInt(a.optInt("height", 180), 80, 420));
     }
 
     static int clampInt(int v, int lo, int hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -79,16 +98,22 @@ public final class WidgetVisual {
         return J.obj("type", "stat", "value", value, "label", J.truncate(s.optString("label"), 28), "change", J.truncate(s.optString("change"), 12), "trend", trend);
     }
 
-    static JSONObject image(String path, File root, File mediaDir, String widgetId) {
+    static File workspaceFile(String path, File root) {
         String p = path.replaceFirst("^/workspace/", "").replaceFirst("^/+", "");
         File f;
         try {
             f = new File(root, p).getCanonicalFile();
-            if (!f.getPath().startsWith(root.getCanonicalPath() + File.separator)) throw new ApiError(403, "image must be a file in your workspace.");
+            if (!f.getPath().startsWith(root.getCanonicalPath() + File.separator)) throw new ApiError(403, "The file must be in your workspace.");
         } catch (java.io.IOException e) {
-            throw new ApiError(422, "Bad image path.");
+            throw new ApiError(422, "Bad file path.");
         }
         if (!f.isFile()) throw new ApiError(404, "No such file in your workspace: " + p);
+        if (f.length() > IMAGE_MAX) throw new ApiError(422, p + " is too large (max 1.5 MB).");
+        return f;
+    }
+
+    static JSONObject image(String path, File root, File mediaDir, String widgetId) {
+        File f = workspaceFile(path, root);
         String name = f.getName().toLowerCase(Locale.ROOT);
         String ext = name.endsWith(".png") ? "png" : name.endsWith(".jpg") || name.endsWith(".jpeg") ? "jpg" : name.endsWith(".webp") ? "webp"
                 : name.endsWith(".gif") ? "gif" : null;
@@ -310,7 +335,21 @@ public final class WidgetVisual {
     /** A self-contained document showing the visual (no network: CSP default-src 'none'). */
     public static String document(JSONObject v, File mediaDir) {
         String type = v.optString("type"), body;
-        if ("html".equals(type)) body = v.optString("html");
+        if ("html".equals(type)) {
+            body = v.optString("html");
+            JSONObject files = v.optJSONObject("files");
+            if (files != null) {
+                java.util.Iterator<String> it = files.keys();
+                while (it.hasNext()) {
+                    String ref = it.next(), file = files.optString(ref), ext = file.substring(file.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+                    String mime = "svg".equals(ext) ? "image/svg+xml" : "jpg".equals(ext) || "jpeg".equals(ext) ? "image/jpeg" : "image/" + ext;
+                    String data = "";
+                    try { data = android.util.Base64.encodeToString(java.nio.file.Files.readAllBytes(new File(mediaDir, file).toPath()), android.util.Base64.NO_WRAP); }
+                    catch (Exception ignored) { }
+                    body = body.replace(ref, "data:" + mime + ";base64," + data);
+                }
+            }
+        }
         else if ("image".equals(type)) {
             String data = "";
             try {

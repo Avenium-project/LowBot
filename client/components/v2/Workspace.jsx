@@ -64,6 +64,14 @@ export default function Workspace() {
   }, []);
 
   const check = useCallback(() => api('/bots').then((b) => setAuthed(b.length ? 'ok' : 'empty')).catch(() => setAuthed('no')), []);
+  const [slowStart, setSlowStart] = useState(false);
+  useEffect(() => {
+    if (authed !== null) return undefined;
+    // If the first answer is slow (many bots busy), say so and ask again instead of a silent splash.
+    const a = setTimeout(() => setSlowStart(true), 6000);
+    const b = setInterval(() => check(), 5000);
+    return () => { clearTimeout(a); clearInterval(b); };
+  }, [authed, check]);
   useEffect(() => { check(); const h = () => setAuthed('no'); window.addEventListener('opendots:auth-required', h); return () => window.removeEventListener('opendots:auth-required', h); }, [check]);
 
   return (
@@ -74,6 +82,7 @@ export default function Workspace() {
             <g transform="rotate(-12 54 20)"><rect className="lb-blob-eye" x="52" y="14" width="5" height="12" rx="2.5" fill="#1c1917" /></g>
             <g transform="rotate(12 66 20)"><rect className="lb-blob-eye" x="64" y="14" width="5" height="12" rx="2.5" fill="#1c1917" /></g></svg></span>
           <span className="text-zinc-500 text-[15px] tracking-wide">LowBot</span>
+          {slowStart && <span className="text-zinc-600 text-[13px] px-8 text-center">Your bots are busy — still opening…</span>}
         </div>)
         : authed === 'ok' ? <Shell /> : <SetupWizard startAt={authed === 'empty' ? 2 : 0} onReady={() => { setAuthed('ok'); }} />}
       <DialogHost />

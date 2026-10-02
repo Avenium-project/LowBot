@@ -117,6 +117,9 @@ public final class Linux {
     void syncCapability() {
         if (available() && installed()) backend.extraCapabilities.add("linux");
         else backend.extraCapabilities.remove("linux");
+        // Runtime shipped but Alpine not downloaded yet (fresh install, reinstall): bots can offer to install it.
+        if (available() && !installed()) backend.extraCapabilities.add("linux_installable");
+        else backend.extraCapabilities.remove("linux_installable");
     }
 
     // ------------------------------------------------------------- install
@@ -407,6 +410,22 @@ public final class Linux {
     // ------------------------------------------------------------- tools
     void register(Tools reg) {
         syncCapability();
+        reg.register(new Spec("linux.install", "Your Linux terminal is not installed on this phone yet (e.g. after a reinstall). Install it: downloads "
+                + "Alpine Linux (≈4 MB, checked by SHA-256) once; the user approves. After it finishes, linux.run and watcher.* work.",
+                Tools.obj(new JSONObject()), Tools.EXTERNAL, "ask", new Tools.Executor() {
+            public Object run(Tools.Ctx ctx, JSONObject a) throws Exception {
+                if (installed()) return J.obj("status", "already installed", "version", installedVersion);
+                install();
+                long until = System.currentTimeMillis() + 240000;
+                while ("installing".equals(state) && System.currentTimeMillis() < until) Thread.sleep(1000);
+                if (installed()) return J.obj("status", "installed", "version", installedVersion, "next", "Use linux.run now.");
+                throw new Tools.ToolError("Linux install " + ("installing".equals(state) ? "is still running — try linux.run in a minute" : "failed: " + error));
+            }
+        }).needs("linux_installable").timeout(260).card(new Tools.Summarize() {
+            public JSONObject card(JSONObject a) {
+                return J.obj("summary", "Install the Linux terminal (Alpine, ≈4 MB download)", "effect", "downloads and installs Linux for the bots on this phone", "target", "linux");
+            }
+        }));
         reg.register(new Spec("linux.run", "Run a shell command in your own Linux (Alpine, /bin/sh) on this phone. Your shell persists between calls "
                 + "(cd, variables, background jobs). Install software with `apk add <pkg>` (e.g. python3, git, nodejs, curl). "
                 + "Shared workspace files are in /workspace. Prefer short, non-interactive commands; output is stdout+stderr.",

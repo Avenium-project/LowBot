@@ -34,7 +34,7 @@ public class CardWidget extends AppWidgetProvider {
             String wid = intent.getStringExtra("widget_id");
             if (appWidgetId >= 0 && wid != null) {
                 LowBotApp.of(ctx).backend.core.kvSet("card_widget:" + appWidgetId, wid);
-                render(ctx, AppWidgetManager.getInstance(ctx), appWidgetId);
+                requestRefresh(ctx);
             }
             return;
         }
@@ -42,13 +42,26 @@ public class CardWidget extends AppWidgetProvider {
     }
 
     @Override
-    public void onUpdate(Context ctx, AppWidgetManager mgr, int[] ids) {
-        for (int id : ids) render(ctx, mgr, id);
-    }
+    public void onUpdate(Context ctx, AppWidgetManager mgr, int[] ids) { requestRefresh(ctx); }
 
     @Override
     public void onDeleted(Context ctx, int[] ids) {
         for (int id : ids) LowBotApp.of(ctx).backend.core.kvSet("card_widget:" + id, null);
+    }
+
+    static boolean refreshQueued = false;
+
+    /** Debounced, off the main thread (bots working send many events). */
+    static void requestRefresh(final Context ctx) {
+        final Context app = ctx.getApplicationContext();
+        synchronized (CardWidget.class) {
+            if (refreshQueued) return;
+            refreshQueued = true;
+        }
+        BotsWidget.main.postDelayed(new Runnable() { public void run() {
+            synchronized (CardWidget.class) { refreshQueued = false; }
+            try { refreshAll(app); } catch (Throwable e) { android.util.Log.w("LowBot", "card widget: " + e); }
+        } }, 500);
     }
 
     static void refreshAll(Context ctx) {
@@ -91,7 +104,7 @@ public class CardWidget extends AppWidgetProvider {
                     WidgetPainter.main.post(new Runnable() { public void run() {
                         WidgetPainter.html(ctx, doc, wd, hgt, new WidgetPainter.Done() { public void bitmap(Bitmap bm) {
                             WidgetPainter.pending.remove(key);
-                            if (WidgetPainter.hasContent(bm)) { WidgetPainter.htmlCache.put(key, bm); refreshAll(ctx); }
+                            if (WidgetPainter.hasContent(bm)) { WidgetPainter.htmlCache.put(key, bm); requestRefresh(ctx); }
                         } });
                     } });
                 }

@@ -17,6 +17,7 @@ export function useWorkspace(enabled) {
   const listeners = useRef(new Set());
   const dirty = useRef(new Set());
   const timer = useRef(null);
+  const first = useRef(0);
 
   const load = useCallback(async (what) => {
     const all = !what;
@@ -40,13 +41,18 @@ export function useWorkspace(enabled) {
     if (t.startsWith('notification.')) d.add('notifications');
     if (t.startsWith('elicitation.')) d.add('elicitations');
     listeners.current.forEach((fn) => fn(ev));
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
+    // Debounce, but refresh at least once a second while events keep coming (many bots working).
+    const flush = () => {
+      timer.current = null;
+      first.current = 0;
       const what = new Set(dirty.current);
       dirty.current.clear();
       load(what);
       setTick((x) => x + 1);
-    }, 150);
+    };
+    if (!first.current) first.current = Date.now();
+    clearTimeout(timer.current);
+    timer.current = setTimeout(flush, Date.now() - first.current > 1000 ? 0 : 150);
   }, [load]);
 
   useEffect(() => {

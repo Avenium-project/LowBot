@@ -8,7 +8,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Handler;
-import android.os.Looper;
 import android.os.PowerManager;
 import android.view.View;
 import android.widget.RemoteViews;
@@ -36,16 +35,22 @@ public class BotsWidget extends AppWidgetProvider {
     static final List<String> BUSY = Arrays.asList("working", "queued", "retrying", "waiting");
     static final long FRAME_MS = 95;
 
-    static final Handler main = new Handler(Looper.getMainLooper());
+    /** Widget work (database reads, drawing sprites, RemoteViews updates) runs here, never on the app's main thread. */
+    static final Handler main;
+    static {
+        android.os.HandlerThread t = new android.os.HandlerThread("lowbot-widgets", android.os.Process.THREAD_PRIORITY_BACKGROUND);
+        t.start();
+        main = new Handler(t.getLooper());
+    }
     static List<JSONObject> shown = new ArrayList<JSONObject>();
     static List<Integer> busySlots = new ArrayList<Integer>();
     static final Map<String, Bitmap> cache = new HashMap<String, Bitmap>();
     static int frame = 0, lastHopSlot = -1;
-    static boolean ticking = false, refreshQueued = false;
+    static volatile boolean ticking = false, refreshQueued = false;
     static Context appCtx;
 
     @Override
-    public void onUpdate(Context ctx, AppWidgetManager mgr, int[] ids) { refresh(ctx); }
+    public void onUpdate(Context ctx, AppWidgetManager mgr, int[] ids) { requestRefresh(ctx); }
 
     @Override
     public void onDisabled(Context ctx) { busySlots = new ArrayList<Integer>(); }

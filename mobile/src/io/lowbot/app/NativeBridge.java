@@ -29,7 +29,17 @@ final class NativeBridge {
     private static final String[] ALLOWED_KEYS = {"device_token"};
     private final MainActivity activity;
     private final SecureStore store;
-    private static final ExecutorService API = Executors.newFixedThreadPool(4);
+    /** Normal API calls. Slow ones (browser, terminal, backups, uploads) get their own lane so they can never hold up the app's start or the chat list. */
+    private static final ExecutorService API = Executors.newFixedThreadPool(6);
+    private static final ExecutorService SLOW = Executors.newFixedThreadPool(6);
+
+    static boolean slow(String method, String path) {
+        String p = path.replaceFirst("^/api/v2", "");
+        return p.startsWith("/computers") || p.startsWith("/linux/install") || p.matches("^/linux/sessions/[^/]+/run.*")
+                || p.startsWith("/backup") || p.startsWith("/export") || p.startsWith("/audit/export") || p.startsWith("/uploads")
+                || p.startsWith("/files") && "POST".equals(method) || p.startsWith("/providers") && p.contains("/test")
+                || p.startsWith("/integrations") || p.startsWith("/mcp/servers");
+    }
 
     NativeBridge(MainActivity activity) {
         this.activity = activity;
@@ -194,7 +204,7 @@ final class NativeBridge {
     public void request(final String id, final String method, final String path, final String body) {
         if (!trusted() || id == null || method == null || path == null) return;
         final Router router = LowBotApp.of(activity).router;
-        API.submit(new Runnable() {
+        (slow(method, path) ? SLOW : API).submit(new Runnable() {
             @Override public void run() {
                 Router.Response r = router.handle(method, path, body);
                 boolean b64 = r.bytes != null;

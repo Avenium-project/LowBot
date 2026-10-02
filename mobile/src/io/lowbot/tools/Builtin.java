@@ -519,20 +519,23 @@ public final class Builtin {
             }
         }));
 
-        reg.register(new Spec("widget.create", "Make a widget for the user's home screen: a card with a title, optional short Markdown content and "
-                + "optionally ONE visual: chart (line/area/bar/pie/donut from numbers), stat (a big number with change and a sparkline), image (a "
-                + ".png/.jpg/.webp/.gif in your workspace — e.g. a matplotlib chart or photo you made in Linux) or html (your own HTML/SVG/CSS, "
-                + "inline JS allowed, no network: inline everything). Examples: 'BTC' as stat with trend, 'Steps this week' as bar chart, "
-                + "'Mail' as Markdown. To keep it fresh, give refresh (what to do) and schedule (e.g. 'every hour'): a routine of yours will run it "
-                + "and call widget.update. The user adds it to the home screen.",
-                Tools.obj(props("title", S, "content", S, "chart", CHART, "stat", STAT, "image", S, "html", S, "height", J.obj("type", "integer"), "refresh", S, "schedule", S), "title"),
+        reg.register(new Spec("widget.create", "Make a widget for the user's home screen. Write its code yourself: code = a self-contained HTML document "
+                + "body (HTML + <style> + <svg>/<canvas> + inline <script>) designed 320 px wide and `height` px tall (default 180) on a dark card "
+                + "(#1f1f1f, text #f4f4f5). No network and no external libraries: inline all data, draw charts with SVG or canvas yourself, and use "
+                + "files from your workspace with src=\"workspace:path/to/file.png\" (e.g. a matplotlib PNG or a photo you saved). Keep it simple and "
+                + "readable at a glance. Shortcuts if you only need a standard look: chart {type, labels, series}, stat {value, label, change, trend} "
+                + "or image (workspace path). content = optional short Markdown shown under it. To keep it fresh, give refresh (what to do) and "
+                + "schedule (e.g. 'every hour'): a routine of yours will run it and call widget.update with new code. The user adds it to the home screen.",
+                Tools.obj(props("title", S, "code", S, "height", J.obj("type", "integer"), "content", S, "chart", CHART, "stat", STAT, "image", S,
+                        "refresh", S, "schedule", S), "title"),
                 Tools.INTERNAL, "allow", new Tools.Executor() {
             public Object run(Ctx ctx, JSONObject a) throws Exception {
                 if (!ctx.b.widgets.botsMayCreate()) throw new ToolError("The user switched off widgets made by bots (Settings → Widgets).");
                 JSONObject w;
                 try {
-                    boolean hasVisual = a.optJSONObject("chart") != null || a.optJSONObject("stat") != null || !a.optString("image").trim().isEmpty() || !a.optString("html").trim().isEmpty();
-                    if (!hasVisual && a.optString("content").trim().isEmpty()) throw new ToolError("Give content (Markdown) or a visual (chart, stat, image or html).");
+                    boolean hasVisual = a.optJSONObject("chart") != null || a.optJSONObject("stat") != null || !a.optString("image").trim().isEmpty()
+                            || !a.optString("html").trim().isEmpty() || !a.optString("code").trim().isEmpty();
+                    if (!hasVisual && a.optString("content").trim().isEmpty()) throw new ToolError("Give the widget's code (or content, chart, stat or image).");
                     w = ctx.b.widgets.create(ctx.bot.optString("id"), a.optString("title"), a.optString("content"), null);
                     if (hasVisual) {
                         try { w = ctx.b.widgets.setVisual(w.optString("id"), a, rootFor(ctx.b, ctx.bot)); }
@@ -545,7 +548,7 @@ public final class Builtin {
                         JSONObject r = ctx.b.routines.create(ctx.bot.optString("id"), "Widget: " + w.optString("title"),
                                 "Refresh widget " + w.optString("id") + " (\"" + w.optString("title") + "\"): " + a.optString("refresh")
                                         + "\nThen call widget.update with widget=" + w.optString("id") + " and the new content"
-                                        + (w.isNull("visual_type") ? "" : " and the new " + w.optString("visual_type") + " (same shape as before)") + ".",
+                                        + (w.isNull("visual_type") ? "" : " and new " + ("html".equals(w.optString("visual_type")) ? "code (same design, fresh data)" : w.optString("visual_type") + " (same shape as before)")) + ".",
                                 a.optString("schedule"), null, null, null, "skip", "latest", true);
                         routine = r.optString("id");
                         ctx.b.core.db.exec("UPDATE widgets SET routine_id = ? WHERE id = ?", routine, w.optString("id"));
@@ -563,9 +566,9 @@ public final class Builtin {
                 return J.obj("widget_id", w.optString("id"), "routine_id", routine, "note", "The user can add it to the home screen from the card in the chat.");
             }
         }).needs("widgets"));
-        reg.register(new Spec("widget.update", "Update one of your widgets: new content and/or title, and/or a new visual (chart, stat, image or html — "
-                + "same shapes as widget.create; clear_visual=true removes it). Fields you leave out stay as they are.",
-                Tools.obj(props("widget", S, "content", S, "title", S, "chart", CHART, "stat", STAT, "image", S, "html", S, "height", J.obj("type", "integer"),
+        reg.register(new Spec("widget.update", "Update one of your widgets: new code (same rules as widget.create) and/or title, content, or a "
+                + "shortcut visual (chart, stat, image); clear_visual=true removes the visual. Fields you leave out stay as they are.",
+                Tools.obj(props("widget", S, "code", S, "height", J.obj("type", "integer"), "content", S, "title", S, "chart", CHART, "stat", STAT, "image", S,
                         "clear_visual", J.obj("type", "boolean")), "widget"), Tools.INTERNAL, "allow", new Tools.Executor() {
             public Object run(Ctx ctx, JSONObject a) throws Exception {
                 JSONObject w = ctx.b.widgets.get(a.optString("widget"));

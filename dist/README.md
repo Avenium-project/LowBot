@@ -2,12 +2,18 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **3.6.0** — widgets can show more than text: a bot adds one visual — a chart from numbers (line, area, bar,
+- Version **3.7.0** — bots write their widgets' code (HTML/CSS/SVG/canvas/JS, no network; workspace images via
+  src="workspace:path"); chart/stat/image stay as shortcuts. The app no longer hangs on the LowBot splash when many bots
+  work: slow calls (browser, terminal, backups) have their own lane, events reach the page in batches, home-screen widgets
+  update off the main thread, watchers restart in the background, and the splash retries and says when bots are busy.
+  After a reinstall (Linux removed with the app's data) bots know the terminal exists and can install it with
+  linux.install (you approve the ≈4 MB download) instead of saying they have no terminal.
+  SHA-256: `19185a5c85ea1b747dba9dfc45ee761ec921b423f4101e3b6ccf51ab6691e432`
+- 3.6.0 — widgets can show more than text: a bot adds one visual — a chart from numbers (line, area, bar,
   pie, donut), a big number with change and trend line (stat), an image from its workspace (e.g. a matplotlib PNG made
   in Linux, or a photo) or its own HTML/SVG/CSS layout. In LowBot it shows in a sandboxed frame without network access;
   on the phone's home screen charts and numbers are drawn natively, images scaled, and HTML pictured in the background.
   Bots can change the visual with widget.update (e.g. from their refresh routine).
-  SHA-256: `05d371cce35cdd5cfa109c222e31a679ae22a6e73b5eabdea938e1a239a20eb1`
 - 3.5.0 — watchers: a bot can write a small program (usually Python) and run it in the background in its
   Linux; the program wakes the bot with `from lowbot import ping; ping('BTC fell to 59800', {...})` or `lowbot-ping "msg"`
   (new email, price drop, page change…). Each ping starts a task for that bot (the ping text is treated as data, not

@@ -381,10 +381,33 @@ public class MainActivity extends Activity implements Computer.Host {
         });
     }
 
+    final StringBuilder pendingEvents = new StringBuilder();
+    final android.os.Handler eventHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    final Runnable flushEvents = new Runnable() {
+        @Override public void run() {
+            String batch;
+            synchronized (pendingEvents) {
+                batch = pendingEvents.toString();
+                pendingEvents.setLength(0);
+            }
+            if (!batch.isEmpty() && web != null)
+                web.evaluateJavascript("(function(a){var f=window.__lowbotEvent;if(f)for(var i=0;i<a.length;i++)f(a[i]);})([" + batch + "])", null);
+        }
+    };
+
     void subscribeEvents() {
         if (eventListener != null) return;
         eventListener = new Core.EventListener() {
-            @Override public void onEvent(JSONObject e) { runJs("window.__lowbotEvent&&window.__lowbotEvent(" + e + ")"); }
+            @Override public void onEvent(JSONObject e) {
+                // Many bots working send many events: deliver them to the page in batches, not one main-thread call each.
+                boolean schedule;
+                synchronized (pendingEvents) {
+                    schedule = pendingEvents.length() == 0;
+                    if (pendingEvents.length() > 0) pendingEvents.append(',');
+                    pendingEvents.append(e.toString());
+                }
+                if (schedule) eventHandler.postDelayed(flushEvents, 120);
+            }
         };
         LowBotApp.of(this).uiListeners.add(eventListener);
     }

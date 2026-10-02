@@ -97,11 +97,14 @@ public class LowBotApp extends Application {
                 for (Core.EventListener l : uiListeners) l.onEvent(e);
                 String t = e.optString("type");
                 if (t.startsWith("run.") || t.startsWith("task.") || t.startsWith("bot.") || t.startsWith("approval.")) BotsWidget.requestRefresh(LowBotApp.this);
-                if (t.startsWith("widget.") || t.startsWith("bot.")) main.post(new Runnable() { public void run() { CardWidget.refreshAll(LowBotApp.this); } });
+                if (t.startsWith("widget.") || t.startsWith("bot.")) CardWidget.requestRefresh(LowBotApp.this);
             }
         });
         backend.start();
-        watchers.restore();
+        // Restarting watchers starts processes: keep it off the main thread so the app opens at once.
+        new Thread(new Runnable() { public void run() {
+            try { watchers.restore(); } catch (Throwable e) { android.util.Log.w("LowBot", "watchers restore: " + e); }
+        } }, "watchers-restore").start();
         backend.scheduleAlarm();
         backend.wake();
     }

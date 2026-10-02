@@ -302,8 +302,10 @@ public class SelfTest extends BroadcastReceiver {
         boolean two = false;
         try { b.widgets.setVisual(wid, J.obj("html", "<b>x</b>", "stat", J.obj("value", "1")), root); } catch (io.lowbot.core.ApiError e) { two = e.status == 422; }
         check(two, "only one visual per widget");
-        b.widgets.setVisual(wid, J.obj("html", "<div style='background:#ff0000;width:100%;height:300px'></div><script>fetch('https://example.com/')</script>", "height", 120), root);
+        b.widgets.setVisual(wid, J.obj("code", "<div style='background:#ff0000;width:100%;height:300px'><img src=\"workspace:charts/plot.png\"></div>"
+                + "<script>fetch('https://example.com/')</script>", "height", 120), root);
         final String htmlDoc = b.widgets.visualDocument(wid).optString("html");
+        check(htmlDoc.contains("data:image/png;base64,") && !htmlDoc.contains("workspace:charts"), "widget code uses workspace images (inlined)");
         final android.graphics.Bitmap[] shot = new android.graphics.Bitmap[1];
         final java.util.concurrent.CountDownLatch shotDone = new java.util.concurrent.CountDownLatch(1);
         final Context fctx = ctx;

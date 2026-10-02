@@ -882,6 +882,9 @@ public final class Engine {
                     .append(J.truncate(o.optString("role_description"), 80)).append(members.contains(o.optString("id")) ? " (in this chat)" : "");
         }
         if (roster.length() > 0) parts.add("Other bots you can message or delegate to:" + roster);
+        if (b.capabilities().contains("linux_installable") && !Tools.excluded(J.strings(bot.optJSONArray("tools")), "linux.run"))
+            parts.add("You have a Linux terminal on this phone, but it is not installed yet (e.g. the app was reinstalled). When a task needs "
+                    + "code or command-line tools, call linux.install (the user approves a ≈4 MB download), then use linux.run. Never say you have no terminal.");
         if (b.capabilities().contains("linux") && !Tools.excluded(J.strings(bot.optJSONArray("tools")), "linux.run"))
             parts.add("You HAVE a Linux terminal: linux.run runs shell commands in your own Alpine Linux on this phone (persistent shell, "
                     + "`apk add` to install python3, git, nodejs…; shared files in /workspace). Use it whenever a task needs code or command-line tools. "
@@ -893,10 +896,10 @@ public final class Engine {
                 ? "You have no role yet. As soon as the user's requests show what you are for, call self.set_role with one short line (in the user's language)."
                 : "Your role: " + bot.optString("role_description") + ". If the user's requests clearly change what you do, update it with self.set_role.");
         if (b.capabilities().contains("widgets"))
-            parts.add("Widgets: when the user asks for a widget (e.g. 'a mail widget', 'BTC price', 'my steps'), make it with widget.create — a short title, "
-                    + "compact Markdown and, when it helps, one visual: chart (numbers → line/area/bar/pie/donut), stat (big number + change + trend), "
-                    + "image (a PNG you made in your workspace, e.g. with matplotlib in Linux, or a photo) or html (your own HTML/SVG/CSS layout, self-contained, "
-                    + "no network). Prefer chart/stat for numbers. If it should stay current, pass refresh + schedule so your routine updates it with widget.update.");
+            parts.add("Widgets: when the user asks for a widget (e.g. 'a mail widget', 'BTC price', 'my steps'), build it with widget.create by WRITING ITS CODE "
+                    + "(code: self-contained HTML/CSS/SVG/canvas/JS, 320 px wide, dark card, no network — inline the data, draw charts yourself, use workspace "
+                    + "images via src=\"workspace:path\"). Make it clear and good-looking at a glance. If it should stay current, pass refresh + schedule so "
+                    + "your routine rewrites it with widget.update.");
         parts.add("Formatting: reply in Markdown — headings, bullet lists, **bold**, `code`, fenced code blocks and tables (| a | b | with a header separator row) "
                 + "render nicely in the app. Put each table row on its own line.");
         parts.add("Team management: you can see the team (bot.list), write to another bot (bot.message), hand it work (task.delegate), "

@@ -70,6 +70,12 @@ public final class Widgets {
         }
         final JSONObject v = WidgetVisual.fromArgs(args, workspaceRoot, mediaDir(), id);
         if (v == null) return w;
+        File[] old = mediaDir().listFiles();
+        if (old != null) for (File f : old) {
+            String n = f.getName();
+            boolean kept = n.equals(v.optString("file")) || (v.optJSONObject("files") != null && v.optJSONObject("files").toString().contains("\"" + n + "\""));
+            if (n.startsWith(id) && !kept) f.delete();
+        }
         db.tx(new Runnable() { public void run() {
             db.exec("UPDATE widgets SET visual_json = ?, updated_at = ? WHERE id = ?", v.toString(), J.nowIso(), id);
             b.core.emit("widget.updated", null, null, null, w.optString("bot_id"), J.obj("widget_id", id));
