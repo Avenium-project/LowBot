@@ -140,7 +140,21 @@ public final class Tasks {
 
     // ----------------------------------------------------------------- messages
     public List<JSONObject> messages(String cid, long after, int limit) {
-        List<JSONObject> rows = db.all("SELECT * FROM messages WHERE conversation_id = ? AND seq > ? ORDER BY seq LIMIT ?", cid, after, limit);
+        return messages(cid, after, limit, null, false);
+    }
+
+    public List<JSONObject> messages(String cid, long after, int limit, Long before, boolean latest) {
+        // All three directions use the existing (conversation_id, seq) index.
+        List<JSONObject> rows;
+        if (before != null) {
+            rows = db.all("SELECT * FROM messages WHERE conversation_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?", cid, before, limit);
+            java.util.Collections.reverse(rows);
+        } else if (latest) {
+            rows = db.all("SELECT * FROM messages WHERE conversation_id = ? ORDER BY seq DESC LIMIT ?", cid, limit);
+            java.util.Collections.reverse(rows);
+        } else {
+            rows = db.all("SELECT * FROM messages WHERE conversation_id = ? AND seq > ? ORDER BY seq LIMIT ?", cid, after, limit);
+        }
         for (JSONObject r : rows) {
             J.put(r, "mentions", J.parseArr(r.optString("mentions_json")));
             J.put(r, "attachments", J.parseArr(r.optString("attachments_json")));

@@ -115,10 +115,22 @@ class TaskService:
             self.db.execute("UPDATE conversations SET last_read_seq = ? WHERE id = ?", (max(0, (seq or 1) - 1), conv_id))
 
     # -- messages ------------------------------------------------------------
-    def messages(self, conv_id: str, after_seq: int = 0, limit: int = 200) -> List[Dict[str, Any]]:
-        rows = self.db.all(
-            "SELECT * FROM messages WHERE conversation_id = ? AND seq > ? ORDER BY seq LIMIT ?",
-            (conv_id, after_seq, limit))
+    def messages(self, conv_id: str, after_seq: int = 0, limit: int = 200, *,
+                 before_seq: Optional[int] = None, latest: bool = False) -> List[Dict[str, Any]]:
+        # Seek using (conversation_id, seq), never scan/transfer the whole history.
+        if before_seq is not None:
+            rows = self.db.all(
+                "SELECT * FROM messages WHERE conversation_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?",
+                (conv_id, before_seq, limit))
+            rows.reverse()
+        elif latest:
+            rows = self.db.all(
+                "SELECT * FROM messages WHERE conversation_id = ? ORDER BY seq DESC LIMIT ?", (conv_id, limit))
+            rows.reverse()
+        else:
+            rows = self.db.all(
+                "SELECT * FROM messages WHERE conversation_id = ? AND seq > ? ORDER BY seq LIMIT ?",
+                (conv_id, after_seq, limit))
         for r in rows:
             r["mentions"] = loads(r.pop("mentions_json"), [])
             r["attachments"] = loads(r.pop("attachments_json"), [])

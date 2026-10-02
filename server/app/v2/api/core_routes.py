@@ -160,13 +160,17 @@ def add_member(conv_id: str, body: Dict[str, str], request: Request):
 
 
 @router.get("/conversations/{conv_id}/messages")
-def get_messages(conv_id: str, request: Request, after: int = 0, limit: int = Query(200, le=500)):
+def get_messages(conv_id: str, request: Request, after: int = Query(0, ge=0),
+                 limit: int = Query(200, ge=1, le=500), before: Optional[int] = Query(None, ge=1),
+                 latest: bool = False):
     r = rt(request)
     try:
         r.services["tasks"].get_conversation(conv_id)
     except TaskError as exc:
         raise bad(exc, 404)
-    return r.services["tasks"].messages(conv_id, after, limit)
+    if after and (before is not None or latest):
+        raise HTTPException(422, "Use either after, before or latest pagination.")
+    return r.services["tasks"].messages(conv_id, after, limit, before_seq=before, latest=latest)
 
 
 @router.post("/conversations/{conv_id}/messages")

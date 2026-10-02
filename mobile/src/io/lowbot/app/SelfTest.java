@@ -138,6 +138,7 @@ public class SelfTest extends BroadcastReceiver {
         JSONObject helper = api(r, "POST", "/api/v2/bots", J.obj("name", "Helper"));
         check("helper".equals(helper.optString("handle")), "handle from name");
         String cid = api(r, "POST", "/api/v2/bots/" + bot.optString("id") + "/conversation", null).optString("id");
+        messagePagination(b, bot.optString("id"));
 
         // 1. plain chat
         JSONObject sent = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "hello there", "client_msg_id", "c1"));
@@ -521,6 +522,37 @@ public class SelfTest extends BroadcastReceiver {
     }
 
     /** The bots' browser: open a page in an offscreen WebView and read it. Network may be unavailable in CI. */
+    static void messagePagination(final Backend b, String botId) {
+        final String cid = b.tasks.createConversation("group", java.util.Arrays.asList(botId), "History test").optString("id");
+        final String other = b.tasks.createConversation("group", java.util.Arrays.asList(botId), "Other history").optString("id");
+        b.core.db.tx(new Runnable() { public void run() {
+            for (int i = 0; i < 123; i++) {
+                b.tasks.insertMessage(cid, "user", "local-user", "history " + i, null, null, null, null, null, null);
+                b.tasks.insertMessage(other, "user", "local-user", "other", null, null, null, null, null, null);
+            }
+        } });
+        Router r = new Router(b);
+        String path = "/api/v2/conversations/" + cid + "/messages?limit=50";
+        JSONArray latest = api(r, "GET", path + "&latest=true", null).optJSONArray("items");
+        check(latest.length() == 50 && "history 73".equals(latest.optJSONObject(0).optString("text"))
+                && "history 122".equals(latest.optJSONObject(49).optString("text")), "history opens on last 50 messages");
+        JSONArray older = api(r, "GET", path + "&before=" + latest.optJSONObject(0).optLong("seq"), null).optJSONArray("items");
+        check(older.length() == 50 && "history 23".equals(older.optJSONObject(0).optString("text"))
+                && "history 72".equals(older.optJSONObject(49).optString("text")), "history older cursor has no overlap");
+        JSONArray oldest = api(r, "GET", path + "&before=" + older.optJSONObject(0).optLong("seq"), null).optJSONArray("items");
+        check(oldest.length() == 23 && "history 0".equals(oldest.optJSONObject(0).optString("text")), "history final partial page");
+        check(api(r, "GET", path + "&before=" + oldest.optJSONObject(0).optLong("seq"), null).optJSONArray("items").length() == 0, "history end");
+        long cursor = latest.optJSONObject(49).optLong("seq");
+        check(api(r, "GET", path + "&after=" + cursor, null).optJSONArray("items").length() == 0, "history unchanged delta is empty");
+        b.core.db.tx(new Runnable() { public void run() {
+            b.tasks.insertMessage(cid, "user", "local-user", "new message", null, null, null, null, null, null);
+        } });
+        JSONArray delta = api(r, "GET", path + "&after=" + cursor, null).optJSONArray("items");
+        check(delta.length() == 1 && "new message".equals(delta.optJSONObject(0).optString("text")), "history fetches only new messages");
+        for (String query : new String[]{"limit=-1", "limit=0", "limit=501", "before=0", "after=-1", "after=1&before=2"})
+            check(r.handle("GET", "/api/v2/conversations/" + cid + "/messages?" + query, null).status == 422, "history validates " + query);
+    }
+
     static void browser(Context ctx, Backend b) {
         Computer c = new Computer(ctx, b);
         try {

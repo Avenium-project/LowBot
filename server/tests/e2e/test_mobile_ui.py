@@ -7,6 +7,7 @@ This proves the responsive web/PWA client; it does NOT prove APK/EXE (test N).
 
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -230,4 +231,65 @@ def test_android_bridge_code_path(server):
         assert page.evaluate("() => window.__lowbotBack()") is True
         expect(page.get_by_role("button", name="Menu")).to_be_visible()
         assert page.evaluate("() => window.__lowbotBack()") is False
+        browser.close()
+
+
+def test_chat_history_pages_and_live_updates(server):
+    """Bounded initial history, stable upward paging, no history fetch on bot events."""
+    bot = api(server, "/bots", {"name": "History pagination"})
+    api(server, f"/bots/{bot['id']}/pause", {})
+    conv = api(server, f"/bots/{bot['id']}/conversation", {})
+    path = f"/conversations/{conv['id']}/messages"
+    for i in range(120):
+        api(server, path, {"text": f"history {i:03d}", "client_msg_id": f"history-{i}"})
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 360, "height": 740}, locale="en-US")
+        assert ctx.request.post(f"{server}/api/v1/auth/login", data={"token": TOKEN}).ok
+        page = ctx.new_page()
+        requests = []
+        page.on("request", lambda r: requests.append(r.url) if r.method == "GET" and path in r.url else None)
+        page.goto(f"{server}/bots/")
+        page.get_by_text("History pagination", exact=True).click()
+        expect(page.get_by_text("history 119", exact=True)).to_be_visible()
+        messages = page.get_by_text(re.compile(r"^history \d{3}$"))
+        expect(messages).to_have_count(50)
+        assert any("latest=true" in url and "limit=50" in url for url in requests)
+        assert all("limit=500" not in url for url in requests)
+
+        scroll = page.get_by_text("history 119", exact=True).locator('xpath=ancestor::div[contains(@class,"overflow-y-auto")][1]')
+        anchor_top = scroll.evaluate("el => { el.scrollTop = 0; return el.children[0].getBoundingClientRect().top; }")
+        expect(messages).to_have_count(100)
+        retained_top = page.get_by_text("history 070", exact=True).locator("xpath=../../..").evaluate("el => el.getBoundingClientRect().top")
+        assert abs(retained_top - anchor_top) < 3
+        assert any("before=" in url for url in requests)
+
+        # A new message appends only the delta, preserving the reader's place.
+        position = scroll.evaluate("el => el.scrollTop")
+        api(server, path, {"text": "history 120", "client_msg_id": "history-120"})
+        expect(messages).to_have_count(101)
+        assert abs(scroll.evaluate("el => el.scrollTop") - position) < 3
+        assert "after=" in requests[-1] and "latest=" not in requests[-1]
+
+        page.wait_for_timeout(300)
+        before = len(requests)
+        api(server, f"/bots/{bot['id']}", {"label": "Changed label"}, method="PATCH")
+        page.wait_for_timeout(700)
+        assert len(requests) == before, "unrelated bot events must not refetch chat history"
+
+        scroll.evaluate("el => { el.scrollTop = 0; }")
+        expect(messages).to_have_count(121)
+        expect(page.get_by_text("history 000", exact=True)).to_have_count(1)
+        assert len(set(messages.all_text_contents())) == 121
+
+        # More than one page arrives while disconnected. Reconnect must drain
+        # forward pages without dropping messages or reloading the initial page.
+        ctx.set_offline(True)
+        for i in range(121, 186):
+            api(server, path, {"text": f"history {i:03d}", "client_msg_id": f"history-{i}"})
+        ctx.set_offline(False)
+        expect(messages).to_have_count(186, timeout=20000)
+        assert len(set(messages.all_text_contents())) == 186
+        assert all("limit=50" in url for url in requests)
         browser.close()
