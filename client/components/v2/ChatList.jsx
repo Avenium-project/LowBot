@@ -82,7 +82,7 @@ function Row({ r, i, compact, activeId, menuKey, onLong, onOpen, preview }) {
           <span className="text-[13px] text-zinc-500 shrink-0">{shortTime(r.conv?.last_message?.created_at)}</span>
         </span>
         <span className="flex items-center justify-between gap-2 mt-0.5">
-          <span className={cls('text-[15px] truncate', p.tone)}>{p.text}</span>
+          <span className={cls('lb-preview text-[15px] truncate', p.tone)}>{p.text}</span>
           {(unread || attn) && <span className={cls('lb-pop h-2.5 w-2.5 rounded-full shrink-0', attn ? 'bg-amber-400' : 'bg-blue-500')} />}
         </span>
       </span>

@@ -68,7 +68,6 @@ function Detail({ ws, name, onBack, onOpenConversation }) {
 
       <Section title="Members">
         <MemberPicker ws={ws} value={w.members} onChange={(members) => patch({ members }, 'Members saved')} />
-        <div className="text-[13px] text-zinc-500 px-2 mt-2">Members see the shared rules and files in every chat bound to this workspace.</div>
       </Section>
 
       <Section title="Shared rules · AGENTS.md">
@@ -123,9 +122,6 @@ export default function WorkspacesPanel({ ws, onOpenConversation }) {
   if (!list) return err ? <Empty>{err}</Empty> : <div className="lb-skeleton h-[40vh] rounded-[22px]" />;
   return (
     <div>
-      <div className="text-[14px] text-zinc-500 px-2 mb-4 leading-snug">
-        A workspace is a shared folder for a team of bots: the same files and one AGENTS.md of rules they all follow. Bots can create workspaces, add each other and talk in the team chat.
-      </div>
       <Section title="Workspaces" actions={!creating && <Button small kind="primary" onClick={() => setCreating(true)}>+ New workspace</Button>}>
         {creating && (
           <Card className="lb-rise space-y-3 mb-4">

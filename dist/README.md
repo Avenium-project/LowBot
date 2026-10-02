@@ -2,11 +2,13 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **2.9.3** — Markdown in replies: tables, headings, lists, checklists, quotes, links; every bot can always
+- Version **2.9.4** — Settings is a short list without explanations: Appearance (text size, animations, previews),
+  Model (ChatGPT account, providers), Routines, Notifications (per bot), Workspaces, Terminal (Linux, bot commands, LAN).
+  SHA-256: `d66213c3030bb1fe5f772f75011acfcf4e36ca81033c3918d074aa5871013b8a`
+- 2.9.3 — Markdown in replies: tables, headings, lists, checklists, quotes, links; every bot can always
   manage other bots (the "can create bots" option is gone; creating/changing/deleting still asks you); a bot sets its
   own role from what you ask it (self.set_role); the Linux terminal is on for every bot as soon as Linux is installed
   (switch it off per bot in the profile).
-  SHA-256: `8cd0125e873ccab633fc8b3a3a0ede120b15b39ddcee0597c62f18eee275fe62`
 - 2.9.2 — the top-left button on the home screen is a settings (gear) button instead of the brown dot.
 - 2.9.1 — bots SEE their browser screenshots (the image is sent to the model, not just a file); every bot
   has the Linux terminal tools and is told it has them; images in chat show as thumbnails (tap for full screen), files as

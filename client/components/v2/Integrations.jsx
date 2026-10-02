@@ -81,7 +81,7 @@ export function ChatGptPhone({ status, onChanged, ws, compact }) {
   };
   return (
     <Card className="mb-3 space-y-3">
-      <div className="font-semibold">ChatGPT</div>
+      <div className="font-semibold">ChatGPT account</div>
       {c.logged_in ? (
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <span className="text-[15px] text-emerald-400">● {'Connected'}{c.account ? ` · ${c.account}` : ''}{c.plan ? ` · ${c.plan}` : ''}</span>
@@ -89,9 +89,9 @@ export function ChatGptPhone({ status, onChanged, ws, compact }) {
         </div>
       ) : (
         <>
-          <div className="text-[15px] text-zinc-400">{'Sign in with your ChatGPT (Plus/Pro) account on OpenAI’s page — LowBot never sees your password and usage counts against your plan limits. Works like OpenCode’s sign-in: through the undocumented Codex backend.'}</div>
+          {!compact && <div className="text-[15px] text-zinc-400">{'Sign in with your ChatGPT (Plus/Pro) account on OpenAI’s page — LowBot never sees your password and usage counts against your plan limits. Works like OpenCode’s sign-in: through the undocumented Codex backend.'}</div>}
           <label className="flex items-start gap-2 text-[13px] text-amber-400"><input type="checkbox" className="mt-0.5" checked={accept} onChange={(e) => setAccept(e.target.checked)} />
-            <span>{'I understand this is unofficial: OpenAI may change or block it at any time, and I use it at my own risk.'}</span></label>
+            <span>{compact ? 'Unofficial — OpenAI may block it; my own risk' : 'I understand this is unofficial: OpenAI may change or block it at any time, and I use it at my own risk.'}</span></label>
           {waiting ? <div className="text-[15px] text-zinc-400">{'Finish signing in in the browser, then come back…'}</div>
             : <button onClick={start} disabled={!accept} className="w-full rounded-full bg-white text-black py-3 font-medium disabled:opacity-40">{'Sign in with ChatGPT'}</button>}
           {c.login?.status === 'failed' && <div className="text-[13px] text-rose-400">{(c.login.output || []).join(' ')}</div>}

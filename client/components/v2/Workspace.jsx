@@ -15,6 +15,7 @@ import TasksPanel, { TaskDetail } from './TasksPanel';
 import { MemoryPanel, RoutinesPanel, SkillsPanel } from './AutomationPanels';
 import { BotBlob, DialogHost, Empty, Section, botLabel, cls, fmtTime, inputCls } from './ui';
 import { useWorkspace } from './useWorkspace';
+import { applyAppearance } from '../../lib/v2/appearance';
 
 function FilesPanel({ ws, conversationId }) {
   const [rows, setRows] = useState([]);
@@ -55,7 +56,7 @@ function SearchPanel({ onOpenConversation, onOpenTask }) {
 export default function Workspace() {
   const [lang, setLangState] = useState('en');
   const [authed, setAuthed] = useState(null);
-  useEffect(() => { setLangState(detectLang()); }, []);
+  useEffect(() => { setLangState(detectLang()); applyAppearance(); }, []);
   const setLang = useCallback((l) => { setLangState(l); window.localStorage.setItem('opendots.lang', l); document.documentElement.lang = l; }, []);
   const t = useCallback((k) => DICT[lang][k] || DICT.en[k] || k, [lang]);
   const ctx = useMemo(() => ({ lang, t, setLang }), [lang, t, setLang]);
@@ -198,7 +199,7 @@ function Shell() {
     workspaces: () => <WorkspacesPanel ws={ws} onOpenConversation={(id) => { setPage(null); openConv(id); }} />,
     memory: () => <MemoryPanel ws={ws} />,
     skills: () => <SkillsPanel ws={ws} skills={skills} reloadSkills={reloadSkills} />,
-    settings: () => <SettingsPanel ws={ws} />,
+    settings: () => <SettingsPanel ws={ws} onOpenConversation={(id) => { setPage(null); openConv(id); }} />,
     search: () => <SearchPanel onOpenConversation={openConv} onOpenTask={openTask} />,
   };
   const titles = { workspaces: 'Workspaces', tasks: t('tasks'), inbox: t('inbox'), computer: t('computer'), files: t('files'), routines: t('routines'),
