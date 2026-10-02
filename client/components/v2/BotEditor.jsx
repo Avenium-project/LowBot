@@ -3,7 +3,7 @@
 // tabs (Info · Links · Media · Files), character shape/colour, model & provider,
 // instructions, routines, notifications, share as template, and a ⋯ menu.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FiChevronLeft, FiChevronRight, FiFileText, FiMoreHorizontal, FiPlus, FiShare, FiCpu } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiFileText, FiMoreHorizontal, FiPlus, FiShare, FiCpu, FiFolder } from 'react-icons/fi';
 import { api, downloadPath, isLocal, saveBlob } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { Ghost, Toggle, AVATAR_COLORS, BotBlob, Button, Field, SHAPES, Section, ShapeIcon, botLabel, cls, colorFor, inputCls, askConfirm, parseAvatar, randomAvatar, shortTime } from './ui';
@@ -90,7 +90,7 @@ function ModelPicker({ f, setF, providers, pl, onCommit }) {
           <option value="">{'Default'}{providers.find((p) => p.is_default) ? ` (${providers.find((p) => p.is_default).name})` : ''}</option>
           {providers.map((p) => <option key={p.id} value={p.id}>{p.name}{p.is_mock ? ' [mock]' : ''}</option>)}
         </select></Field>
-      <Field label={'Model'} hint={models.length ? null : ('The list appears after Test connection in Settings → Models, or type an id.')}>
+      <Field label={'Model'}>
         {models.length ? (
           <select className={inputCls} value={models.includes(f.model) ? f.model : (f.model ? '__custom' : '')}
             onChange={(e) => { if (e.target.value === '__custom') return; const v = { ...f, model: e.target.value }; setF(v); onCommit(v); }}>
@@ -100,7 +100,27 @@ function ModelPicker({ f, setF, providers, pl, onCommit }) {
           </select>
         ) : <input className={inputCls} value={f.model} placeholder={profile?.default_model || 'model id'} onChange={(e) => setF({ ...f, model: e.target.value })} onBlur={() => onCommit(f)} />}
       </Field>
-      {profile && <div className="text-xs text-zinc-500">{'Tools'}: {String(profile.capabilities?.tools ?? '?')} · {'vision'}: {String(profile.capabilities?.vision ?? '?')}{profile.is_mock ? ' · mock' : ''}</div>}
+    </div>
+  );
+}
+
+// The bot's shared workspaces: one switch per workspace.
+function BotWorkspaces({ bot, tick }) {
+  const [list, setList] = useState(null);
+  const load = () => api('/projects').then(setList).catch(() => setList([]));
+  useEffect(() => { load(); }, [tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!list) return null;
+  const toggle = (w, on) => api(`/projects/${encodeURIComponent(w.name)}`, { method: 'PATCH',
+    body: { members: on ? [...w.members, bot.id] : w.members.filter((x) => x !== bot.id) } }).then(load);
+  return (
+    <div className={cls(card, 'overflow-hidden')}>
+      {list.length ? list.map((w) => (
+        <div key={w.name} className="flex items-center gap-4 px-5 py-3.5 border-b border-white/5 last:border-b-0">
+          <FiFolder className="text-zinc-400 text-xl shrink-0" />
+          <span className="flex-1 min-w-0 truncate text-[17px]">{w.name}</span>
+          <Toggle on={w.members.includes(bot.id)} label={`Workspace ${w.name}`} onChange={(on) => toggle(w, on)} />
+        </div>))
+        : <div className="px-5 py-4 text-[16px] text-zinc-500">None yet</div>}
     </div>
   );
 }
@@ -301,7 +321,6 @@ export function BotEditor({ ws, bot: initial, onDone }) {
         <button aria-label="back" onClick={onDone} className="lb-press h-12 w-12 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center text-2xl"><FiChevronLeft /></button>
         {saved && <span className="lb-pop text-[13px] text-emerald-400">{'Saved'}</span>}
         {bot && <div className="flex gap-3 relative">
-          <button aria-label={'Share'} onClick={shareTemplate} className="lb-press h-12 w-12 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center text-xl"><FiShare /></button>
           <button aria-label="more" onClick={() => setMenu(!menu)} className="lb-press h-12 w-12 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center text-xl"><FiMoreHorizontal /></button>
           {menu && <div className="lb-rise lb-stagger absolute right-0 top-14 z-10 min-w-[220px] rounded-2xl bg-[#262626] border border-white/10 shadow-2xl overflow-hidden text-[15px]">
             {[[bot.pinned ? t('unpin') : t('pin'), () => api(`/bots/${bot.id}`, { method: 'PATCH', body: { pinned: !bot.pinned } }).then((b) => { setBot(b); setMenu(false); ws.reload(); })],
@@ -334,14 +353,7 @@ export function BotEditor({ ws, bot: initial, onDone }) {
               className="w-full bg-transparent text-center text-[17px] text-zinc-300 placeholder:text-zinc-500 py-3.5 border-t border-white/10 outline-none" />}
           </div>
 
-          {bot && <nav className="relative grid grid-cols-4 mt-6 border-b border-white/10">
-            {tabs.map(([k, label]) => (
-              <button key={k} onClick={() => setTab(k)} className={cls('py-3 text-[17px] transition-colors', tab === k ? 'text-white' : 'text-zinc-500')}>{label}</button>))}
-            <span className="absolute bottom-0 h-[3px] w-1/4 transition-transform duration-300 ease-out" style={{ transform: `translateX(${tabs.findIndex((x) => x[0] === tab) * 100}%)` }}>
-              <span className="block mx-auto h-full w-3/4 rounded-full bg-white" /></span>
-          </nav>}
-
-          {(tab === 'info' || !bot) ? <div key="info" className="lb-rise">
+          <div key="info" className="lb-rise">
             <Label>{'Character'}</Label>
             <div className={cls(card, 'p-5')}>
               <div className="grid grid-cols-4 gap-y-4 justify-items-center">
@@ -358,36 +370,30 @@ export function BotEditor({ ws, bot: initial, onDone }) {
               <div className="border-t border-white/10 mt-5 pt-4">
                 <button onClick={() => update({ avatar: randomAvatar() })} className="text-sky-400 text-[17px]">{'Random character'}</button></div>
             </div>
-            <Caption>{'How this Bot looks everywhere'}</Caption>
 
             <Label>{'Model'}</Label>
             <ModelPicker f={f} setF={setF} providers={providers} pl={pl} onCommit={(v) => commit(v)} />
 
-            {!(bot && local) && <div className="mt-5"><Row icon={<FiFileText />} label="Instructions" onClick={() => setScreen('instructions')} /></div>}
-            {bot && local && <><Label>Memory</Label><MemoryFiles bot={bot} tick={ws.tick} open={setScreen} /></>}
-
             {bot && <><Label>{'Routines'}</Label><Routines bot={bot} pl={pl} tick={ws.tick} /></>}
 
             {bot && local && <>
-              <div className={cls(card, 'mt-5 flex items-center justify-between px-5 py-4')}>
-                <span className="text-[17px]">{'Notifications'}</span>
+              <Label>{'Notifications'}</Label>
+              <div className={cls(card, 'flex items-center justify-between px-5 py-4')}>
+                <span className="text-[17px]">{'Notify me'}</span>
                 <Toggle on={f.notify} label="notify" onChange={(on) => update({ notify: on })} />
               </div>
-              <Caption>{'Get notified when this Bot finishes or needs an answer'}</Caption>
-              <div className={cls(card, 'mt-5 flex items-center justify-between px-5 py-4')}>
+              <Label>{'Workspaces'}</Label>
+              <BotWorkspaces bot={bot} tick={ws.tick} />
+              <Label>{'Terminal'}</Label>
+              <div className={cls(card, 'flex items-center justify-between px-5 py-4')}>
                 <span className="text-[17px]">{'Linux terminal'}</span>
                 <Toggle on={hasTerminal} label="Linux terminal" onChange={(on) => update({ tools: setTool(f.tools, 'linux.*', on) })} />
               </div>
-              <Caption>{'On by default once Linux is installed (Settings → Linux terminal). The bot runs commands in its own Linux shell; each command asks you first unless you change that in Settings.'}</Caption>
             </>}
-
-            {bot && <div className="mt-5"><Row icon={<FiShare className="text-sky-400" />} label={<span className="text-sky-400">{'Share as template'}</span>} onClick={shareTemplate} right={<span />} /></div>}
-
-            <div className="mt-5"><Advanced f={f} set={set} ws={ws} bot={bot} pl={pl} onSave={bot ? () => commit() : null} /></div>
 
             {!bot && <button onClick={create} className="lb-press mt-6 w-full rounded-full bg-white text-black py-4 text-[17px] font-semibold">{'Create bot'}</button>}
             {err && <div className="text-sm text-rose-300 mt-3">{err}</div>}
-          </div> : <div key={tab} className="lb-rise mt-4"><MediaTabs tab={tab} conversationId={conv?.id} pl={pl} tick={ws.tick} /></div>}
+          </div>
         </>}
       </div>
     </div>
