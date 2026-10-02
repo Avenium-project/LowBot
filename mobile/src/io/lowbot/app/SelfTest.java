@@ -411,7 +411,6 @@ public class SelfTest extends BroadcastReceiver {
         check(w.processPings() == 0 && w.find(bid, "btc").optInt("dropped") == 1, "watcher pings faster than min_interval are dropped");
         write(new File(dir(w.pings, "bot_doesnotexist"), "ping-3.json"), J.obj("bot", bid, "message", "forged").toString());
         check(w.processPings() == 0, "a ping from an unknown bot folder is ignored (bot comes from the folder, not the file)");
-        b.engine.drain(20000);
         JSONObject bare = b.bots.create(J.obj("name", "NoTerm", "tools", new JSONArray().put("web.fetch").put("-linux.*")), null);
         java.util.Map<String, io.lowbot.engine.Tools.Spec> tools = b.tools.forBot(b.bots.get(bare.optString("id")), null, null);
         check(!tools.containsKey("watcher.start") && !tools.containsKey("linux.run"), "terminal off also switches watchers off");
