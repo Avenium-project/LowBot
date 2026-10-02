@@ -118,7 +118,6 @@ function Advanced({ f, set, ws, bot, pl, onSave }) {
           <Field label={t('computerMode')}><select className={inputCls} value={f.computer_mode} onChange={set('computer_mode')}><option value="shared">{t('shared')}</option><option value="isolated">{t('isolated')}</option></select></Field>
           <Field label={t('budget')}><input className={inputCls} type="number" step="0.01" value={f.budget} onChange={set('budget')} /></Field>
         </div>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.can_create_bots} onChange={set('can_create_bots')} /> {'can create bots'}</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.team_memory_access} onChange={set('team_memory_access')} /> {'team knowledge access'}</label>
         {onSave && <Button kind="primary" onClick={onSave}><FiCpu /> {'Save'}</Button>}
       </div>
@@ -265,7 +264,7 @@ export function BotEditor({ ws, bot: initial, onDone }) {
     const out = { name: v.name, avatar: v.avatar || randomAvatar(), role_description: v.role_description, instructions: v.instructions,
       provider_profile_id: v.provider_profile_id || null, model: v.model || null,
       tools: v.tools.split(',').map((x) => x.trim()).filter(Boolean), org_role: v.org_role || null, reports_to: v.reports_to || null,
-      computer_mode: v.computer_mode, can_create_bots: v.can_create_bots, team_memory_access: v.team_memory_access,
+      computer_mode: v.computer_mode, team_memory_access: v.team_memory_access,
       budget: v.budget === '' ? {} : { max_cost_per_day: Number(v.budget) } };
     if (local) { out.label = v.label; out.notify = v.notify; }
     return out;
@@ -292,8 +291,9 @@ export function BotEditor({ ws, bot: initial, onDone }) {
   const conv = bot && ws.conversations.find((c) => c.kind === 'private' && c.default_bot_id === bot.id);
   const tabs = [['info', 'Info'], ['links', 'Links'], ['media', 'Media'], ['files', 'Files']];
   const toolList = f.tools.split(',').map((x) => x.trim()).filter(Boolean);
-  const hasTerminal = toolList.includes('linux.*') || toolList.includes('linux.run');
-  const setTool = (_, name, on) => (on ? [...toolList.filter((x) => !x.startsWith('linux.')), name] : toolList.filter((x) => !x.startsWith('linux.'))).join(', ');
+  // The Linux terminal is on for every bot once Linux is installed; switching it off stores "-linux.*".
+  const hasTerminal = !toolList.includes('-linux.*');
+  const setTool = (_, __, on) => (on ? toolList.filter((x) => x !== '-linux.*') : [...toolList.filter((x) => x !== '-linux.*'), '-linux.*']).join(', ');
 
   return (
     <div className="fixed inset-0 z-40 bg-[#141414] flex flex-col lb-page-in">
@@ -378,7 +378,7 @@ export function BotEditor({ ws, bot: initial, onDone }) {
                 <span className="text-[17px]">{'Linux terminal'}</span>
                 <Toggle on={hasTerminal} label="Linux terminal" onChange={(on) => update({ tools: setTool(f.tools, 'linux.*', on) })} />
               </div>
-              <Caption>{'Lets this bot run commands in its own Linux on this phone (Settings → Linux terminal). Each command asks you first unless you change that in Settings.'}</Caption>
+              <Caption>{'On by default once Linux is installed (Settings → Linux terminal). The bot runs commands in its own Linux shell; each command asks you first unless you change that in Settings.'}</Caption>
             </>}
 
             {bot && <div className="mt-5"><Row icon={<FiShare className="text-sky-400" />} label={<span className="text-sky-400">{'Share as template'}</span>} onClick={shareTemplate} right={<span />} /></div>}

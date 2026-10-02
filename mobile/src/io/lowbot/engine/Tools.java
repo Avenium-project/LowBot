@@ -189,7 +189,8 @@ public final class Tools {
         Map<String, Spec> out = new TreeMap<String, Spec>();
         List<String> allowed = J.strings(bot.optJSONArray("tools"));
         for (Map.Entry<String, Spec> e : all(bot).entrySet()) {
-            if (!J.anyGlob(allowed, e.getKey()) && !J.anyGlob(MIND_TOOLS, e.getKey())) continue;
+            if (!J.anyGlob(allowed, e.getKey()) && !J.anyGlob(ALWAYS, e.getKey())) continue;
+            if (excluded(allowed, e.getKey())) continue;
             if (skillTools != null && !skillTools.isEmpty() && !J.anyGlob(skillTools, e.getKey())) continue;
             if (e.getValue().requires != null && caps != null && !caps.contains(e.getValue().requires)) continue;
             out.put(e.getKey(), e.getValue());
@@ -201,4 +202,15 @@ public final class Tools {
 
     /** Every bot can keep its own memory files (soul.md still needs approval). */
     static final List<String> MIND_TOOLS = java.util.Arrays.asList("memory.save", "memory.search", "memory.forget", "handoff.write", "soul.update", "project.use", "project.update_rules");
+
+    /** Available to every bot: its memory files, managing the team (create/update/delete still ask the user),
+     *  its own role, and — once Linux is installed — its Linux terminal (each command asks the user). */
+    static final List<String> ALWAYS = new java.util.ArrayList<String>(MIND_TOOLS);
+    static { ALWAYS.addAll(java.util.Arrays.asList("bot.*", "self.set_role", "linux.*")); }
+
+    /** "-linux.*" in a bot's tool list switches that tool off for the bot. */
+    public static boolean excluded(List<String> allowed, String name) {
+        for (String a : allowed) if (a.startsWith("-") && J.glob(a.substring(1), name)) return true;
+        return false;
+    }
 }

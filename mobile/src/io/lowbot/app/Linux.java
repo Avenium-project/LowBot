@@ -110,6 +110,12 @@ public final class Linux {
         return sizeCache;
     }
 
+    /** Bots get the terminal tools once Linux is installed (and the runtime is in this build). */
+    void syncCapability() {
+        if (available() && installed()) backend.extraCapabilities.add("linux");
+        else backend.extraCapabilities.remove("linux");
+    }
+
     // ------------------------------------------------------------- install
     public synchronized JSONObject install() {
         if (!available()) throw new ApiError(501, "This build of LowBot does not include the Linux runtime (proot).");
@@ -168,6 +174,7 @@ public final class Linux {
         deleteTree(rootfs);
         if (!staging.renameTo(rootfs)) throw new Exception("Could not move the Linux files into place.");
         installedVersion = pin.getString("version");
+        syncCapability();
     }
 
     public synchronized void remove() {
@@ -175,6 +182,7 @@ public final class Linux {
         deleteTree(rootfs);
         deleteTree(new File(base, "rootfs.new"));
         installedVersion = null;
+        syncCapability();
         state = "idle";
         emit();
     }
@@ -341,7 +349,7 @@ public final class Linux {
 
     // ------------------------------------------------------------- tools
     void register(Tools reg) {
-        if (available()) backend.extraCapabilities.add("linux");
+        syncCapability();
         reg.register(new Spec("linux.run", "Run a shell command in your own Linux (Alpine, /bin/sh) on this phone. Your shell persists between calls "
                 + "(cd, variables, background jobs). Install software with `apk add <pkg>` (e.g. python3, git, nodejs, curl). "
                 + "Shared workspace files are in /workspace. Prefer short, non-interactive commands; output is stdout+stderr.",

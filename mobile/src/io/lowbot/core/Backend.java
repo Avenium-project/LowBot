@@ -41,7 +41,7 @@ public final class Backend {
     public final Tools tools = new Tools();
     public final Engine engine;
     public volatile Platform platform;
-    public final Set<String> extraCapabilities = new HashSet<String>();
+    public final Set<String> extraCapabilities = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<String, Boolean>());
 
     public static synchronized Backend get(Context ctx) {
         if (instance == null) {

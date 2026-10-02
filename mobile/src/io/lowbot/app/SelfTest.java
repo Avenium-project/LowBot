@@ -119,7 +119,9 @@ public class SelfTest extends BroadcastReceiver {
                         J.obj("name", "Researcher", "soul", "# Researcher\nFinds sources.", "workspace", "team"))))
                 .put(J.obj("after_tool", "bot.create", "reply", "hired: {{last}}"))
                 .put(J.obj("when", "fire the researcher", "call", J.obj("name", "bot.delete", "arguments", J.obj("bot", "researcher", "reason", "test"))))
-                .put(J.obj("after_tool", "bot.delete", "reply", "removed: {{last}}"));
+                .put(J.obj("after_tool", "bot.delete", "reply", "removed: {{last}}"))
+                .put(J.obj("when", "you handle my trading", "call", J.obj("name", "self.set_role", "arguments", J.obj("role", "Trading research and paper trading"))))
+                .put(J.obj("after_tool", "self.set_role", "reply", "role set"));
         JSONObject prov = api(r, "POST", "/api/v2/providers", J.obj("kind", "scripted_mock", "name", "Mock", "script", script));
         check(prov.optBoolean("is_mock"), "mock provider is labelled");
         JSONObject bot = api(r, "POST", "/api/v2/bots", J.obj("name", "Asystent", "role_description", "test"));
@@ -242,6 +244,16 @@ public class SelfTest extends BroadcastReceiver {
         b.approvals.decide(aFire.optString("id"), "approve", aFire.optString("args_hash"));
         b.engine.drain(20000);
         check(b.bots.byHandle("researcher") == null && !b.mind.members("team").contains(researcher.optString("id")), "bot deleted another bot");
+
+        // 7e. A bot sets its own role from what the user asks; team tools need no per-bot switch
+        api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "from now on you handle my trading"));
+        b.engine.drain(20000);
+        check("Trading research and paper trading".equals(b.bots.get(bot.optString("id")).optString("role_description")), "bot sets its own role");
+        JSONObject bare = api(r, "POST", "/api/v2/bots", J.obj("name", "Bare", "tools", new JSONArray().put("web.fetch").put("-linux.*")));
+        java.util.Map<String, io.lowbot.engine.Tools.Spec> bareTools = b.tools.forBot(b.bots.get(bare.optString("id")), null, null);
+        check(bareTools.containsKey("bot.create") && bareTools.containsKey("self.set_role") && !bareTools.containsKey("linux.run"),
+                "team tools always available; -linux.* switches the terminal off");
+        b.bots.delete(bare.optString("id"));
 
         // 8. Always allow stores a rule for this bot + tool
         JSONObject t8 = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "post it again")).optJSONArray("tasks").getJSONObject(0);

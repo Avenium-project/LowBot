@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { FiArrowUp, FiCheckCircle, FiChevronLeft, FiClock, FiLock, FiMic, FiMonitor, FiPaperclip, FiPlus, FiSquare, FiStopCircle, FiXCircle } from 'react-icons/fi';
 import { api, downloadPath, fetchBlobUrl, isLocal, pendingOutbox, sendMessage } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
@@ -18,6 +19,12 @@ function dayLabel(iso, lang) {
   if (d.toDateString() === y.toDateString()) return `${'Yesterday'} ${time}`;
   return d.toLocaleString(lang, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 }
+
+// Markdown: GFM tables, task lists, strikethrough; links open outside the app; tables scroll sideways.
+const MD = {
+  a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-sky-400 underline underline-offset-2">{children}</a>,
+  table: ({ children }) => <div className="lb-table"><table>{children}</table></div>,
+};
 
 const isImage = (a) => a.kind === 'image' || /^image\//.test(a.mime || '') || /\.(png|jpe?g|gif|webp)$/i.test(a.name || '');
 function fmtSize(n) { return !n ? '' : n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`; }
@@ -119,7 +126,7 @@ function Bubble({ m, bot, showName, onOpenComputer, animate }) {
         onlyFile ? 'p-0' : 'px-4 py-3', onlyFile ? '' : mine ? 'bg-[#3a3a3c] text-white' : 'bg-[#262626] text-zinc-100')}>
         {showName && bot && <div className="flex items-center gap-1.5 mb-1 text-[13px] text-zinc-400"><BotBlob bot={bot} size={18} still />{bot.name}</div>}
         {onlyFile ? null : mine ? <div className="whitespace-pre-wrap">{m.text}</div>
-          : <div className="lb-md prose prose-invert max-w-none prose-p:my-1 prose-pre:my-2 text-[16px]"><ReactMarkdown>{m.text}</ReactMarkdown></div>}
+          : <div className="lb-md prose prose-invert max-w-none prose-p:my-1 prose-pre:my-2 prose-headings:mt-3 prose-headings:mb-1.5 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 text-[16px]"><ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>{m.text}</ReactMarkdown></div>}
         {m.attachments?.length > 0 && <div className={cls('flex flex-col gap-1.5', mine && 'items-end')}>{m.attachments.map((a, i) => <Attachment key={i} a={a} />)}</div>}
       </div>
     </div>

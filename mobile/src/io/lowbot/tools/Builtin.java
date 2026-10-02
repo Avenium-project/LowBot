@@ -477,6 +477,18 @@ public final class Builtin {
             }
         }));
 
+        reg.register(new Spec("self.set_role", "Set your own role: one short line saying what you do for the user (shown under your name). "
+                + "Call it when the user's requests make your job clear, or when your work has clearly changed.",
+                Tools.obj(props("role", S), "role"), Tools.INTERNAL, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) throws Exception {
+                String role = a.optString("role").replaceAll("\\s+", " ").trim();
+                if (role.isEmpty()) throw new ToolError("Give a short role.");
+                if (role.length() > 160) role = role.substring(0, 157) + "…";
+                ctx.b.bots.update(ctx.bot.optString("id"), J.obj("role_description", role));
+                return J.obj("role", role);
+            }
+        }));
+
         reg.register(new Spec("bot.update", "Change another bot's profile (the user approves): name, role, model or its soul.md. (Its character sprite is chosen at random.) Tools and permissions cannot be changed by bots.",
                 Tools.obj(props("bot", S, "name", S, "role_description", S, "model", S, "soul", S), "bot"), Tools.INTERNAL, "ask", new Tools.Executor() {
             public Object run(Ctx ctx, JSONObject a) throws Exception {

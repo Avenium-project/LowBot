@@ -141,14 +141,14 @@ public final class Bots {
         List<String> tools = toolsArr != null && toolsArr.length() > 0 ? J.strings(toolsArr) : Arrays.asList(DEFAULT_TOOLS);
         JSONArray policy = d.optJSONArray("policy") == null ? new JSONArray() : d.optJSONArray("policy");
         // Every bot may manage the team by default (creating/deleting still needs the user's approval).
-        boolean canCreate = !d.has("can_create_bots") || J.bool(d, "can_create_bots");
+        boolean canCreate = true; // every bot may manage the team (create/delete ask the user)
         if (db.count("SELECT COUNT(*) FROM bots") >= MAX_BOTS) throw new ApiError(409, "Bot limit reached (" + MAX_BOTS + "). Delete a bot first.");
         if (createdBy != null) {
-            if (!createdBy.optBoolean("can_create_bots")) throw new ApiError(403, "This bot is not allowed to create bots.");
             List<String> parent = J.strings(createdBy.optJSONArray("tools"));
             boolean explicit = toolsArr != null && toolsArr.length() > 0;
             List<String> granted = new ArrayList<String>(), missing = new ArrayList<String>();
             for (String t : tools) {
+                if (t.startsWith("-")) { granted.add(t); continue; }
                 boolean ok = false;
                 for (String p : parent) if (p.equals(t) || J.glob(p, t)) ok = true;
                 if (ok) granted.add(t); else missing.add(t);
@@ -163,7 +163,7 @@ public final class Bots {
                 if (r != null && !"allow".equals(r.optString("effect"))) merged.put(r);
             }
             policy = merged;
-            canCreate = createdBy.optBoolean("can_create_bots");
+            canCreate = true;
         }
         final String id = J.id("bot");
         String handle = J.str(d, "handle", null);
@@ -198,6 +198,7 @@ public final class Bots {
     public JSONObject update(final String id, final JSONObject d) {
         require(id);
         checkFields(d, false);
+        d.remove("can_create_bots"); // always on
         validate(d);
         String rt = J.str(d, "reports_to", null);
         if (id.equals(rt)) throw new ApiError(422, "A bot cannot report to itself.");
@@ -356,6 +357,7 @@ public final class Bots {
             t.put("linux.*");
             db.exec("UPDATE bots SET tools_json = ? WHERE id = ?", t.toString(), r.optString("id"));
         }
+        db.exec("UPDATE bots SET can_create_bots = 1");
         b.core.kvSet("upgrade:linux_tools", "1");
     }
 

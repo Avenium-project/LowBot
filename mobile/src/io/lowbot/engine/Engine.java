@@ -876,10 +876,15 @@ public final class Engine {
                     .append(J.truncate(o.optString("role_description"), 80)).append(members.contains(o.optString("id")) ? " (in this chat)" : "");
         }
         if (roster.length() > 0) parts.add("Other bots you can message or delegate to:" + roster);
-        if (b.capabilities().contains("linux") && J.anyGlob(J.strings(bot.optJSONArray("tools")), "linux.run"))
+        if (b.capabilities().contains("linux") && !Tools.excluded(J.strings(bot.optJSONArray("tools")), "linux.run"))
             parts.add("You HAVE a Linux terminal: linux.run runs shell commands in your own Alpine Linux on this phone (persistent shell, "
                     + "`apk add` to install python3, git, nodejs…; shared files in /workspace). Use it whenever a task needs code or command-line tools. "
                     + "If it reports that Linux is not installed, ask the user to install it in Settings → Linux terminal.");
+        parts.add(bot.optString("role_description").trim().isEmpty()
+                ? "You have no role yet. As soon as the user's requests show what you are for, call self.set_role with one short line (in the user's language)."
+                : "Your role: " + bot.optString("role_description") + ". If the user's requests clearly change what you do, update it with self.set_role.");
+        parts.add("Formatting: reply in Markdown — headings, bullet lists, **bold**, `code`, fenced code blocks and tables (| a | b | with a header separator row) "
+                + "render nicely in the app. Put each table row on its own line.");
         parts.add("Team management: you can see the team (bot.list), write to another bot (bot.message), hand it work (task.delegate), "
                 + "create a new bot when a job needs a specialist (bot.create — give it a clear soul), change a bot's profile (bot.update) "
                 + "and delete a bot that is no longer needed (bot.delete). Creating, changing and deleting bots needs the user's approval. "
