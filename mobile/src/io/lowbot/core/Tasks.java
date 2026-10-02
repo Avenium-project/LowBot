@@ -140,7 +140,21 @@ public final class Tasks {
 
     // ----------------------------------------------------------------- messages
     public List<JSONObject> messages(String cid, long after, int limit) {
-        List<JSONObject> rows = db.all("SELECT * FROM messages WHERE conversation_id = ? AND seq > ? ORDER BY seq LIMIT ?", cid, after, limit);
+        return messages(cid, after, limit, null, false);
+    }
+
+    public List<JSONObject> messages(String cid, long after, int limit, Long before, boolean latest) {
+        // All three directions use the existing (conversation_id, seq) index.
+        List<JSONObject> rows;
+        if (before != null) {
+            rows = db.all("SELECT * FROM messages WHERE conversation_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?", cid, before, limit);
+            java.util.Collections.reverse(rows);
+        } else if (latest) {
+            rows = db.all("SELECT * FROM messages WHERE conversation_id = ? ORDER BY seq DESC LIMIT ?", cid, limit);
+            java.util.Collections.reverse(rows);
+        } else {
+            rows = db.all("SELECT * FROM messages WHERE conversation_id = ? AND seq > ? ORDER BY seq LIMIT ?", cid, after, limit);
+        }
         for (JSONObject r : rows) {
             J.put(r, "mentions", J.parseArr(r.optString("mentions_json")));
             J.put(r, "attachments", J.parseArr(r.optString("attachments_json")));
@@ -192,7 +206,7 @@ public final class Tasks {
                 // Steering: a message to a bot that is already working on this chat's request joins that run
                 // (the bot sees it before its next step) instead of starting a second task.
                 String steerTask = null;
-                if (targets.size() == 1 && skill == null) steerTask = activeUserTask(cid, targets.get(0).optString("id"));
+                if (targets.size() == 1 && skill == null) steerTask = activeTask(cid, targets.get(0).optString("id"));
                 JSONObject msg = insertMessage(cid, "user", Core.OWNER, text, mentions, null, clientMsgId, threadRoot, attachments,
                         steerTask == null ? null : J.obj("steer", steerTask));
                 JSONArray tasks = new JSONArray();
@@ -200,7 +214,13 @@ public final class Tasks {
                     tasks.put(createTask(bot.optString("id"), cid, "user", Core.OWNER, text, J.truncate(text, 80), "",
                             null, PRIORITY_USER, msg.optString("id"), skill, null));
                 }
-                else b.core.emit("task.steered", cid, steerTask, null, targets.get(0).optString("id"), J.obj("message_id", msg.optString("id")));
+                else {
+                    // A question must be answered even while an earlier action waits
+                    // for approval/delegated work. Its tool step keeps that wait intact.
+                    db.exec("UPDATE runs SET status = 'queued', updated_at = ? WHERE task_id = ? AND status IN ('waiting_approval','waiting_dependency')",
+                            J.nowIso(), steerTask);
+                    b.core.emit("task.steered", cid, steerTask, null, targets.get(0).optString("id"), J.obj("message_id", msg.optString("id")));
+                }
                 out[0] = J.obj("message_id", msg.optString("id"), "seq", msg.optLong("seq"), "tasks", tasks, "duplicate", false, "steered_task", steerTask);
             }
         });
@@ -243,17 +263,27 @@ public final class Tasks {
         return any ? sb.toString() : text;
     }
 
-    /** The bot's in-progress task for a user request in this chat (not one parked on a question). */
-    String activeUserTask(String cid, String botId) {
+    /** The bot's in-progress task in this chat (not one parked on a question). */
+    String activeTask(String cid, String botId) {
         return db.scalar("SELECT t.id FROM tasks t JOIN runs r ON r.task_id = t.id WHERE t.conversation_id = ? AND t.bot_id = ? "
-                + "AND t.requester_type = 'user' AND r.status IN ('queued','running','retry_scheduled','waiting_approval','waiting_dependency') "
+                + "AND r.status IN ('queued','running','retry_scheduled','waiting_approval','waiting_dependency') "
                 + "ORDER BY t.created_at DESC LIMIT 1", cid, botId);
     }
 
     /** Steering messages for a task, oldest first. */
     public List<JSONObject> steerMessages(String taskId) {
-        return db.all("SELECT id, text, created_at, attachments_json FROM messages WHERE author_type = 'user' AND meta_json LIKE ? ORDER BY seq",
-                "%\"steer\":\"" + taskId + "\"%");
+        return db.all("SELECT id, seq, text, created_at, attachments_json FROM messages WHERE conversation_id = "
+                + "(SELECT conversation_id FROM tasks WHERE id = ?) AND author_type = 'user' AND meta_json LIKE ? ORDER BY seq",
+                taskId, "%\"steer\":\"" + taskId + "\"%");
+    }
+
+    /** Earliest message not yet acknowledged. The seq cursor survives engine restarts. */
+    public JSONObject pendingSteer(JSONObject task, String runId) {
+        JSONObject last = db.one("SELECT output_json FROM run_steps WHERE run_id = ? AND kind = 'steering' AND status = 'completed' ORDER BY seq DESC", runId);
+        long after = last == null ? 0 : J.parse(last.optString("output_json")).optLong("message_seq");
+        return db.one("SELECT id, seq, text, created_at, attachments_json FROM messages WHERE conversation_id = ? AND seq > ? "
+                + "AND author_type = 'user' AND meta_json LIKE ? ORDER BY seq", task.optString("conversation_id"), after,
+                "%\"steer\":\"" + task.optString("id") + "\"%");
     }
 
     List<JSONObject> route(JSONObject conv, List<String> mentions) {
@@ -362,8 +392,6 @@ public final class Tasks {
                 String now = J.nowIso();
                 String corr = parent != null ? parent.optString("correlation_id") : J.id("corr");
                 String root = parent != null ? (J.str(parent, "root_task_id", null) != null ? parent.optString("root_task_id") : parent.optString("id")) : null;
-                JSONObject budget = bot.optJSONObject("budget");
-                int maxSteps = budget != null && budget.optInt("max_steps") > 0 ? budget.optInt("max_steps") : b.core.settings.defaultMaxSteps;
                 db.insert("tasks", J.obj("id", tid, "conversation_id", cid, "bot_id", botId, "requester_type", requesterType,
                         "requester_id", requesterId, "parent_task_id", parent == null ? null : parent.optString("id"), "root_task_id", root,
                         "correlation_id", corr, "depth", parent == null ? 0 : parent.optInt("depth") + 1,
@@ -372,7 +400,8 @@ public final class Tasks {
                         "skill_id", skill == null ? null : skill.optString("id"), "skill_version", skill == null ? null : skill.optInt("version"),
                         "source_message_id", sourceMessageId, "routine_run_id", routineRunId, "created_at", now, "updated_at", now));
                 db.insert("runs", J.obj("id", rid, "task_id", tid, "bot_id", botId, "status", bot.optBoolean("paused") ? "paused" : "queued",
-                        "priority", priority, "max_attempts", b.core.settings.maxAttempts, "max_steps", maxSteps,
+                        // Legacy NOT NULL column retained for database compatibility; no step cap is enforced.
+                        "priority", priority, "max_attempts", b.core.settings.maxAttempts, "max_steps", 0,
                         "created_at", now, "updated_at", now));
                 b.core.emit("task.created", cid, tid, rid, botId, J.obj("title", title, "requester_type", requesterType,
                         "requester_id", requesterId, "parent_task_id", parent == null ? null : parent.optString("id")));
@@ -496,6 +525,8 @@ public final class Tasks {
             if (lastModel == null || at.compareTo(lastModel) > 0) lastModel = at;
         }
         if (!"cancelled".equals(status)) for (JSONObject m : steerMessages(task.optString("id"))) {
+            if (db.one("SELECT id FROM messages WHERE task_id = ? AND author_type = 'bot' AND meta_json LIKE ?",
+                    task.optString("id"), "%\"steering_message_id\":\"" + m.optString("id") + "\"%") != null) continue;
             if (lastModel != null && m.optString("created_at").compareTo(lastModel) < 0) continue;
             createTask(task.optString("bot_id"), cid, "user", Core.OWNER, m.optString("text"), J.truncate(m.optString("text"), 80), "",
                     null, PRIORITY_USER, m.optString("id"), null, null);

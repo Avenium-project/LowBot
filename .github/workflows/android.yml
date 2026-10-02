@@ -17,12 +17,13 @@ jobs:
         with: { node-version: 22 }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "21" }
+      - name: Work service regression test
+        run: python3 -m unittest discover -s mobile/tests -v
       - uses: android-actions/setup-android@v3
         with: { packages: "platforms;android-35 build-tools;35.0.0" }
       - name: Build web UI
         run: npm --prefix client ci && npm --prefix client run build:export
       - name: Test APK (local test signing key)
-        env: { VERSION_CODE: "${{ github.run_number }}" }
         run: mobile/build-apk.sh test
       - name: Release APK (production key from secrets; skipped if absent)
         if: ${{ env.KEYSTORE_B64 != '' }}
@@ -30,7 +31,6 @@ jobs:
           LOWBOT_KEYSTORE_PASSWORD: ${{ secrets.LOWBOT_KEYSTORE_PASSWORD }}
           LOWBOT_KEY_ALIAS: ${{ secrets.LOWBOT_KEY_ALIAS }}
           LOWBOT_KEY_PASSWORD: ${{ secrets.LOWBOT_KEY_PASSWORD }}
-          VERSION_CODE: "${{ github.run_number }}"
         run: |
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
           cp mobile/build/LowBot-*-test.apk "$RUNNER_TEMP/" || true

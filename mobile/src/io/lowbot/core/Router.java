@@ -140,7 +140,19 @@ public final class Router {
             if ("members".equals(sub) && post) return Response.json(b.tasks.addMember(id, body.optString("bot_id")));
             if ("messages".equals(sub) && get) {
                 b.tasks.getConversation(id);
-                return Response.json(b.tasks.messages(id, Long.parseLong(q(u, "after", "0")), qi(u, "limit", 200, 500)));
+                long after;
+                Long before;
+                int limit;
+                try {
+                    after = Long.parseLong(q(u, "after", "0"));
+                    String cursor = q(u, "before", null);
+                    before = cursor == null ? null : Long.valueOf(cursor);
+                    limit = Integer.parseInt(q(u, "limit", "200"));
+                } catch (NumberFormatException e) { throw new ApiError(422, "Invalid message pagination."); }
+                boolean latest = Boolean.parseBoolean(q(u, "latest", "false"));
+                if (after < 0 || (before != null && before < 1) || limit < 1 || limit > 500
+                        || (after > 0 && (before != null || latest))) throw new ApiError(422, "Invalid message pagination.");
+                return Response.json(b.tasks.messages(id, after, limit, before, latest));
             }
             if ("messages".equals(sub) && post) {
                 if (body.optString("text").length() > 50000) throw new ApiError(422, "Message too long.");

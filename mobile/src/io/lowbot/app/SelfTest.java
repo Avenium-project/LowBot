@@ -54,6 +54,8 @@ public class SelfTest extends BroadcastReceiver {
             b = Backend.forTest(ctx, "selftest.db");
             b.start();
             b = scenario(ctx, b);
+            PriorityMessageTest.run(ctx);
+            StepLimitTest.run(ctx);
             browser(ctx, b);
             watchers(ctx, b);
             linux(ctx, b);
@@ -99,6 +101,7 @@ public class SelfTest extends BroadcastReceiver {
         check("ok".equals(api(r, "GET", "/api/v2/health", null).optString("status")), "health");
 
         JSONArray script = new JSONArray()
+                .put(J.obj("when", "\\[Priority user message\\]", "reply", J.obj("reply", "I'll add a footnote before finishing.", "todo", "add a footnote").toString()))
                 // First: the handoff request quotes the whole chat, which would match the rules below.
                 .put(J.obj("when", "Write the new handoff now", "reply", "## Goal\nKeep testing LowBot.\n## Next steps\n- continue"))
                 .put(J.obj("when", "take it into account", "reply", "steered: {{last}}"))
@@ -138,6 +141,7 @@ public class SelfTest extends BroadcastReceiver {
         JSONObject helper = api(r, "POST", "/api/v2/bots", J.obj("name", "Helper"));
         check("helper".equals(helper.optString("handle")), "handle from name");
         String cid = api(r, "POST", "/api/v2/bots/" + bot.optString("id") + "/conversation", null).optString("id");
+        messagePagination(b, bot.optString("id"));
 
         // 1. plain chat
         JSONObject sent = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "hello there", "client_msg_id", "c1"));
@@ -246,6 +250,10 @@ public class SelfTest extends BroadcastReceiver {
         JSONObject steerRes = api(r, "POST", "/api/v2/conversations/" + cidSteer + "/messages", J.obj("text", "add a footnote"));
         check(steerRes.optJSONArray("tasks").length() == 0 && tSteer.optString("id").equals(steerRes.optString("steered_task"))
                 && b.core.db.count("SELECT COUNT(*) FROM tasks WHERE conversation_id = ?", cidSteer) == before, "message while working steers the run (no second task)");
+        b.engine.drain(20000);
+        check(lastBotMessage(b, cidSteer).optString("text").contains("add a footnote")
+                && "waiting_approval".equals(runStatus(b, tSteer.optString("id"))), "priority reply is sent without waiting for approval or executing the tool");
+        check(b.tasks.requireTask(tSteer.optString("id")).optString("instructions").contains("- [ ] add a footnote"), "follow-up is persisted in the task checklist");
         JSONObject aSteer = b.approvals.list("pending").get(0);
         b.approvals.decide(aSteer.optString("id"), "deny", aSteer.optString("args_hash"));
         b.engine.drain(20000);
@@ -521,6 +529,37 @@ public class SelfTest extends BroadcastReceiver {
     }
 
     /** The bots' browser: open a page in an offscreen WebView and read it. Network may be unavailable in CI. */
+    static void messagePagination(final Backend b, String botId) {
+        final String cid = b.tasks.createConversation("group", java.util.Arrays.asList(botId), "History test").optString("id");
+        final String other = b.tasks.createConversation("group", java.util.Arrays.asList(botId), "Other history").optString("id");
+        b.core.db.tx(new Runnable() { public void run() {
+            for (int i = 0; i < 123; i++) {
+                b.tasks.insertMessage(cid, "user", "local-user", "history " + i, null, null, null, null, null, null);
+                b.tasks.insertMessage(other, "user", "local-user", "other", null, null, null, null, null, null);
+            }
+        } });
+        Router r = new Router(b);
+        String path = "/api/v2/conversations/" + cid + "/messages?limit=50";
+        JSONArray latest = api(r, "GET", path + "&latest=true", null).optJSONArray("items");
+        check(latest.length() == 50 && "history 73".equals(latest.optJSONObject(0).optString("text"))
+                && "history 122".equals(latest.optJSONObject(49).optString("text")), "history opens on last 50 messages");
+        JSONArray older = api(r, "GET", path + "&before=" + latest.optJSONObject(0).optLong("seq"), null).optJSONArray("items");
+        check(older.length() == 50 && "history 23".equals(older.optJSONObject(0).optString("text"))
+                && "history 72".equals(older.optJSONObject(49).optString("text")), "history older cursor has no overlap");
+        JSONArray oldest = api(r, "GET", path + "&before=" + older.optJSONObject(0).optLong("seq"), null).optJSONArray("items");
+        check(oldest.length() == 23 && "history 0".equals(oldest.optJSONObject(0).optString("text")), "history final partial page");
+        check(api(r, "GET", path + "&before=" + oldest.optJSONObject(0).optLong("seq"), null).optJSONArray("items").length() == 0, "history end");
+        long cursor = latest.optJSONObject(49).optLong("seq");
+        check(api(r, "GET", path + "&after=" + cursor, null).optJSONArray("items").length() == 0, "history unchanged delta is empty");
+        b.core.db.tx(new Runnable() { public void run() {
+            b.tasks.insertMessage(cid, "user", "local-user", "new message", null, null, null, null, null, null);
+        } });
+        JSONArray delta = api(r, "GET", path + "&after=" + cursor, null).optJSONArray("items");
+        check(delta.length() == 1 && "new message".equals(delta.optJSONObject(0).optString("text")), "history fetches only new messages");
+        for (String query : new String[]{"limit=-1", "limit=0", "limit=501", "before=0", "after=-1", "after=1&before=2"})
+            check(r.handle("GET", "/api/v2/conversations/" + cid + "/messages?" + query, null).status == 422, "history validates " + query);
+    }
+
     static void browser(Context ctx, Backend b) {
         Computer c = new Computer(ctx, b);
         try {

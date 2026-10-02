@@ -303,12 +303,6 @@ class Engine:
                         tasks.post_bot_message(task, result, route_mentions=False)
                     self._finish(run, task, "completed", result, None)
                 raise RunParked()
-            model_steps = sum(1 for s in steps if s["kind"] == "model")
-            if model_steps >= run["max_steps"]:
-                with self.db.tx():
-                    self._fence(run)
-                    self._finish(run, task, "failed", None, f"Step limit ({run['max_steps']}) reached.")
-                raise RunParked()
             await self._model_step(run, task, bot, steps)
 
     def _steps(self, run_id: str) -> List[Dict[str, Any]]:

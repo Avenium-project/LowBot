@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -10,6 +10,7 @@ import { ElicitationCard } from './InboxPanel';
 import { FileIcon, FileViewer, fmtSize } from './Files';
 import { WidgetChatCard } from './Widgets';
 import { BotBlob, cls } from './ui';
+import { useMessages } from './useMessages';
 
 const BUSY = ['working', 'queued', 'retrying', 'waiting'];
 
@@ -256,7 +257,7 @@ function WorkingStrip({ task, bot, onAnswer, special }) {
 
 export default function Conversation({ conversation, ws, onBack, skills, onOpenBot, onOpenComputer }) {
   const { t, lang } = useT();
-  const [messages, setMessages] = useState([]);
+  const { subscribe, connection } = ws;
   const [approvals, setApprovals] = useState([]);
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState([]);
@@ -269,6 +270,18 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
   const [firstUnread] = useState(conversation.unread > 0 ? conversation.last_read_seq : null);
   const endRef = useRef(null);
   const fileRef = useRef(null);
+  const scrollRef = useRef(null);
+  const scrollAnchor = useRef(null);
+  const stickToBottom = useRef(true);
+  const lastScrollTop = useRef(0);
+  const beforePrepend = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const top = el.getBoundingClientRect().top;
+    const anchor = Array.from(el.children).find((child) => child.getBoundingClientRect().bottom > top);
+    if (anchor) scrollAnchor.current = { element: anchor, top: anchor.getBoundingClientRect().top };
+  }, []);
+  const { messages, reload: reloadMessages, loadOlder } = useMessages(conversation.id, subscribe, connection, beforePrepend, setError);
   const botsById = useMemo(() => Object.fromEntries(ws.bots.map((b) => [b.id, b])), [ws.bots]);
   const members = conversation.bot_ids.map((id) => botsById[id]).filter(Boolean);
   const lead = members[0];
@@ -283,22 +296,42 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
   const convTaskIds = new Set(ws.tasks.filter((x) => x.conversation_id === conversation.id).map((x) => x.id));
   const elicitations = ws.elicitations.filter((e) => convTaskIds.has(e.task_id));
 
-  const load = useCallback(async () => {
-    const [rows, apr] = await Promise.all([
-      api(`/conversations/${conversation.id}/messages?limit=500`),
-      api('/approvals?status=').catch(() => []),
-    ]);
-    setMessages(rows);
+  const loadApprovals = useCallback(async () => {
+    const apr = await api('/approvals?status=').catch(() => []);
     setApprovals(apr.filter((a) => a.conversation_id === conversation.id && a.status !== 'invalidated'));
-    if (rows.length) api(`/conversations/${conversation.id}/read`, { method: 'POST', body: { seq: rows[rows.length - 1].seq } }).catch(() => {});
   }, [conversation.id]);
+  const load = useCallback(() => Promise.all([reloadMessages(), loadApprovals()]), [reloadMessages, loadApprovals]);
 
-  useEffect(() => { load(); }, [load, ws.tick]);
+  useEffect(() => { loadApprovals(); }, [loadApprovals, connection]);
+  useEffect(() => {
+    let timer;
+    const stop = subscribe((ev) => {
+      if (ev.conversation_id === conversation.id && ev.type.startsWith('approval.') && !timer)
+        timer = setTimeout(() => { timer = null; loadApprovals(); }, 100);
+    });
+    return () => { clearTimeout(timer); stop(); };
+  }, [conversation.id, subscribe, loadApprovals]);
   // Text shared from another app (Android share sheet) lands in the composer.
   useEffect(() => {
     if (window.__lowbotPendingShare) { setText(window.__lowbotPendingShare); window.__lowbotPendingShare = null; }
   }, []);
-  useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [messages.length, approvals.length, activeTasks.length]);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const anchor = scrollAnchor.current;
+    if (anchor) {
+      el.scrollTop += anchor.element.getBoundingClientRect().top - anchor.top;
+      scrollAnchor.current = null;
+    } else if (stickToBottom.current) el.scrollTop = el.scrollHeight;
+    lastScrollTop.current = el.scrollTop;
+  }, [messages, approvals.length, activeTasks.length]);
+
+  const onScroll = () => {
+    const el = scrollRef.current;
+    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (el.scrollTop < lastScrollTop.current && el.scrollTop < 120) loadOlder();
+    lastScrollTop.current = el.scrollTop;
+  };
 
   // Timeline: messages and approval cards ordered by time.
   const timeline = useMemo(() => messages.map((m) => ({ kind: 'msg', at: m.created_at, m }))
@@ -321,6 +354,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
     const att = attachments.map(({ artifact_id, name, kind }) => ({ artifact_id, name, kind }));
     attachments.forEach((a) => a.preview && URL.revokeObjectURL(a.preview));
     setText(''); setAttachments([]);
+    stickToBottom.current = true;
     try { await sendMessage(conversation.id, body, att); }
     catch (err) { setError(err.status ? err.message : ('Offline — will send when back online.')); }
     load();
@@ -459,7 +493,7 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
           className="h-12 w-12 shrink-0 rounded-full bg-[#2a2a2a]/95 border border-white/10 flex items-center justify-center text-xl"><FiMonitor /></button>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 pt-20 pb-2 min-h-0">
+      <div ref={scrollRef} onScroll={onScroll} style={{ overflowAnchor: 'none' }} className="flex-1 overflow-y-auto px-4 pt-20 pb-2 min-h-0">
         {timeline.map((it, i) => {
           const at = new Date(it.at).getTime();
           const sep = lastAt === null || at - lastAt > 10 * 60 * 1000;

@@ -58,6 +58,38 @@ def test_message_flow_and_idempotent_post(client):
     assert tree["run"]["status"] == "completed" and tree["steps"][0]["kind"] == "model"
 
 
+def test_message_history_pages_and_incremental_updates(client):
+    bot, conv = setup_bot(client, [])
+    tasks = app.state.v2.services["tasks"]
+    other = tasks.create_conversation("group", [bot["id"]])
+    ids = []
+    with tasks.db.tx():
+        for i in range(123):
+            ids.append(tasks._insert_message(conv["id"], "user", "owner", f"history {i}")["id"])
+            tasks._insert_message(other["id"], "user", "owner", "other conversation")
+    url = f"/api/v2/conversations/{conv['id']}/messages"
+    latest = client.get(url, params={"latest": True, "limit": 50}).json()
+    assert [m["id"] for m in latest] == ids[-50:]
+    older = client.get(url, params={"before": latest[0]["seq"], "limit": 50}).json()
+    assert [m["id"] for m in older] == ids[-100:-50]
+    oldest = client.get(url, params={"before": older[0]["seq"], "limit": 50}).json()
+    assert [m["id"] for m in oldest] == ids[:-100]
+    assert client.get(url, params={"before": oldest[0]["seq"], "limit": 50}).json() == []
+    assert client.get(url, params={"after": latest[-1]["seq"], "limit": 50}).json() == []
+    with tasks.db.tx():
+        new = tasks._insert_message(conv["id"], "bot", bot["id"], "new reply", meta={"test": True})
+    appended = client.get(url, params={"after": latest[-1]["seq"], "limit": 50}).json()
+    assert [m["id"] for m in appended] == [new["id"]]
+    assert appended[0]["meta"] == {"test": True} and appended[0]["attachments"] == []
+    # New inserts do not shift an exclusive older cursor (unlike OFFSET paging).
+    assert client.get(url, params={"before": latest[0]["seq"], "limit": 50}).json() == older
+    # Legacy forward reads used by the engine and other callers keep their order.
+    assert [m["id"] for m in client.get(url, params={"after": 0, "limit": 2}).json()] == ids[:2]
+    for params in ({"limit": 0}, {"limit": -1}, {"limit": 501}, {"before": 0},
+                   {"after": -1}, {"after": 1, "before": 2}, {"after": 1, "latest": True}):
+        assert client.get(url, params=params).status_code == 422
+
+
 def test_approval_over_http(client):
     b, conv = setup_bot(client, [{"when": "remember", "call": {"name": "memory.save", "arguments": {"content": "x"}}},
                                  {"on": "tool", "reply": "stored"}],
