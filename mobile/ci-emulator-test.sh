@@ -22,7 +22,7 @@ grep -qE "na tym telefonie|on this phone" ui.xml
 grep -qE "xAI API|OpenCode Go" ui.xml && echo "provider presets loaded through the native bridge" || echo "presets not visible in the accessibility tree (not fatal)"
 
 # Home-screen widgets must be offered by the launcher's widget picker.
-widgets=$(adb shell dumpsys appwidget | grep -oE "io\.lowbot\.app/\.(BotsWidget|CardWidget)" | sort -u | tr '\n' ' ')
+widgets=$(adb shell dumpsys appwidget | grep -oE "io\.lowbot\.app/[a-z.]*(BotsWidget|CardWidget)" | sort -u | tr '\n' ' ' || true)
 echo "widget providers: $widgets"
 case "$widgets" in *BotsWidget*CardWidget*) echo "home-screen widgets registered" ;; *) echo "home-screen widgets missing"; exit 1 ;; esac
 
