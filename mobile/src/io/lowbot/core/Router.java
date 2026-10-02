@@ -159,7 +159,7 @@ public final class Router {
         // -------------------------------------------------------------- tasks
         if (a.equals("tasks")) {
             if (id == null && get) {
-                StringBuilder sql = new StringBuilder("SELECT t.*, r.id AS run_id, r.status AS run_status FROM tasks t LEFT JOIN runs r ON r.task_id = t.id WHERE 1 = 1");
+                StringBuilder sql = new StringBuilder("SELECT t.*, r.id AS run_id, r.status AS run_status, r.phase AS run_phase FROM tasks t LEFT JOIN runs r ON r.task_id = t.id WHERE 1 = 1");
                 List<Object> args = new ArrayList<Object>();
                 String st = q(u, "status", null);
                 if ("active".equals(st)) sql.append(" AND t.status NOT IN ('completed','failed','cancelled')");

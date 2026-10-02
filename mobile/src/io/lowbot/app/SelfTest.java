@@ -105,6 +105,7 @@ public class SelfTest extends BroadcastReceiver {
                 .put(J.obj("when", "Write the new handoff now", "reply", "## Goal\nKeep testing LowBot.\n## Next steps\n- continue"))
                 .put(J.obj("when", "take it into account", "reply", "steered: {{last}}"))
                 .put(J.obj("when", "add a footnote", "reply", "noted, I will add a footnote"))
+                .put(J.obj("when", "nothing left here", "reply", "NO_REPLY"))
                 .put(J.obj("when", "exchange keys", "call", J.obj("name", "secret.request", "arguments", J.obj("description", "Exchange API credentials",
                         "fields", new JSONArray().put(J.obj("name", "EX_KEY", "description", "API key")).put(J.obj("name", "EX_SECRET", "description", "API secret"))))))
                 .put(J.obj("when", "mail widget", "call", J.obj("name", "widget.create", "arguments",
@@ -254,6 +255,14 @@ public class SelfTest extends BroadcastReceiver {
         check("waiting_approval".equals(runStatus(b, tSteer.optString("id")))
                 && b.core.db.count("SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND author_type = 'bot' AND text LIKE '%add a footnote%'", cidSteer) == 1,
                 "the bot answers at once while its long task still runs");
+        check("typing".equals(b.core.db.scalar("SELECT r.phase FROM runs r JOIN tasks t ON t.id = r.task_id WHERE t.conversation_id = ? AND t.expected_output = 'quick_reply'", cidSteer)),
+                "a quick reply shows as typing");
+        JSONObject fu = b.tasks.createTask(helper.optString("id"), cidSteer, "user", io.lowbot.core.Core.OWNER, "nothing left here", "nothing left here",
+                io.lowbot.core.Tasks.FOLLOW_UP, null, io.lowbot.core.Tasks.PRIORITY_USER, null, null, null);
+        b.engine.drain(20000);
+        check("completed".equals(b.core.db.scalar("SELECT status FROM tasks WHERE id = ?", fu.optString("id")))
+                && b.core.db.count("SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND text LIKE '%NO_REPLY%'", cidSteer) == 0,
+                "a follow-up with nothing left to do posts no message");
         JSONObject aSteer = b.approvals.list("pending").get(0);
         b.approvals.decide(aSteer.optString("id"), "deny", aSteer.optString("args_hash"));
         b.engine.drain(20000);

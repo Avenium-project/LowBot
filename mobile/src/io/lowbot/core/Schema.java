@@ -104,4 +104,9 @@ final class Schema {
     static final String[] V4 = {
         "ALTER TABLE widgets ADD COLUMN visual_json TEXT",
     };
+
+    /** v5: what a running bot is doing right now ("typing" a reply or "working" with tools), for the chat indicator. */
+    static final String[] V5 = {
+        "ALTER TABLE runs ADD COLUMN phase TEXT",
+    };
 }

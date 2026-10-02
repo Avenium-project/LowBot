@@ -253,7 +253,7 @@ public final class Tasks {
 
     /** The bot's in-progress task for a user request in this chat (not one parked on a question). */
     /** Marks the short reply a bot gives to a message sent while it works. */
-    public static final String QUICK_REPLY = "quick_reply";
+    public static final String QUICK_REPLY = "quick_reply", FOLLOW_UP = "follow_up";
 
     public String activeUserTask(String cid, String botId) {
         return db.scalar("SELECT t.id FROM tasks t JOIN runs r ON r.task_id = t.id WHERE t.conversation_id = ? AND t.bot_id = ? "
@@ -508,7 +508,9 @@ public final class Tasks {
         }
         if (!"cancelled".equals(status)) for (JSONObject m : steerMessages(task.optString("id"))) {
             if (lastModel != null && m.optString("created_at").compareTo(lastModel) < 0) continue;
-            createTask(task.optString("bot_id"), cid, "user", Core.OWNER, m.optString("text"), J.truncate(m.optString("text"), 80), "",
+            // Already answered by a quick reply: the follow-up only does what is left, or ends silently.
+            boolean replied = db.count("SELECT COUNT(*) FROM tasks WHERE source_message_id = ? AND expected_output = ?", m.optString("id"), QUICK_REPLY) > 0;
+            createTask(task.optString("bot_id"), cid, "user", Core.OWNER, m.optString("text"), J.truncate(m.optString("text"), 80), replied ? FOLLOW_UP : "",
                     null, PRIORITY_USER, m.optString("id"), null, null);
         }
         if (J.str(task, "routine_run_id", null) != null)

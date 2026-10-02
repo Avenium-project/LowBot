@@ -2,12 +2,16 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **3.8.0** — a message to a bot that is working gets an answer at once (a short parallel reply with the
+- Version **3.9.0** — no more repeated answers: a message that got a quick reply no longer starts a second full
+  answer when the task ends (a follow-up only does what is left, or stays silent), and the final message is told not
+  to repeat the quick reply. The chat shows "X is typing" while a bot writes a reply and "X is working" while it uses
+  tools.
+  SHA-256: `c4949a8a25da25a932d1a062c99cd76f1ad8e063a5a45a83151d84b29c390faa`
+- 3.8.0 — a message to a bot that is working gets an answer at once (a short parallel reply with the
   status/result so far or "will do"); the long task picks the message up and finishes. No more approvals by default:
   bots just act; they ask only to install Linux and before what they flag as truly dangerous (payments, purchases,
   accounts, personal data, irreversible deletion) with approval.request. Settings → Safety → "Ask before actions"
   brings the old prompts back. Your own Block rules still apply.
-  SHA-256: `d43a84dbfa9f7574047481985a04da27b7fe9364dc8ba41b45e171f87b6e2fc2`
 - 3.7.0 — bots write their widgets' code (HTML/CSS/SVG/canvas/JS, no network; workspace images via
   src="workspace:path"); chart/stat/image stay as shortcuts. The app no longer hangs on the LowBot splash when many bots
   work: slow calls (browser, terminal, backups) have their own lane, events reach the page in batches, home-screen widgets

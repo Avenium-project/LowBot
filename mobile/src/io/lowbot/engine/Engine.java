@@ -353,7 +353,12 @@ public final class Engine {
             failHard(run, task, e);
             throw new Parked();
         }
+        // "typing" while the bot writes a reply (a quick reply, or its first answer before using any tool), "working" otherwise.
+        boolean usedTools = false;
+        for (JSONObject st : steps) if ("tool".equals(st.optString("kind"))) usedTools = true;
+        final String phase = io.lowbot.core.Tasks.QUICK_REPLY.equals(task.optString("expected_output")) || !usedTools ? "typing" : "working";
         db.tx(new Runnable() { public void run() {
+            db.exec("UPDATE runs SET phase = ? WHERE id = ?", phase, run.optString("id"));
             b.core.emit("run.model_call", null, task.optString("id"), run.optString("id"), bot.optString("id"),
                     J.obj("model", res.model, "provider", res.profile.optString("kind"), "mock", res.profile.optBoolean("is_mock")));
         } });
@@ -404,7 +409,9 @@ public final class Engine {
                     J.obj("step_id", sid, "kind", "model", "text", J.truncate(resp.text, 500), "tool_calls", names));
             if (calls.isEmpty()) {
                 String text = resp.text.trim().isEmpty() ? "(no response)" : resp.text.trim();
-                if (J.str(task, "conversation_id", null) != null) b.tasks.postBotMessage(task, text, J.obj("run_id", run.optString("id")), true);
+                // A follow-up with nothing left to do ends silently instead of repeating an answer.
+                boolean silent = io.lowbot.core.Tasks.FOLLOW_UP.equals(task.optString("expected_output")) && text.replaceAll("[^A-Z_]", "").equals("NO_REPLY");
+                if (J.str(task, "conversation_id", null) != null && !silent) b.tasks.postBotMessage(task, text, J.obj("run_id", run.optString("id")), true);
                 finish(run, task, "completed", text, null);
             }
         } });
@@ -599,6 +606,7 @@ public final class Engine {
 
     void invoke(final JSONObject run, final JSONObject task, final JSONObject bot, final JSONObject step, final Tools.Spec spec, final JSONObject args, final boolean external) {
         final Tools.Ctx ctx = ctx(run, task, bot, step);
+        db.exec("UPDATE runs SET phase = 'working' WHERE id = ?", run.optString("id"));
         Object result;
         String err = null;
         boolean toolError = false;
@@ -892,6 +900,9 @@ public final class Engine {
                     + "Answer them RIGHT NOW in one short message: answer the question or give the result/status they asked for from what you already know "
                     + "(at most a couple of quick tool calls). If they ask you to change or add something, confirm it — your running task sees this message "
                     + "and applies it, then finishes the rest. Do not start long work in this reply.");
+        } else if (io.lowbot.core.Tasks.FOLLOW_UP.equals(task.optString("expected_output"))) {
+            parts.add("FOLLOW-UP: the user's last message arrived just as you finished your previous task, and you already gave a quick reply to it. "
+                    + "Do only what it asks that is NOT done yet. If nothing is left to do, reply exactly NO_REPLY (nothing else) and no message is shown.");
         } else if (!task.optString("expected_output").isEmpty()) parts.add("Expected output: " + task.optString("expected_output"));
         if (skill != null) {
             parts.add("Active skill /" + skill.optString("slug") + " v" + skill.optInt("version") + ":\n" + skill.optString("instructions"));
@@ -960,9 +971,12 @@ public final class Engine {
         return sb.toString();
     }
 
-    static JSONObject steerMessage(JSONObject m) {
-        return J.obj("role", "user", "content", "[The user wrote this while you were working — you already sent them a quick reply; take it into account "
-                + "from now on and finish your work]: " + m.optString("text"));
+    JSONObject steerMessage(JSONObject m) {
+        String reply = db.scalar("SELECT tk.result_text FROM tasks tk WHERE tk.source_message_id = ? AND tk.expected_output = ? AND tk.status = 'completed'",
+                m.optString("id"), io.lowbot.core.Tasks.QUICK_REPLY);
+        return J.obj("role", "user", "content", "[The user wrote this while you were working — take it into account from now on and finish your work"
+                + (reply == null ? "" : "; you already answered it with a quick reply: \"" + J.truncate(reply, 600) + "\" — do not repeat that in your final message")
+                + "]: " + m.optString("text"));
     }
 
     static JSONObject screenshotMessage(JSONArray images) {

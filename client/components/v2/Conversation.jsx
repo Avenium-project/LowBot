@@ -233,7 +233,7 @@ function WorkingStrip({ task, bot, onAnswer, special }) {
   const [answer, setAnswer] = useState('');
   const asking = task.run_status === 'waiting_input' && !special;
   const needsYou = ['waiting_input', 'waiting_approval', 'unknown_outcome'].includes(task.run_status);
-  const phrase = WORK_PHRASE[task.run_status] || 'is working';
+  const phrase = task.run_status === 'running' && task.run_phase === 'typing' ? 'is typing' : (WORK_PHRASE[task.run_status] || 'is working');
   return (
     <div className="lb-rise my-3">
       <div className="flex items-center gap-3">
@@ -273,11 +273,12 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
   const members = conversation.bot_ids.map((id) => botsById[id]).filter(Boolean);
   const lead = members[0];
   const activeAll = ws.tasks.filter((x) => x.conversation_id === conversation.id && !['completed', 'failed', 'cancelled'].includes(x.status));
-  // One "is working" line per bot: a task waiting on the user wins, otherwise the newest.
+  // One line per bot: a task waiting on the user wins, then one that is typing a reply, otherwise the newest.
   const activeTasks = Object.values(activeAll.reduce((acc, x) => {
     const cur = acc[x.bot_id];
     const needs = (t) => ['waiting_input', 'waiting_approval', 'unknown_outcome'].includes(t.run_status);
-    if (!cur || (needs(x) && !needs(cur))) acc[x.bot_id] = x;
+    const typing = (t) => t.run_status === 'running' && t.run_phase === 'typing';
+    if (!cur || (needs(x) && !needs(cur)) || (!needs(cur) && typing(x) && !typing(cur))) acc[x.bot_id] = x;
     return acc;
   }, {}));
   const convTaskIds = new Set(ws.tasks.filter((x) => x.conversation_id === conversation.id).map((x) => x.id));
