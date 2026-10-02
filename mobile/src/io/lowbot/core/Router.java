@@ -482,6 +482,7 @@ public final class Router {
             if (id == null && get) return Response.json(J.obj("bots_may_create", b.widgets.botsMayCreate(), "widgets", Db.toArray(b.widgets.list())));
             if ("settings".equals(id) && post) { b.widgets.setBotsMayCreate(J.bool(body, "bots_may_create")); return Response.json(J.obj("bots_may_create", b.widgets.botsMayCreate())); }
             if (id != null && sub == null && get) return Response.json(b.widgets.require(id));
+            if (id != null && "visual".equals(sub) && get) return Response.json(b.widgets.visualDocument(id));
             if (id != null && sub == null && patch) {
                 if (body.has("on_home")) b.widgets.setHome(id, J.bool(body, "on_home"));
                 if (body.has("title") || body.has("content")) b.widgets.update(id, J.str(body, "title", null), J.str(body, "content", null));

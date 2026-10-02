@@ -93,6 +93,10 @@ podatności w publicznym issue.
   z Linuxa **nie** przechodzi przez filtr SSRF/LAN LowBota. Dlatego polecenia botów podlegają zgodom
   („Execution on this phone”), a obraz Alpine jest przypięty sumą SHA-256. Polecenia wpisane przez
   właściciela w Computer → Terminals wykonują się od razu i są zapisywane w dzienniku audytu.
+- Wizualizacje widgetów (wykres, liczba, obraz, własny HTML bota) są pokazywane w dokumencie z CSP
+  `default-src 'none'` w iframe `sandbox="allow-scripts"` (bez dostępu do aplikacji i sieci); na ekranie
+  telefonu HTML jest renderowany w WebView z zablokowaną siecią i bez mostka do aplikacji. Obraz musi być
+  plikiem z workspace bota (kontrola ścieżki), maks. 1,5 MB.
 - Watchery (`watcher.start`) to programy bota działające w tle w tym samym Linuksie — ta sama zgoda co
   `linux.run`, te same ograniczenia (bez piaskownicy, sieć poza filtrem). Każdy bot ma własny folder
   pingów (`/lowbot/pings`), więc program budzi tylko swojego bota; bot jest ustalany po folderze, nie po

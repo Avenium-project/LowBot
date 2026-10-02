@@ -12,10 +12,29 @@ import { BotBlob, Toggle, askConfirm, cls, shortTime } from './ui';
 const MD = { table: ({ children }) => <div className="lb-table"><table>{children}</table></div> };
 
 function Body({ w, clamp }) {
+  if (!w.content && w.visual_type) return <Visual w={w} />;
   return (
+    <>
+    <Visual w={w} />
     <div className={cls('lb-md prose prose-invert max-w-none prose-p:my-0.5 prose-ul:my-0.5 prose-li:my-0 prose-headings:my-1 text-[14px] leading-snug text-zinc-200', clamp && 'max-h-[168px] overflow-hidden')}>
       {w.content ? <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MD}>{w.content}</ReactMarkdown> : <span className="text-zinc-500">Empty</span>}
     </div>
+    </>
+  );
+}
+
+/** A widget's chart / stat / image / HTML: a sandboxed frame without network access (its CSP is default-src 'none'). */
+export function Visual({ w }) {
+  const [doc, setDoc] = useState(null);
+  useEffect(() => {
+    if (!w.visual_type) { setDoc(null); return; }
+    api(`/widgets/${w.id}/visual`).then(setDoc).catch(() => setDoc(null));
+  }, [w.id, w.visual_type, w.updated_at]);
+  if (!w.visual_type || !doc?.html) return null;
+  const style = doc.type === 'html' ? { height: doc.height } : { aspectRatio: `320 / ${doc.height}` };
+  return (
+    <iframe title={w.title} sandbox="allow-scripts" srcDoc={doc.html} referrerPolicy="no-referrer"
+      className="block w-full border-0 rounded-xl bg-transparent mb-1" style={style} />
   );
 }
 

@@ -20,7 +20,7 @@ import java.util.List;
  * events commit atomically.
  */
 public final class Db extends SQLiteOpenHelper {
-    public static final int VERSION = 3;
+    public static final int VERSION = 4;
     private final List<Runnable> afterCommit = new ArrayList<Runnable>();
     private int depth = 0;
 
@@ -39,6 +39,7 @@ public final class Db extends SQLiteOpenHelper {
         for (String s : Schema.V1) db.execSQL(s);
         for (String s : Schema.V2) db.execSQL(s);
         for (String s : Schema.V3) db.execSQL(s);
+        for (String s : Schema.V4) db.execSQL(s);
     }
 
     @Override
@@ -46,6 +47,7 @@ public final class Db extends SQLiteOpenHelper {
         // Append-only migrations.
         if (oldV < 2) for (String s : Schema.V2) db.execSQL(s);
         if (oldV < 3) for (String s : Schema.V3) db.execSQL(s);
+        if (oldV < 4) for (String s : Schema.V4) db.execSQL(s);
     }
 
     private SQLiteDatabase w() {

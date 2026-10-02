@@ -38,6 +38,17 @@ public final class Builtin {
 
     static JSONObject props(Object... kv) { return J.obj(kv); }
 
+    static final JSONObject CHART = J.obj("type", "object", "description", "{type: line|area|bar|pie|donut, labels: [x labels], "
+            + "series: [{name, values: [numbers]}] (or values: [numbers]), unit}",
+            "properties", J.obj("type", J.obj("type", "string", "enum", new JSONArray().put("line").put("area").put("bar").put("pie").put("donut")),
+                    "labels", J.obj("type", "array", "items", J.obj("type", "string")),
+                    "series", J.obj("type", "array", "items", J.obj("type", "object", "properties", J.obj("name", J.obj("type", "string"),
+                            "values", J.obj("type", "array", "items", J.obj("type", "number"))))),
+                    "values", J.obj("type", "array", "items", J.obj("type", "number")), "unit", J.obj("type", "string")));
+    static final JSONObject STAT = J.obj("type", "object", "description", "{value: '59 800 $', label: 'BTC', change: '-3.2%', trend: [numbers]}",
+            "properties", J.obj("value", J.obj("type", "string"), "label", J.obj("type", "string"), "change", J.obj("type", "string"),
+                    "trend", J.obj("type", "array", "items", J.obj("type", "number"))));
+
     // ---------------------------------------------------------------- workspace
     public static File root(Ctx ctx) throws ToolError { return rootFor(ctx.b, ctx.bot); }
 
@@ -508,21 +519,33 @@ public final class Builtin {
             }
         }));
 
-        reg.register(new Spec("widget.create", "Make a widget for the user's home screen: a small card with a title and short Markdown content "
-                + "(e.g. 'Mail' with the latest messages, 'Today' with the agenda). To keep it fresh, give refresh (what to do) and schedule "
-                + "(e.g. 'every hour', 'every day at 8:00'): a routine of yours will run it and call widget.update. The user adds it to the home screen.",
-                Tools.obj(props("title", S, "content", S, "refresh", S, "schedule", S), "title", "content"), Tools.INTERNAL, "allow", new Tools.Executor() {
+        reg.register(new Spec("widget.create", "Make a widget for the user's home screen: a card with a title, optional short Markdown content and "
+                + "optionally ONE visual: chart (line/area/bar/pie/donut from numbers), stat (a big number with change and a sparkline), image (a "
+                + ".png/.jpg/.webp/.gif in your workspace — e.g. a matplotlib chart or photo you made in Linux) or html (your own HTML/SVG/CSS, "
+                + "inline JS allowed, no network: inline everything). Examples: 'BTC' as stat with trend, 'Steps this week' as bar chart, "
+                + "'Mail' as Markdown. To keep it fresh, give refresh (what to do) and schedule (e.g. 'every hour'): a routine of yours will run it "
+                + "and call widget.update. The user adds it to the home screen.",
+                Tools.obj(props("title", S, "content", S, "chart", CHART, "stat", STAT, "image", S, "html", S, "height", J.obj("type", "integer"), "refresh", S, "schedule", S), "title"),
+                Tools.INTERNAL, "allow", new Tools.Executor() {
             public Object run(Ctx ctx, JSONObject a) throws Exception {
                 if (!ctx.b.widgets.botsMayCreate()) throw new ToolError("The user switched off widgets made by bots (Settings → Widgets).");
                 JSONObject w;
-                try { w = ctx.b.widgets.create(ctx.bot.optString("id"), a.optString("title"), a.optString("content"), null); }
-                catch (io.lowbot.core.ApiError e) { throw new ToolError(e.getMessage()); }
+                try {
+                    boolean hasVisual = a.optJSONObject("chart") != null || a.optJSONObject("stat") != null || !a.optString("image").trim().isEmpty() || !a.optString("html").trim().isEmpty();
+                    if (!hasVisual && a.optString("content").trim().isEmpty()) throw new ToolError("Give content (Markdown) or a visual (chart, stat, image or html).");
+                    w = ctx.b.widgets.create(ctx.bot.optString("id"), a.optString("title"), a.optString("content"), null);
+                    if (hasVisual) {
+                        try { w = ctx.b.widgets.setVisual(w.optString("id"), a, rootFor(ctx.b, ctx.bot)); }
+                        catch (io.lowbot.core.ApiError e) { ctx.b.widgets.delete(w.optString("id")); throw e; }
+                    }
+                } catch (io.lowbot.core.ApiError e) { throw new ToolError(e.getMessage()); }
                 String routine = null;
                 if (!a.optString("refresh").trim().isEmpty() && !a.optString("schedule").trim().isEmpty()) {
                     try {
                         JSONObject r = ctx.b.routines.create(ctx.bot.optString("id"), "Widget: " + w.optString("title"),
                                 "Refresh widget " + w.optString("id") + " (\"" + w.optString("title") + "\"): " + a.optString("refresh")
-                                        + "\nThen call widget.update with widget=" + w.optString("id") + " and the new short Markdown content.",
+                                        + "\nThen call widget.update with widget=" + w.optString("id") + " and the new content"
+                                        + (w.isNull("visual_type") ? "" : " and the new " + w.optString("visual_type") + " (same shape as before)") + ".",
                                 a.optString("schedule"), null, null, null, "skip", "latest", true);
                         routine = r.optString("id");
                         ctx.b.core.db.exec("UPDATE widgets SET routine_id = ? WHERE id = ?", routine, w.optString("id"));
@@ -540,13 +563,17 @@ public final class Builtin {
                 return J.obj("widget_id", w.optString("id"), "routine_id", routine, "note", "The user can add it to the home screen from the card in the chat.");
             }
         }).needs("widgets"));
-        reg.register(new Spec("widget.update", "Replace the content (and optionally the title) of one of your widgets.",
-                Tools.obj(props("widget", S, "content", S, "title", S), "widget", "content"), Tools.INTERNAL, "allow", new Tools.Executor() {
+        reg.register(new Spec("widget.update", "Update one of your widgets: new content and/or title, and/or a new visual (chart, stat, image or html — "
+                + "same shapes as widget.create; clear_visual=true removes it). Fields you leave out stay as they are.",
+                Tools.obj(props("widget", S, "content", S, "title", S, "chart", CHART, "stat", STAT, "image", S, "html", S, "height", J.obj("type", "integer"),
+                        "clear_visual", J.obj("type", "boolean")), "widget"), Tools.INTERNAL, "allow", new Tools.Executor() {
             public Object run(Ctx ctx, JSONObject a) throws Exception {
                 JSONObject w = ctx.b.widgets.get(a.optString("widget"));
                 if (w == null || !ctx.bot.optString("id").equals(w.optString("bot_id"))) throw new ToolError("No widget of yours with that id (see widget.list).");
-                try { ctx.b.widgets.update(w.optString("id"), J.str(a, "title", null), a.optString("content")); }
-                catch (io.lowbot.core.ApiError e) { throw new ToolError(e.getMessage()); }
+                try {
+                    ctx.b.widgets.update(w.optString("id"), J.str(a, "title", null), J.str(a, "content", null));
+                    ctx.b.widgets.setVisual(w.optString("id"), a, rootFor(ctx.b, ctx.bot));
+                } catch (io.lowbot.core.ApiError e) { throw new ToolError(e.getMessage()); }
                 return J.obj("updated", w.optString("id"));
             }
         }).needs("widgets"));
@@ -555,7 +582,7 @@ public final class Builtin {
             public Object run(Ctx ctx, JSONObject a) {
                 JSONArray out = new JSONArray();
                 for (JSONObject w : ctx.b.widgets.list()) if (ctx.bot.optString("id").equals(w.optString("bot_id")))
-                    out.put(J.obj("id", w.optString("id"), "title", w.optString("title"), "on_home", w.optBoolean("on_home"), "updated_at", w.optString("updated_at")));
+                    out.put(J.obj("id", w.optString("id"), "title", w.optString("title"), "visual", w.opt("visual_type"), "on_home", w.optBoolean("on_home"), "updated_at", w.optString("updated_at")));
                 return J.obj("widgets", out);
             }
         }).needs("widgets"));

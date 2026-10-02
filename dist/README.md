@@ -2,7 +2,13 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **3.5.0** — watchers: a bot can write a small program (usually Python) and run it in the background in its
+- Version **3.6.0** — widgets can show more than text: a bot adds one visual — a chart from numbers (line, area, bar,
+  pie, donut), a big number with change and trend line (stat), an image from its workspace (e.g. a matplotlib PNG made
+  in Linux, or a photo) or its own HTML/SVG/CSS layout. In LowBot it shows in a sandboxed frame without network access;
+  on the phone's home screen charts and numbers are drawn natively, images scaled, and HTML pictured in the background.
+  Bots can change the visual with widget.update (e.g. from their refresh routine).
+  SHA-256: `05d371cce35cdd5cfa109c222e31a679ae22a6e73b5eabdea938e1a239a20eb1`
+- 3.5.0 — watchers: a bot can write a small program (usually Python) and run it in the background in its
   Linux; the program wakes the bot with `from lowbot import ping; ping('BTC fell to 59800', {...})` or `lowbot-ping "msg"`
   (new email, price drop, page change…). Each ping starts a task for that bot (the ping text is treated as data, not
   instructions); pings faster than the watcher's min interval are dropped; up to 3 watchers per bot, 8 in total; they
@@ -10,7 +16,6 @@
   Linux command; Settings → Terminal → Watchers shows status, pings and logs (Stop / Delete). Turning a bot's Terminal
   off also turns its watchers off. Needs Linux installed; not yet tried on a real phone. Also: page → Markdown
   extract no longer glues words together on pages that space words with CSS, and keeps role=heading headings.
-  SHA-256: `99b368706862a673b98f6aa94cc159b72ca0c638e8d43ed72c6bc06b22c28355`
 - 3.4.0 — secrets: every bot can show a secure field (one or several values, e.g. API key + secret) that
   stores them encrypted on the phone; bots only get {{secret:NAME}} placeholders and are told never to ask for keys in
   chat; any stored secret value that shows up in tool output, a reply or the terminal log is replaced by its placeholder;

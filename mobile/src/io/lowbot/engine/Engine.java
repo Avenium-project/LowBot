@@ -893,8 +893,10 @@ public final class Engine {
                 ? "You have no role yet. As soon as the user's requests show what you are for, call self.set_role with one short line (in the user's language)."
                 : "Your role: " + bot.optString("role_description") + ". If the user's requests clearly change what you do, update it with self.set_role.");
         if (b.capabilities().contains("widgets"))
-            parts.add("Widgets: when the user asks for a widget (e.g. 'a mail widget'), make it with widget.create — a short title and compact Markdown "
-                    + "content; if it should stay current, pass refresh + schedule so your routine updates it with widget.update.");
+            parts.add("Widgets: when the user asks for a widget (e.g. 'a mail widget', 'BTC price', 'my steps'), make it with widget.create — a short title, "
+                    + "compact Markdown and, when it helps, one visual: chart (numbers → line/area/bar/pie/donut), stat (big number + change + trend), "
+                    + "image (a PNG you made in your workspace, e.g. with matplotlib in Linux, or a photo) or html (your own HTML/SVG/CSS layout, self-contained, "
+                    + "no network). Prefer chart/stat for numbers. If it should stay current, pass refresh + schedule so your routine updates it with widget.update.");
         parts.add("Formatting: reply in Markdown — headings, bullet lists, **bold**, `code`, fenced code blocks and tables (| a | b | with a header separator row) "
                 + "render nicely in the app. Put each table row on its own line.");
         parts.add("Team management: you can see the team (bot.list), write to another bot (bot.message), hand it work (task.delegate), "

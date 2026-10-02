@@ -106,6 +106,8 @@ public class SelfTest extends BroadcastReceiver {
                         "fields", new JSONArray().put(J.obj("name", "EX_KEY", "description", "API key")).put(J.obj("name", "EX_SECRET", "description", "API secret"))))))
                 .put(J.obj("when", "mail widget", "call", J.obj("name", "widget.create", "arguments",
                         J.obj("title", "Mail", "content", "- 2 new messages", "refresh", "Check my inbox", "schedule", "every hour"))))
+                .put(J.obj("when", "price widget", "call", J.obj("name", "widget.create", "arguments",
+                        J.obj("title", "BTC", "stat", J.obj("value", "59 800 $", "label", "BTC", "change", "-3.2%", "trend", new JSONArray().put(61000).put(60500).put(59800))))))
                 .put(J.obj("after_tool", "widget.create", "reply", "widget made"))
                 .put(J.obj("when", "say nothing", "reply", ""))
                 .put(J.obj("when", "write a file", "call", J.obj("name", "workspace.write", "arguments", J.obj("path", "notes/a.txt", "content", "hello phone"))))
@@ -266,6 +268,54 @@ public class SelfTest extends BroadcastReceiver {
             int px = bm.getPixel(56, (int) (bm.getHeight() * 0.62f));
             check(android.graphics.Color.alpha(px) > 0, "widget sprite draws " + sh);
         }
+
+        // 7c4. Widget visuals: chart, stat, image, HTML — shown without network, drawn natively for the home screen
+        api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "make me a price widget"));
+        b.engine.drain(20000);
+        JSONObject statW = null;
+        for (JSONObject x : b.widgets.list()) if ("BTC".equals(x.optString("title"))) statW = x;
+        check(statW != null && "stat".equals(statW.optString("visual_type")), "bot makes a stat widget");
+        JSONObject statDoc = api(r, "GET", "/api/v2/widgets/" + statW.optString("id") + "/visual", null);
+        check(statDoc.optString("html").contains("59 800 $") && statDoc.optString("html").contains("default-src 'none'"), "stat visual document, no network (CSP)");
+        File root = io.lowbot.tools.Builtin.rootFor(b, bot);
+        String wid = b.widgets.create(bot.optString("id"), "Steps", "", null).optString("id");
+        b.widgets.setVisual(wid, J.obj("chart", J.obj("type", "bar", "labels", new JSONArray().put("Mon").put("Tue").put("Wed"),
+                "series", new JSONArray().put(J.obj("name", "steps", "values", new JSONArray().put(4200).put(8100).put(6600))))), root);
+        String chartHtml = b.widgets.visualDocument(wid).optString("html");
+        check(chartHtml.contains("<svg") && chartHtml.contains("Mon") && chartHtml.contains("<polygon"), "bar chart rendered as SVG");
+        android.graphics.Bitmap chartBm = WidgetPainter.scene(io.lowbot.core.WidgetVisual.scene(b.widgets.visual(wid)), 640);
+        check(chartBm.getWidth() == 640 && WidgetPainter.hasContent(chartBm), "chart drawn natively for the home screen");
+        b.widgets.setVisual(wid, J.obj("chart", J.obj("type", "donut", "labels", new JSONArray().put("a").put("b"), "values", new JSONArray().put(1).put(3))), root);
+        check(WidgetPainter.hasContent(WidgetPainter.scene(io.lowbot.core.WidgetVisual.scene(b.widgets.visual(wid)), 320)), "donut chart drawn");
+        android.graphics.Bitmap png = android.graphics.Bitmap.createBitmap(40, 20, android.graphics.Bitmap.Config.ARGB_8888);
+        png.eraseColor(android.graphics.Color.rgb(200, 30, 40));
+        new File(root, "charts").mkdirs();
+        java.io.FileOutputStream po = new java.io.FileOutputStream(new File(root, "charts/plot.png"));
+        png.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, po);
+        po.close();
+        b.widgets.setVisual(wid, J.obj("image", "/workspace/charts/plot.png"), root);
+        check(b.widgets.visualDocument(wid).optString("html").contains("data:image/png;base64,")
+                && WidgetPainter.image(new File(b.widgets.mediaDir(), b.widgets.visual(wid).optString("file")), 320) != null, "image widget from a workspace file");
+        boolean escaped = false;
+        try { b.widgets.setVisual(wid, J.obj("image", "../../lowbot.db"), root); } catch (io.lowbot.core.ApiError e) { escaped = e.status == 403 || e.status == 404 || e.status == 422; }
+        check(escaped, "image path cannot leave the workspace");
+        boolean two = false;
+        try { b.widgets.setVisual(wid, J.obj("html", "<b>x</b>", "stat", J.obj("value", "1")), root); } catch (io.lowbot.core.ApiError e) { two = e.status == 422; }
+        check(two, "only one visual per widget");
+        b.widgets.setVisual(wid, J.obj("html", "<div style='background:#ff0000;width:100%;height:300px'></div><script>fetch('https://example.com/')</script>", "height", 120), root);
+        final String htmlDoc = b.widgets.visualDocument(wid).optString("html");
+        final android.graphics.Bitmap[] shot = new android.graphics.Bitmap[1];
+        final java.util.concurrent.CountDownLatch shotDone = new java.util.concurrent.CountDownLatch(1);
+        final Context fctx = ctx;
+        WidgetPainter.main.post(new Runnable() { public void run() {
+            WidgetPainter.html(fctx, htmlDoc, 320, 120, new WidgetPainter.Done() { public void bitmap(android.graphics.Bitmap bm) { shot[0] = bm; shotDone.countDown(); } });
+        } });
+        shotDone.await(15, java.util.concurrent.TimeUnit.SECONDS);
+        int mid = shot[0] == null ? 0 : shot[0].getPixel(160, 60);
+        check(shot[0] != null && android.graphics.Color.red(mid) > 200 && android.graphics.Color.green(mid) < 60,
+                "HTML widget pictured for the home screen (pixel " + Integer.toHexString(mid) + ")");
+        b.widgets.delete(wid);
+        b.widgets.delete(statW.optString("id"));
 
         // 7d. Team: shared workspace, a bot creates and deletes another bot (with the user's approval)
         api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "set up team space"));

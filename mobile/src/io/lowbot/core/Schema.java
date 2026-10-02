@@ -99,4 +99,9 @@ final class Schema {
         "CREATE TABLE widgets (id TEXT PRIMARY KEY, bot_id TEXT, title TEXT NOT NULL, content TEXT NOT NULL DEFAULT '', "
             + "on_home INTEGER NOT NULL DEFAULT 0, routine_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
     };
+
+    /** v4: the visual part of a widget (chart, stat, image or HTML) as JSON. */
+    static final String[] V4 = {
+        "ALTER TABLE widgets ADD COLUMN visual_json TEXT",
+    };
 }

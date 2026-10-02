@@ -6,7 +6,9 @@ import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.os.Build;
+import android.view.View;
 import android.widget.RemoteViews;
 
 import org.json.JSONObject;
@@ -15,6 +17,7 @@ import java.util.List;
 
 import io.lowbot.core.Backend;
 import io.lowbot.core.J;
+import io.lowbot.core.WidgetVisual;
 
 /**
  * A widget a bot made (title + short text), placed on the phone's home screen. Which LowBot
@@ -68,6 +71,37 @@ public class CardWidget extends AppWidgetProvider {
                 .replaceAll("(?m)^\\|?\\s*-{2,}.*$\\n?", "").replaceAll("\\[([^\\]]*)\\]\\([^)]*\\)", "$1").trim();
     }
 
+    /** The widget's chart/stat/image/HTML as a bitmap, or null (HTML is drawn in the background, then the widget refreshes). */
+    static Bitmap visual(final Context ctx, Backend b, JSONObject w) {
+        final JSONObject v = b.widgets.visual(w.optString("id"));
+        if (v == null) return null;
+        int width = Math.min(720, BotsWidget.px(ctx, 300));
+        try {
+            String type = v.optString("type");
+            if ("chart".equals(type) || "stat".equals(type)) return WidgetPainter.scene(WidgetVisual.scene(v), width);
+            if ("image".equals(type)) return WidgetPainter.image(new java.io.File(b.widgets.mediaDir(), v.optString("file")), width);
+            if ("html".equals(type)) {
+                final String key = w.optString("id") + "|" + w.optString("updated_at");
+                Bitmap cached = WidgetPainter.htmlCache.get(key);
+                if (cached != null) return cached;
+                if (WidgetPainter.pending.add(key)) {
+                    final int hgt = Math.round(width * WidgetVisual.height(v) / (float) WidgetVisual.W);
+                    final String doc = WidgetVisual.document(v, b.widgets.mediaDir());
+                    final int wd = width;
+                    WidgetPainter.main.post(new Runnable() { public void run() {
+                        WidgetPainter.html(ctx, doc, wd, hgt, new WidgetPainter.Done() { public void bitmap(Bitmap bm) {
+                            WidgetPainter.pending.remove(key);
+                            if (WidgetPainter.hasContent(bm)) { WidgetPainter.htmlCache.put(key, bm); refreshAll(ctx); }
+                        } });
+                    } });
+                }
+            }
+        } catch (Throwable e) {
+            android.util.Log.w("LowBot", "widget visual: " + e);
+        }
+        return null;
+    }
+
     static void render(Context ctx, AppWidgetManager mgr, int appWidgetId) {
         Backend b = LowBotApp.of(ctx).backend;
         JSONObject w = b.widgets.get(b.core.kvGet("card_widget:" + appWidgetId));
@@ -76,7 +110,8 @@ public class CardWidget extends AppWidgetProvider {
             for (JSONObject x : all) if (x.optBoolean("on_home")) { w = x; break; }
             if (w == null && !all.isEmpty()) w = all.get(0);
         }
-        RemoteViews rv = new RemoteViews(ctx.getPackageName(), R.layout.widget_card);
+        Bitmap visual = w == null ? null : visual(ctx, b, w);
+        RemoteViews rv = new RemoteViews(ctx.getPackageName(), visual != null ? R.layout.widget_card_visual : R.layout.widget_card);
         Intent open = new Intent(ctx, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         if (w == null) {
             rv.setTextViewText(R.id.card_title, "LowBot");
@@ -85,7 +120,12 @@ public class CardWidget extends AppWidgetProvider {
         } else {
             JSONObject bot = b.bots.get(w.optString("bot_id"));
             rv.setTextViewText(R.id.card_title, w.optString("title"));
-            rv.setTextViewText(R.id.card_text, plain(w.optString("content")));
+            String text = plain(w.optString("content"));
+            rv.setTextViewText(R.id.card_text, text);
+            if (visual != null) {
+                rv.setImageViewBitmap(R.id.card_visual, visual);
+                rv.setViewVisibility(R.id.card_text, text.isEmpty() ? View.GONE : View.VISIBLE);
+            }
             String t = w.optString("updated_at");
             rv.setTextViewText(R.id.card_time, t.length() >= 16 ? java.time.Instant.parse(t).atZone(java.time.ZoneId.systemDefault())
                     .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) : "");
