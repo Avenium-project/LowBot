@@ -188,7 +188,7 @@ public final class Router {
             if ("pause".equals(sub)) { b.tasks.pause(id); return Response.json(J.obj("ok", true)); }
             if ("resume".equals(sub)) { b.tasks.resume(id); return Response.json(J.obj("ok", true)); }
             if ("answer".equals(sub)) { b.tasks.answerInput(id, body.optString("answer")); return Response.json(J.obj("ok", true)); }
-            if ("secret".equals(sub)) { b.answerSecret(id, body.optString("value")); return Response.json(J.obj("ok", true)); }
+            if ("secret".equals(sub)) { b.answerSecret(id, body); return Response.json(J.obj("ok", true)); }
         }
         if (a.equals("runs") && "resolve".equals(sub)) { b.engine.resolveUnknown(id, body.optString("outcome"), body.optString("note")); return Response.json(J.obj("ok", true)); }
 
@@ -461,6 +461,17 @@ public final class Router {
                     : b.core.db.all("SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", qi(u, "limit", 200, 2000));
             for (JSONObject r : rows) { J.put(r, "summary", J.parse(r.optString("summary_json"))); r.remove("summary_json"); }
             return Response.json(rows);
+        }
+
+        // ------------------------------------------------------------ secrets (names only; values never leave the vault)
+        if (a.equals("secrets")) {
+            if (id == null && get) return Response.json(b.core.userSecrets());
+            if (id != null && del) {
+                String sid = b.core.secretIdByName("user:" + id);
+                if (sid == null) throw new ApiError(404, "Unknown secret.");
+                b.core.secretDelete(sid);
+                return Response.json(J.obj("deleted", id));
+            }
         }
 
         // ------------------------------------------------------------ widgets

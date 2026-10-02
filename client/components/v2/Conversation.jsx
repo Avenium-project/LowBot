@@ -92,27 +92,37 @@ function Attachment({ a }) {
 
 // Grok-style secure secret request: the value goes to the encrypted vault, never into the chat or the model.
 function SecretCard({ m }) {
-  const { lang } = useT();
-  const [value, setValue] = useState('');
-  const [state, setState] = useState('');
   const req = m.meta.secret_request;
+  const fields = req.fields?.length ? req.fields : [{ name: req.name, description: req.description }];
+  const [values, setValues] = useState({});
+  const [show, setShow] = useState({});
+  const [state, setState] = useState('');
+  const ready = fields.every((f) => (values[f.name] || '').length > 0);
   const save = async (e) => {
     e.preventDefault();
-    try { await api(`/tasks/${m.task_id}/secret`, { method: 'POST', body: { value } }); setValue(''); setState('ok'); }
+    try { await api(`/tasks/${m.task_id}/secret`, { method: 'POST', body: { values } }); setValues({}); setState('ok'); }
     catch (err) { setState(err.message); }
   };
   return (
-    <div className="lb-rise my-2 rounded-[22px] bg-[#262626] px-4 py-4">
-      <div className="flex items-center gap-2 text-[17px] font-semibold text-white"><FiLock /> {'Secure secret request'}</div>
-      <div className="text-[15px] text-zinc-300 mt-1">{req.description} <span className="text-zinc-500">({req.name})</span></div>
-      {state === 'ok' ? <div className="mt-3 rounded-xl py-2.5 text-center bg-emerald-900/40 text-emerald-400">{'Saved in the phone vault'}</div> : (
-        <form onSubmit={save} className="mt-3 flex gap-2">
-          <input type="password" autoComplete="off" className="flex-1 min-w-0 rounded-xl bg-black/40 px-3 py-2.5 outline-none text-zinc-100" value={value} onChange={(e) => setValue(e.target.value)}
-            placeholder={'Value (hidden from the bot)'} />
-          <button disabled={!value} className="rounded-xl bg-white text-black px-4 font-medium disabled:opacity-50">{'Save'}</button>
+    <div className="lb-rise my-2 rounded-[22px] bg-[#262626] border border-white/10 px-4 py-4">
+      <div className="flex items-center gap-2 text-[17px] font-semibold text-white"><FiLock /> Secure field</div>
+      {req.description && <div className="text-[15px] text-zinc-300 mt-1">{req.description}</div>}
+      {state === 'ok' ? <div className="mt-3 rounded-xl py-2.5 text-center bg-emerald-900/40 text-emerald-400">Saved in the phone vault</div> : (
+        <form onSubmit={save} className="mt-3 space-y-2">
+          {fields.map((f) => (
+            <label key={f.name} className="block">
+              <span className="block text-[12px] text-zinc-500 mb-1">{f.description || f.name} <span className="text-zinc-600">· {f.name}</span></span>
+              <span className="flex items-center gap-2 rounded-xl bg-black/40 pr-2">
+                <input type={show[f.name] ? 'text' : 'password'} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+                  className="flex-1 min-w-0 bg-transparent px-3 py-2.5 outline-none text-zinc-100 font-mono text-[14px]" value={values[f.name] || ''}
+                  onChange={(e) => setValues({ ...values, [f.name]: e.target.value })} placeholder="Paste here" />
+                <button type="button" onClick={() => setShow({ ...show, [f.name]: !show[f.name] })} className="text-[12px] text-zinc-400 px-1">{show[f.name] ? 'Hide' : 'Show'}</button>
+              </span>
+            </label>))}
+          <button disabled={!ready} className="w-full rounded-xl bg-white text-black py-2.5 font-medium disabled:opacity-40">Save securely</button>
         </form>)}
       {state && state !== 'ok' && <div className="text-xs text-rose-300 mt-2">{state}</div>}
-      <div className="text-[12px] text-zinc-500 mt-2">{'The bot only sees the name, never the value.'}</div>
+      <div className="text-[12px] text-zinc-500 mt-2">Encrypted on this phone. The bot only gets placeholders like {'{{secret:'}{fields[0].name}{'}}'} — never the value.</div>
     </div>
   );
 }
@@ -127,6 +137,16 @@ function TakeoverCard({ m, onOpenComputer }) {
         {'Take over the computer'}</button>
     </div>
   );
+}
+
+// {{secret:NAME}} in your own messages (a pasted key moved to the vault) shows as a lock chip.
+function withSecretChips(text) {
+  const parts = String(text || '').split(/(\{\{secret:[A-Za-z0-9_.-]+\}\})/g);
+  if (parts.length === 1) return text;
+  return parts.map((p, i) => {
+    const mm = /^\{\{secret:([A-Za-z0-9_.-]+)\}\}$/.exec(p);
+    return mm ? <span key={i} className="inline-flex items-center gap-1 rounded-md bg-black/30 px-1.5 text-[14px] text-emerald-300"><FiLock className="text-[12px]" />{mm[1]}</span> : p;
+  });
 }
 
 function Bubble({ m, bot, showName, onOpenComputer, animate, ws }) {
@@ -144,7 +164,7 @@ function Bubble({ m, bot, showName, onOpenComputer, animate, ws }) {
       <div className={cls('min-w-0 max-w-[85%] text-[16px] leading-snug break-words [overflow-wrap:anywhere] rounded-[22px]', !mine && 'lb-selectable',
         onlyFile ? 'p-0' : 'px-4 py-3', onlyFile ? '' : mine ? 'bg-[#3a3a3c] text-white' : 'bg-[#262626] text-zinc-100')}>
         {showName && bot && <div className="flex items-center gap-1.5 mb-1 text-[13px] text-zinc-400"><BotBlob bot={bot} size={18} still />{bot.name}</div>}
-        {onlyFile ? null : mine ? <div className="whitespace-pre-wrap">{m.text}</div>
+        {onlyFile ? null : mine ? <div className="whitespace-pre-wrap">{withSecretChips(m.text)}</div>
           : <div className="lb-md prose prose-invert max-w-none prose-p:my-1 prose-pre:my-2 prose-headings:mt-3 prose-headings:mb-1.5 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 text-[16px]"><ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MD}>{m.text}</ReactMarkdown></div>}
         {m.attachments?.length > 0 && <div className={cls('flex flex-col gap-1.5', mine && 'items-end')}>{m.attachments.map((a, i) => <Attachment key={i} a={a} />)}</div>}
       </div>

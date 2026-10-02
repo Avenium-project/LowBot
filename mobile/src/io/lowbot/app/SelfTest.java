@@ -99,6 +99,8 @@ public class SelfTest extends BroadcastReceiver {
 
         JSONArray script = new JSONArray()
                 .put(J.obj("when", "take it into account", "reply", "steered: {{last}}"))
+                .put(J.obj("when", "exchange keys", "call", J.obj("name", "secret.request", "arguments", J.obj("description", "Exchange API credentials",
+                        "fields", new JSONArray().put(J.obj("name", "EX_KEY", "description", "API key")).put(J.obj("name", "EX_SECRET", "description", "API secret"))))))
                 .put(J.obj("when", "mail widget", "call", J.obj("name", "widget.create", "arguments",
                         J.obj("title", "Mail", "content", "- 2 new messages", "refresh", "Check my inbox", "schedule", "every hour"))))
                 .put(J.obj("after_tool", "widget.create", "reply", "widget made"))
@@ -185,6 +187,19 @@ public class SelfTest extends BroadcastReceiver {
                 && b.core.db.count("SELECT COUNT(*) FROM events WHERE payload_json LIKE '%super-secret-value%'") == 0
                 && b.core.db.count("SELECT COUNT(*) FROM run_steps WHERE output_json LIKE '%super-secret-value%'") == 0, "secret value absent from chat/events/steps");
         check("super-secret-value-123".equals(b.core.secretGet(b.core.secretIdByName("user:DEMO_KEY"))), "secret decrypts from keystore vault");
+        check(b.core.scrubSecrets("token is super-secret-value-123 ok").equals("token is {{secret:DEMO_KEY}} ok"), "secret values are scrubbed from bot-visible text");
+        JSONObject t5b = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "set up exchange keys")).optJSONArray("tasks").getJSONObject(0);
+        b.engine.drain(20000);
+        api(r, "POST", "/api/v2/tasks/" + t5b.optString("id") + "/secret", J.obj("values", J.obj("EX_KEY", "key-value-AAA111", "EX_SECRET", "secret-value-BBB222")));
+        b.engine.drain(20000);
+        check("key-value-AAA111".equals(b.core.secretGet(b.core.secretIdByName("user:EX_KEY")))
+                && "secret-value-BBB222".equals(b.core.secretGet(b.core.secretIdByName("user:EX_SECRET")))
+                && b.core.db.count("SELECT COUNT(*) FROM messages WHERE text LIKE '%BBB222%' OR text LIKE '%AAA111%'") == 0, "secure field with two values");
+        api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "my key is sk-proj-abcdefghijklmnopqrstuvwxyz123456 thanks"));
+        b.engine.drain(20000);
+        check(b.core.db.count("SELECT COUNT(*) FROM messages WHERE text LIKE '%sk-proj-abcdef%'") == 0
+                && b.core.db.count("SELECT COUNT(*) FROM messages WHERE text LIKE '%{{secret:PASTED_KEY_1}}%'") == 1
+                && b.core.secretIdByName("user:PASTED_KEY_1") != null, "a key pasted into the chat moves to the vault");
 
         // 6. delegation with wait
         api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "please delegate"));

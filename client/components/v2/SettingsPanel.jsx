@@ -270,7 +270,27 @@ function Safety({ ws }) {
             <div className="flex gap-2"><Button kind="primary" disabled={!rule.tool.trim()} onClick={add}>Add</Button><Button onClick={() => setAdding(false)}>Cancel</Button></div>
           </div>)}
       </>}
+      <SecretsList />
       {err && <div className="text-[13px] text-rose-400 px-2 mt-2">{err}</div>}
+    </>
+  );
+}
+
+function SecretsList() {
+  const [rows, setRows] = useState(null);
+  const load = () => api('/secrets').then(setRows).catch(() => setRows([]));
+  useEffect(() => { load(); }, []);
+  if (!rows) return null;
+  return (
+    <>
+      <Label>Secrets in the vault</Label>
+      <div className={group}>
+        {rows.length ? rows.map((r) => (
+          <Row key={r.id} label={<span className="font-mono text-[15px]">{r.name}</span>} value={r.description}
+            right={<button type="button" aria-label={`Delete ${r.name}`} className="lb-press text-zinc-500 px-1"
+              onClick={async () => { if (await askConfirm({ title: `Delete ${r.name}?`, message: 'Bots that use it will ask for it again.', confirmLabel: 'Delete', danger: true })) api(`/secrets/${encodeURIComponent(r.name)}`, { method: 'DELETE' }).then(load); }}>✕</button>} />))
+          : <div className="px-5 py-4 text-[16px] text-zinc-500">None yet</div>}
+      </div>
     </>
   );
 }

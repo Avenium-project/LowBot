@@ -3,10 +3,13 @@ package io.lowbot.core;
 import android.content.Context;
 import android.util.Base64;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
 import java.util.HashSet;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.Set;
 
 import io.lowbot.engine.Engine;
@@ -148,25 +151,40 @@ public final class Backend {
     }
 
     /** Answer a secret.request: the value goes to the encrypted vault, never into messages, events or the model. */
-    public void answerSecret(final String taskId, String value) {
+    /** Stores the value(s) the user typed into a secret card; the run continues with placeholders only. */
+    public void answerSecret(final String taskId, JSONObject body) {
         final JSONObject run = tasks.runFor(taskId);
         if (run == null || !"waiting_input".equals(run.optString("status"))) throw new ApiError(409, "This task is not waiting for a secret.");
         final JSONObject waiting = J.parse(run.optString("waiting_json"));
         JSONObject req = waiting.optJSONObject("secret_request");
         if (req == null) throw new ApiError(409, "This task is waiting for an answer, not a secret.");
-        if (value == null || value.isEmpty()) throw new ApiError(422, "Empty secret.");
-        final String name = req.optString("name");
-        String existing = core.secretIdByName("user:" + name);
-        core.secretPut("user:" + name, "user_secret", req.optString("description"), value, existing);
+        JSONArray fields = req.optJSONArray("fields");
+        if (fields == null || fields.length() == 0) fields = new JSONArray().put(J.obj("name", req.optString("name"), "description", req.optString("description")));
+        JSONObject values = body.optJSONObject("values");
+        if (values == null) values = J.obj(fields.optJSONObject(0).optString("name"), body.optString("value"));
+        final JSONArray placeholders = new JSONArray();
+        final List<String> names = new ArrayList<String>();
+        for (int i = 0; i < fields.length(); i++) {
+            String n = fields.optJSONObject(i).optString("name");
+            String v = values.optString(n, "");
+            if (v.isEmpty()) throw new ApiError(422, "Fill in " + n + ".");
+            names.add(n);
+            placeholders.put("{{secret:" + n + "}}");
+        }
+        for (int i = 0; i < fields.length(); i++) {
+            String n = fields.optJSONObject(i).optString("name");
+            core.secretPut("user:" + n, "user_secret", fields.optJSONObject(i).optString("description", req.optString("description")), values.optString(n), core.secretIdByName("user:" + n));
+        }
+        final String name = String.join(", ", names);
         core.db.tx(new Runnable() {
             @Override public void run() {
                 core.db.exec("UPDATE run_steps SET status = 'completed', output_json = ?, updated_at = ? WHERE id = ? AND status = 'waiting'",
-                        J.obj("stored", true, "placeholder", "{{secret:" + name + "}}").toString(), J.nowIso(), waiting.optString("step_id"));
+                        J.obj("stored", true, "placeholders", placeholders, "placeholder", placeholders.optString(0)).toString(), J.nowIso(), waiting.optString("step_id"));
                 if (core.db.change("UPDATE runs SET status = 'queued', waiting_json = '{}', updated_at = ? WHERE id = ? AND status = 'waiting_input'",
                         J.nowIso(), run.optString("id")) != 1) throw new ApiError(409, "The task state changed; refresh and retry.");
                 JSONObject t = tasks.requireTask(taskId);
                 if (J.str(t, "conversation_id", null) != null)
-                    tasks.insertMessage(t.optString("conversation_id"), "user", Core.OWNER, "🔒 Secret '" + name + "' provided (hidden)", null, taskId, null, null, null,
+                    tasks.insertMessage(t.optString("conversation_id"), "user", Core.OWNER, "🔒 Saved in the vault: " + name + " (hidden)", null, taskId, null, null, null,
                             J.obj("secret_provided", name));
                 core.audit("secret.provide", "user", Core.OWNER, taskId, run.optString("id"), null, null, null, J.obj("name", name));
                 core.emit("run.input_received", null, taskId, run.optString("id"), run.optString("bot_id"), J.obj("secret", name));

@@ -87,6 +87,7 @@ podatności w publicznym issue.
   więc istnieje okno na DNS rebinding; podzasoby stron w przeglądarce botów nie są filtrowane.
 - `terminal.run` uruchamia `sh` Androida jako użytkownik aplikacji (bez roota), domyślnie „Pytaj za każdym
   razem”; to ograniczenie uprawnień, nie piaskownica.
+- Sekrety: `secret.request` pokazuje bezpieczne pole (wiele wartości), wartości trafiają do sejfu Android Keystore; model dostaje tylko `{{secret:NAZWA}}`. Każda zapisana wartość w wynikach narzędzi, odpowiedziach bota, wynikach zadań i logu terminala jest zamieniana na placeholder. Klucze wklejone wprost do czatu (sk-…, xai-…, ghp_…, AKIA…, AIza…, xox…, glpat-…, bloki PRIVATE KEY) są automatycznie przenoszone do sejfu przed zapisem wiadomości. To ogranicza, ale nie wyklucza wycieku (np. zakodowanej wartości).
 - `linux.run` (Linux terminal) uruchamia Alpine przez proot jako użytkownik aplikacji. proot to nie
   piaskownica bezpieczeństwa: polecenia mają dostęp do plików aplikacji przez `/workspace`, a ruch sieciowy
   z Linuxa **nie** przechodzi przez filtr SSRF/LAN LowBota. Dlatego polecenia botów podlegają zgodom

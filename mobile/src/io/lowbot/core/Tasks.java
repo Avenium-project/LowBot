@@ -173,7 +173,7 @@ public final class Tasks {
      * hand off to a better-suited member.
      */
     public JSONObject postUserMessage(final String cid, String rawText, final String clientMsgId, final JSONArray attachments, final String threadRoot) {
-        final String text = rawText == null ? "" : rawText.trim();
+        final String text = vaultPastedSecrets(rawText == null ? "" : rawText.trim());
         if (text.isEmpty() && (attachments == null || attachments.length() == 0)) throw new ApiError(422, "Message is empty.");
         JSONObject conv = getConversation(cid);
         if (clientMsgId != null) {
@@ -206,6 +206,41 @@ public final class Tasks {
         });
         b.wake();
         return out[0];
+    }
+
+    // Things that are clearly credentials: provider keys and private-key blocks.
+    static final java.util.regex.Pattern PASTED_SECRET = java.util.regex.Pattern.compile(
+            "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----"
+            + "|\\b(?:sk-(?:proj-|ant-)?[A-Za-z0-9_\\-]{20,}|xai-[A-Za-z0-9_\\-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}"
+            + "|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_\\-]{35}|xox[abpr]-[A-Za-z0-9\\-]{20,}|glpat-[A-Za-z0-9_\\-]{20,})\\b");
+
+    /**
+     * A key pasted straight into the chat goes to the encrypted vault; the message keeps only
+     * the placeholder, so neither the chat history nor the model ever holds the value.
+     */
+    String vaultPastedSecrets(String text) {
+        if (text.isEmpty()) return text;
+        java.util.regex.Matcher m = PASTED_SECRET.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        boolean any = false;
+        while (m.find()) {
+            any = true;
+            String v = m.group();
+            String name = null;
+            for (JSONObject r : db.all("SELECT id, name FROM secret_references WHERE name LIKE 'user:%'"))
+                if (v.equals(b.core.secretGet(r.optString("id")))) name = r.optString("name").substring(5);
+            if (name == null) {
+                int n = 1;
+                while (b.core.secretIdByName("user:PASTED_KEY_" + n) != null) n++;
+                name = "PASTED_KEY_" + n;
+                b.core.secretPut("user:" + name, "user_secret", "Pasted in chat", v, null);
+                final String nm = name;
+                db.tx(new Runnable() { public void run() { b.core.audit("secret.pasted", "user", Core.OWNER, null, null, null, null, null, J.obj("name", nm)); } });
+            }
+            m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement("{{secret:" + name + "}}"));
+        }
+        m.appendTail(sb);
+        return any ? sb.toString() : text;
     }
 
     /** The bot's in-progress task for a user request in this chat (not one parked on a question). */
@@ -249,7 +284,8 @@ public final class Tasks {
     }
 
     /** A bot speaks in a conversation; @mentions of member bots wake them (bounded by loop guards). */
-    public JSONObject postBotMessage(final JSONObject task, final String text, final JSONObject meta, final boolean routeMentions) {
+    public JSONObject postBotMessage(final JSONObject task, String rawText, final JSONObject meta, final boolean routeMentions) {
+        final String text = b.core.scrubSecrets(rawText); // a bot never shows a stored secret's value
         final String cid = J.str(task, "conversation_id", null);
         if (cid == null) throw new ApiError(422, "This task has no conversation to post to.");
         final JSONObject conv = getConversation(cid);
@@ -436,6 +472,8 @@ public final class Tasks {
     // ----------------------------------------------------- completion & handoffs
     /** Inside a transaction. */
     public void finishTask(JSONObject task, String status, String result, String error) {
+        result = b.core.scrubSecrets(result);
+        error = b.core.scrubSecrets(error);
         String now = J.nowIso();
         db.exec("UPDATE tasks SET status = ?, result_text = ?, error = ?, updated_at = ?, completed_at = ?, unread = 1 WHERE id = ?",
                 status, result, error, now, now, task.optString("id"));

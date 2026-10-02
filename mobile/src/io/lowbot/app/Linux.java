@@ -241,7 +241,7 @@ public final class Linux {
         }
 
         synchronized void appendLog(String s) {
-            log.append(s);
+            log.append(backend.core.scrubSecrets(s)); // filled-in secrets never show in the terminal log
             if (log.length() > LOG_MAX) log.delete(0, log.length() - LOG_MAX);
         }
 

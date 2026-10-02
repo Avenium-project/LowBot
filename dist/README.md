@@ -2,10 +2,14 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **3.3.1** — Markdown formatting really works now (lists with bullets/numbers, headings, spacing — the
+- Version **3.4.0** — secrets: every bot can show a secure field (one or several values, e.g. API key + secret) that
+  stores them encrypted on the phone; bots only get {{secret:NAME}} placeholders and are told never to ask for keys in
+  chat; any stored secret value that shows up in tool output, a reply or the terminal log is replaced by its placeholder;
+  a key pasted straight into the chat moves to the vault automatically; Settings → Safety lists secrets (delete).
+  SHA-256: `23f12e61664de9c2eb64d2569db440a3fb437981b804b856289e563c624070e8`
+- 3.3.1 — Markdown formatting really works now (lists with bullets/numbers, headings, spacing — the
   typography styles were missing), single line breaks are kept, code blocks scroll instead of breaking lines and have
   a Copy button.
-  SHA-256: `d42c53b0cbdcce5e5e609cf80aa7c0f5f49cdadd808c918f6d7f7c012a21e11f`
 - 3.3.0 — paste images into the message field (Paste, or + → Paste image to take the image from the
   phone's clipboard), several attachments at once, thumbnails with ✕ before sending.
 - 3.2.0 — browser-use style browsing for bots (ideas from github.com/browser-use/browser-use, rebuilt on the

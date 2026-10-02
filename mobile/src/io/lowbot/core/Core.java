@@ -186,6 +186,7 @@ public final class Core {
                 }
             }
         });
+        invalidateScrub();
         return sid;
     }
 
@@ -203,6 +204,36 @@ public final class Core {
         }
     }
 
+    // Values of the user's secrets (user:NAME), to scrub them from anything the model or the chat sees.
+    private volatile java.util.Map<String, String> scrubCache = null;
+
+    void invalidateScrub() { scrubCache = null; }
+
+    /** Replaces every stored user-secret value in s with its placeholder {{secret:NAME}}. */
+    public String scrubSecrets(String s) {
+        if (s == null || s.isEmpty()) return s;
+        java.util.Map<String, String> m = scrubCache;
+        if (m == null) {
+            m = new java.util.LinkedHashMap<String, String>();
+            for (JSONObject r : db.all("SELECT id, name FROM secret_references WHERE name LIKE 'user:%'")) {
+                String v = secretGet(r.optString("id"));
+                if (v != null && v.length() >= 6) m.put(v, r.optString("name").substring(5));
+            }
+            scrubCache = m;
+        }
+        for (java.util.Map.Entry<String, String> e : m.entrySet())
+            if (s.contains(e.getKey())) s = s.replace(e.getKey(), "{{secret:" + e.getValue() + "}}");
+        return s;
+    }
+
+    /** The user's stored secrets: names and descriptions only. */
+    public java.util.List<JSONObject> userSecrets() {
+        java.util.List<JSONObject> out = new java.util.ArrayList<JSONObject>();
+        for (JSONObject r : db.all("SELECT id, name, description, created_at FROM secret_references WHERE name LIKE 'user:%' ORDER BY name"))
+            out.add(J.obj("id", r.optString("id"), "name", r.optString("name").substring(5), "description", r.optString("description"), "created_at", r.optString("created_at")));
+        return out;
+    }
+
     public String secretIdByName(String name) {
         return db.scalar("SELECT id FROM secret_references WHERE name = ? ORDER BY created_at DESC", name);
     }
@@ -212,5 +243,6 @@ public final class Core {
         db.tx(new Runnable() {
             @Override public void run() { db.exec("DELETE FROM secret_references WHERE id = ?", id); }
         });
+        invalidateScrub();
     }
 }

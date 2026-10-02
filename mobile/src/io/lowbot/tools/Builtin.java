@@ -381,20 +381,39 @@ public final class Builtin {
             }
         }));
 
-        reg.register(new Spec("secret.request", "Securely ask the user for a secret (API key, token). The value is stored encrypted on the phone, never shown to you; "
-                + "use it as the placeholder {{secret:NAME}} in http.post headers/body or browser.type.",
-                Tools.obj(props("name", J.obj("type", "string"), "description", S), "name", "description"), Tools.INTERNAL, "allow", new Tools.Executor() {
+        reg.register(new Spec("secret.request", "Show the user a secure field for secrets (API keys, tokens, passwords for an API) instead of asking them to paste "
+                + "secrets into the chat. Values go to the phone's encrypted vault and are NEVER shown to you; use them as {{secret:NAME}} in "
+                + "http.post, browser.type or linux.run. Several values at once (e.g. API key + API secret): pass fields.",
+                Tools.obj(props("name", S, "description", S, "fields", J.obj("type", "array", "items",
+                        J.obj("type", "object", "properties", J.obj("name", S, "description", S), "required", new JSONArray().put("name")))), "description"),
+                Tools.INTERNAL, "allow", new Tools.Executor() {
             public Object run(final Ctx ctx, final JSONObject a) throws Exception {
-                final String name = a.optString("name").replaceAll("[^A-Za-z0-9_\\-.]", "_");
-                if (ctx.b.core.secretIdByName("user:" + name) != null)
-                    return J.obj("stored", true, "placeholder", "{{secret:" + name + "}}", "note", "Already stored.");
+                JSONArray fields = new JSONArray();
+                JSONArray given = a.optJSONArray("fields");
+                if (given != null) for (int i = 0; i < given.length() && i < 6; i++) {
+                    JSONObject f = given.optJSONObject(i);
+                    if (f == null || f.optString("name").trim().isEmpty()) continue;
+                    fields.put(J.obj("name", f.optString("name").replaceAll("[^A-Za-z0-9_\\-.]", "_"), "description", f.optString("description")));
+                }
+                if (fields.length() == 0) {
+                    if (a.optString("name").trim().isEmpty()) throw new ToolError("Give name (or fields).");
+                    fields.put(J.obj("name", a.optString("name").replaceAll("[^A-Za-z0-9_\\-.]", "_"), "description", a.optString("description")));
+                }
+                JSONArray missing = new JSONArray(), placeholders = new JSONArray();
+                for (int i = 0; i < fields.length(); i++) {
+                    String n = fields.optJSONObject(i).optString("name");
+                    placeholders.put("{{secret:" + n + "}}");
+                    if (ctx.b.core.secretIdByName("user:" + n) == null) missing.put(fields.optJSONObject(i));
+                }
+                if (missing.length() == 0) return J.obj("stored", true, "placeholders", placeholders, "note", "Already stored.");
+                final JSONObject req = J.obj("name", missing.optJSONObject(0).optString("name"), "description", a.optString("description"), "fields", missing);
                 if (J.str(ctx.task, "conversation_id", null) != null)
-                    ctx.b.tasks.postBotMessage(ctx.task, "🔑 " + a.optString("description"), J.obj("secret_request", J.obj("name", name, "description", a.optString("description"))), false);
+                    ctx.b.tasks.postBotMessage(ctx.task, "🔑 " + a.optString("description"), J.obj("secret_request", req), false);
                 ctx.b.core.db.tx(new Runnable() { public void run() {
                     ctx.b.core.notify("needs_input", ctx.bot.optString("name") + " needs a secret", a.optString("description"), ctx.task.optString("id"), null,
                             J.str(ctx.task, "conversation_id", null), ctx.bot.optString("id"));
                 } });
-                return new Wait("input", J.obj("secret_request", J.obj("name", name, "description", a.optString("description"))));
+                return new Wait("input", J.obj("secret_request", req));
             }
         }));
 
