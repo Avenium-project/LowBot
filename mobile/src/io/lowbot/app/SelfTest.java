@@ -219,17 +219,18 @@ public class SelfTest extends BroadcastReceiver {
                 && b.core.db.count("SELECT COUNT(*) FROM messages WHERE author_type = 'system' AND text LIKE '%empty answer%'") == 1, "empty answer reported, not '(no response)'");
 
         // 7c2. Steering: a message to a bot that is still working joins its run instead of starting another
-        JSONObject tSteer = api(r, "POST", "/api/v2/conversations/" + cidEmpty + "/messages", J.obj("text", "post it now")).optJSONArray("tasks").getJSONObject(0);
+        String cidSteer = api(r, "POST", "/api/v2/conversations", J.obj("kind", "group", "title", "steer", "bot_ids", new JSONArray().put(helper.optString("id")))).optString("id");
+        JSONObject tSteer = api(r, "POST", "/api/v2/conversations/" + cidSteer + "/messages", J.obj("text", "post it now")).optJSONArray("tasks").getJSONObject(0);
         b.engine.drain(20000);
         check("waiting_approval".equals(runStatus(b, tSteer.optString("id"))), "steer setup: run is waiting");
-        long before = b.core.db.count("SELECT COUNT(*) FROM tasks WHERE conversation_id = ?", cidEmpty);
-        JSONObject steerRes = api(r, "POST", "/api/v2/conversations/" + cidEmpty + "/messages", J.obj("text", "add a footnote"));
+        long before = b.core.db.count("SELECT COUNT(*) FROM tasks WHERE conversation_id = ?", cidSteer);
+        JSONObject steerRes = api(r, "POST", "/api/v2/conversations/" + cidSteer + "/messages", J.obj("text", "add a footnote"));
         check(steerRes.optJSONArray("tasks").length() == 0 && tSteer.optString("id").equals(steerRes.optString("steered_task"))
-                && b.core.db.count("SELECT COUNT(*) FROM tasks WHERE conversation_id = ?", cidEmpty) == before, "message while working steers the run (no second task)");
+                && b.core.db.count("SELECT COUNT(*) FROM tasks WHERE conversation_id = ?", cidSteer) == before, "message while working steers the run (no second task)");
         JSONObject aSteer = b.approvals.list("pending").get(0);
         b.approvals.decide(aSteer.optString("id"), "deny", aSteer.optString("args_hash"));
         b.engine.drain(20000);
-        check(lastBotMessage(b, cidEmpty).optString("text").contains("add a footnote"), "the bot sees the steering message in its next step");
+        check(lastBotMessage(b, cidSteer).optString("text").contains("add a footnote"), "the bot sees the steering message in its next step");
 
         // 7c3. Widgets made by a bot (on by default; the user can switch it off)
         api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "make me a mail widget"));
