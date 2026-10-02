@@ -74,12 +74,13 @@ public final class Computer {
 
     public final class Surface {
         public final String id, botId;
-        public final WebView web;
+        public volatile WebView web;
+        final List<WebView> tabs = new java.util.concurrent.CopyOnWriteArrayList<WebView>();
         final Map<Integer, String> refs = new ConcurrentHashMap<Integer, String>();
         volatile boolean busy;
         volatile CountDownLatch loading;
         volatile boolean recording;
-        Surface(String id, String botId, WebView web) { this.id = id; this.botId = botId; this.web = web; }
+        Surface(String id, String botId, WebView web) { this.id = id; this.botId = botId; this.web = web; tabs.add(web); }
         public String botName() {
             JSONObject b = backend.bots.get(botId);
             if (b == null) return "";
@@ -187,17 +188,70 @@ public final class Computer {
                 Surface existing = surfaces.get(sid);
                 if (existing != null) return existing;
                 Surface ns = new Surface(sid, botId, newWebView());
-                ns.web.setWebViewClient(new SurfaceClient(ns));
-                final Surface fs = ns;
-                ns.web.setWebChromeClient(new android.webkit.WebChromeClient() {
-                    @Override public void onProgressChanged(WebView v, int p) { notifyPage(fs, v.getUrl(), p); }
-                });
-                ns.web.addJavascriptInterface(new Recorder(ns), "LowBotRec");
+                configure(ns, ns.web);
                 park(ns);
                 surfaces.put(sid, ns);
                 return ns;
             }
         }, 10000);
+    }
+
+    void configure(final Surface s, WebView w) {
+        w.setWebViewClient(new SurfaceClient(s));
+        w.setWebChromeClient(new android.webkit.WebChromeClient() {
+            @Override public void onProgressChanged(WebView v, int p) { if (v == s.web) notifyPage(s, v.getUrl(), p); }
+        });
+        w.addJavascriptInterface(new Recorder(s), "LowBotRec");
+    }
+
+    // ------------------------------------------------------------------ tabs
+    static final int MAX_TABS = 5;
+
+    JSONObject tabs(final Surface s) throws ToolError {
+        return onMain(new Callable<JSONObject>() { public JSONObject call() {
+            JSONArray a = new JSONArray();
+            for (int i = 0; i < s.tabs.size(); i++) {
+                WebView w = s.tabs.get(i);
+                a.put(J.obj("index", i, "title", J.truncate(w.getTitle() == null ? "" : w.getTitle(), 80), "url", w.getUrl() == null ? "about:blank" : w.getUrl(), "active", w == s.web));
+            }
+            return J.obj("tabs", a);
+        } }, 5000);
+    }
+
+    void switchTab(final Surface s, final int index) throws ToolError {
+        if (index < 0 || index >= s.tabs.size()) throw new ToolError("No tab " + index + " (see browser.tabs list).");
+        onMain(new Callable<Void>() { public Void call() {
+            WebView w = s.tabs.get(index);
+            if (w == s.web) return null;
+            if (s.web.getParent() instanceof ViewGroup) ((ViewGroup) s.web.getParent()).removeView(s.web);
+            s.web = w;
+            s.refs.clear();
+            park(s);
+            return null;
+        } }, 5000);
+    }
+
+    void newTab(final Surface s) throws ToolError {
+        if (s.tabs.size() >= MAX_TABS) throw new ToolError("Too many tabs (" + MAX_TABS + "). Close one first.");
+        onMain(new Callable<Void>() { public Void call() {
+            WebView w = newWebView();
+            configure(s, w);
+            s.tabs.add(w);
+            return null;
+        } }, 5000);
+        switchTab(s, s.tabs.size() - 1);
+    }
+
+    void closeTab(final Surface s, final int index) throws ToolError {
+        if (s.tabs.size() <= 1) throw new ToolError("This is the only tab.");
+        if (index < 0 || index >= s.tabs.size()) throw new ToolError("No tab " + index + ".");
+        final WebView w = s.tabs.get(index);
+        if (w == s.web) switchTab(s, index == 0 ? 1 : index - 1);
+        s.tabs.remove(w);
+        main.post(new Runnable() { public void run() {
+            if (w.getParent() instanceof ViewGroup) ((ViewGroup) w.getParent()).removeView(w);
+            w.destroy();
+        } });
     }
 
     void closeOldest() {
@@ -210,8 +264,10 @@ public final class Computer {
         final Surface s = surfaces.remove(sid);
         if (s == null) return;
         main.post(new Runnable() { public void run() {
-            if (s.web.getParent() instanceof ViewGroup) ((ViewGroup) s.web.getParent()).removeView(s.web);
-            s.web.destroy();
+            for (WebView w : s.tabs) {
+                if (w.getParent() instanceof ViewGroup) ((ViewGroup) w.getParent()).removeView(w);
+                w.destroy();
+            }
         } });
     }
 
@@ -319,12 +375,23 @@ public final class Computer {
             + "document.addEventListener('change',function(ev){var e=ev.target;if(!e||!('value' in e))return;var pw=(e.type==='password');"
             + "LowBotRec.record(JSON.stringify({tool:'browser.type',arguments:{label:lab(e),text:pw?'(password — the user types it)':String(e.value).slice(0,200)}}));},true);})();";
 
-    static final String READ_JS = "(function(max){var sel='a[href],button,input:not([type=hidden]),select,textarea,[role=button],[role=link],[role=tab],[role=menuitem],[onclick],[contenteditable=true]';"
-            + "var els=document.querySelectorAll(sel),out=[],i=0;document.querySelectorAll('[data-lb-ref]').forEach(function(e){e.removeAttribute('data-lb-ref');});"
-            + "for(var k=0;k<els.length&&out.length<max;k++){var e=els[k],r=e.getBoundingClientRect();if(r.width<2||r.height<2)continue;var st=getComputedStyle(e);if(st.visibility==='hidden'||st.display==='none')continue;"
-            + "i++;e.setAttribute('data-lb-ref',i);var t=e.tagName.toLowerCase(),ty=e.type||'',lb=((e.innerText||e.value||e.getAttribute('aria-label')||e.getAttribute('placeholder')||e.getAttribute('title')||e.name||'')+'').replace(/\\s+/g,' ').trim().slice(0,80);"
-            + "if(ty==='password')lb='(password field)';out.push(i+': '+t+(ty?'['+ty+']':'')+' '+lb+(t==='a'&&e.href?' -> '+String(e.href).slice(0,120):''));}"
-            + "var txt=document.body?document.body.innerText:'';return JSON.stringify({url:location.href,title:document.title,text:txt.slice(0,6000),truncated:txt.length>6000,elements:out});})";
+    // browser-use style page reading: numbered interactive elements of the visible viewport (topmost only),
+    // scroll position, page text; an overlay draws the same numbers on screenshots.
+    static final String READ_JS = "(function(max, all){ var SEL='a[href],button,input:not([type=hidden]),select,textarea,summary,label[for],[role=button],[role=link],[role=tab],[role=menuitem],[role=menuitemcheckbox],[role=checkbox],[role=radio],[role=switch],[role=option],[role=combobox],[role=textbox],[role=searchbox],[onclick],[contenteditable=true],[tabindex]:not([tabindex=\"-1\"]),[aria-haspopup]'; document.querySelectorAll('[data-lb-ref]').forEach(function(e){e.removeAttribute('data-lb-ref');}); var vh=window.innerHeight, vw=window.innerWidth, set=[], seen=new Set(); document.querySelectorAll(SEL).forEach(function(e){ if(!seen.has(e)){seen.add(e);set.push(e);} }); var extra=document.querySelectorAll('div,span,li,img,svg,td'); for(var x=0;x<extra.length&&x<4000;x++){var e=extra[x]; if(seen.has(e))continue; try{ if(getComputedStyle(e).cursor==='pointer' && !(e.parentElement&&getComputedStyle(e.parentElement).cursor==='pointer')){seen.add(e);set.push(e);} }catch(_){} } set.sort(function(a,b){var p=a.compareDocumentPosition(b);return p&Node.DOCUMENT_POSITION_FOLLOWING?-1:1;}); function label(e){ var t=(e.getAttribute('aria-label')||e.innerText||e.value||e.getAttribute('placeholder')||e.getAttribute('title')||e.getAttribute('alt')||e.name||'')+''; if(!t.trim()&&e.id){var l=document.querySelector('label[for=\"'+e.id+'\"]');if(l)t=l.innerText;} if(!t.trim()){var img=e.querySelector&&e.querySelector('img[alt],svg[aria-label]');if(img)t=img.getAttribute('alt')||img.getAttribute('aria-label')||'';} return t.replace(/\\s+/g,' ').trim().slice(0,90); } var out=[], i=0, below=0; for(var k=0;k<set.length&&out.length<max;k++){ var e=set[k], r=e.getBoundingClientRect(); if(r.width<3||r.height<3)continue; var st=getComputedStyle(e); if(st.visibility==='hidden'||st.display==='none'||+st.opacity===0)continue; var inView=r.bottom>0&&r.top<vh&&r.right>0&&r.left<vw; if(!inView){ if(r.top>=vh) below++; if(!all) continue; } if(inView){ var cx=Math.min(vw-1,Math.max(0,r.left+r.width/2)), cy=Math.min(vh-1,Math.max(0,r.top+r.height/2)); var top=document.elementFromPoint(cx,cy); if(top&&top!==e&&!e.contains(top)&&!top.contains(e)) continue; } i++; e.setAttribute('data-lb-ref',i); var tag=e.tagName.toLowerCase(), ty=(e.getAttribute('type')||'').toLowerCase(), role=e.getAttribute('role')||'', attrs=''; if(ty)attrs+=' type='+ty; if(role)attrs+=' role='+role; var lb=label(e); if(ty==='password')lb='(password field \u2014 never type into it)'; if(tag==='input'||tag==='textarea'){ if(e.placeholder)attrs+=' placeholder=\"'+e.placeholder.slice(0,40)+'\"'; if(ty==='checkbox'||ty==='radio')attrs+=e.checked?' checked':' unchecked'; else if(ty!=='password'&&e.value)attrs+=' value=\"'+String(e.value).slice(0,60)+'\"'; } if(tag==='select'){ var o=e.options[e.selectedIndex]; attrs+=' selected=\"'+(o?o.text.slice(0,40):'')+'\" options='+e.options.length; lb=''; } if(e.getAttribute('aria-expanded'))attrs+=' expanded='+e.getAttribute('aria-expanded'); if(e.disabled)attrs+=' disabled'; var line='['+i+']<'+tag+attrs+'>'+lb+(tag==='a'&&e.href?' -> '+String(e.href).slice(0,100):''); if(!inView) line+=' (off-screen)'; out.push(line); } var se=document.scrollingElement||document.documentElement, above=Math.round(se.scrollTop), rest=Math.max(0,Math.round(se.scrollHeight-se.scrollTop-vh)); var txt=document.body?document.body.innerText:''; return JSON.stringify({url:location.href,title:document.title, scroll:{pixels_above:above,pixels_below:rest,hint:rest>50?'More below \u2014 scroll down to see more elements.':'At the bottom of the page.'}, elements:out,text:txt.slice(0,5000),truncated:txt.length>5000}); })";
+    static final String HIGHLIGHT_JS = "(function(on){ var old=document.getElementById('__lb_hl'); if(old)old.remove(); if(!on)return 'off'; var box=document.createElement('div'); box.id='__lb_hl'; box.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483647'; var colors=['#FF2D55','#00A2FF','#34C759','#FF9500','#AF52DE','#FFCC00','#00C7BE','#FF3B30']; document.querySelectorAll('[data-lb-ref]').forEach(function(e){ var r=e.getBoundingClientRect(); if(r.bottom<0||r.top>innerHeight||r.width<3)return; var n=+e.getAttribute('data-lb-ref'), c=colors[n%colors.length]; var b=document.createElement('div'); b.style.cssText='position:fixed;left:'+r.left+'px;top:'+r.top+'px;width:'+r.width+'px;height:'+r.height+'px;border:2px solid '+c+';box-sizing:border-box;border-radius:3px'; var t=document.createElement('div'); t.textContent=n; t.style.cssText='position:absolute;right:-2px;top:-2px;transform:translateY(-100%);background:'+c+';color:#fff;font:bold 11px sans-serif;padding:0 3px;border-radius:3px;line-height:15px'; if(r.top<16)t.style.transform='none'; b.appendChild(t); box.appendChild(b); }); document.documentElement.appendChild(box); return 'on'; })";
+    static final String EXTRACT_JS = "(function(max){ var out=[], len=0; function push(s){ if(len>max)return; out.push(s); len+=s.length; } function text(n){ return (n.innerText||n.textContent||'').replace(/\\s+/g,' ').trim(); } function walk(n){ if(len>max||!n)return; if(n.nodeType===3){ var t=n.textContent.replace(/\\s+/g,' '); if(t.trim())push(t); return; } if(n.nodeType!==1)return; var tag=n.tagName.toLowerCase(); if(['script','style','noscript','svg','template','iframe','select','option','textarea','input'].indexOf(tag)>=0)return; var st=getComputedStyle(n); if(st.display==='none'||st.visibility==='hidden')return; if(/^h[1-6]$/.test(tag)){ push('\\n\\n'+'#'.repeat(+tag[1])+' '+text(n)+'\\n'); return; } if(tag==='a'&&n.href){ var t2=text(n); if(t2)push('['+t2+']('+n.href+')'); return; } if(tag==='img'){ if(n.alt)push('![' + n.alt + ']'); return; } if(tag==='li'){ push('\\n- '); for(var c=n.firstChild;c;c=c.nextSibling)walk(c); return; } if(tag==='br'){ push('\\n'); return; } if(tag==='table'){ push('\\n'); var rows=n.querySelectorAll('tr'); for(var r=0;r<rows.length&&r<80;r++){ var cells=rows[r].querySelectorAll('th,td'), a=[]; for(var c2=0;c2<cells.length;c2++)a.push(text(cells[c2]).slice(0,80)); push('| '+a.join(' | ')+' |\\n'); if(r===0)push('|'+a.map(function(){return '---';}).join('|')+'|\\n'); } return; } var block=['p','div','section','article','header','footer','main','aside','nav','form','ul','ol','pre','blockquote','tr','dl','dt','dd','figure'].indexOf(tag)>=0; if(block)push('\\n'); for(var ch=n.firstChild;ch;ch=ch.nextSibling)walk(ch); if(block)push('\\n'); } walk(document.body); var md=out.join('').replace(/[ \\t]+\\n/g,'\\n').replace(/\\n{3,}/g,'\\n\\n').trim(); return JSON.stringify({url:location.href,title:document.title,markdown:md.slice(0,max),truncated:md.length>max}); })";
+
+    JSONObject readPage(Surface s, int max, boolean all) throws ToolError {
+        JSONObject r = J.parse(js(s, READ_JS + "(" + Math.max(10, Math.min(300, max)) + "," + all + ")", 12000));
+        s.refs.clear();
+        JSONArray el = r.optJSONArray("elements");
+        if (el != null) for (int i = 0; i < el.length(); i++) {
+            String line = el.optString(i);
+            int c = line.indexOf(']');
+            if (line.startsWith("[") && c > 1) try { s.refs.put(Integer.parseInt(line.substring(1, c)), line.substring(c + 1).trim()); } catch (NumberFormatException ignored) { }
+        }
+        return r;
+    }
 
     JSONObject state(Surface s) throws ToolError {
         String v = js(s, "JSON.stringify({url:location.href,title:document.title,text_excerpt:(document.body?document.body.innerText:'').slice(0,1500)})", 8000);
@@ -510,19 +577,63 @@ public final class Computer {
                 } });
             }
         }).needs("browser").timeout(60).card(card("Open")));
-        reg.register(new Spec("browser.read", "Read the current page: text and numbered interactive elements (refs).",
-                Tools.obj(J.obj("max_elements", I)), Tools.READ, "allow", new Tools.Executor() {
+        reg.register(new Spec("browser.read", "Read the page like browser-use: numbered interactive elements in the visible part of the page "
+                + "([12]<button>Sign in</button>), scroll position (pixels above/below) and the page text. Use the numbers as ref in click/type/select. "
+                + "Elements below the fold appear after browser.scroll; include_offscreen lists them too.",
+                Tools.obj(J.obj("max_elements", I, "include_offscreen", J.obj("type", "boolean"))), Tools.READ, "allow", new Tools.Executor() {
             public Object run(Ctx ctx, final JSONObject a) throws Exception {
                 return act(ctx, new ActFn() { public Object run(Surface s) throws Exception {
-                    JSONObject r = J.parse(js(s, READ_JS + "(" + Math.max(10, Math.min(300, a.optInt("max_elements", 120))) + ")", 10000));
-                    s.refs.clear();
-                    JSONArray el = r.optJSONArray("elements");
-                    if (el != null) for (int i = 0; i < el.length(); i++) {
-                        String line = el.optString(i);
-                        int c = line.indexOf(':');
-                        if (c > 0) try { s.refs.put(Integer.parseInt(line.substring(0, c)), line.substring(c + 1).trim()); } catch (NumberFormatException ignored) { }
-                    }
-                    return r;
+                    return readPage(s, a.optInt("max_elements", 150), a.optBoolean("include_offscreen"));
+                } });
+            }
+        }).needs("browser"));
+        reg.register(new Spec("browser.extract", "Get the whole page as Markdown (headings, links, lists, tables) to find or extract information without clicking.",
+                Tools.obj(J.obj("max_chars", I)), Tools.READ, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, final JSONObject a) throws Exception {
+                return act(ctx, new ActFn() { public Object run(Surface s) throws Exception {
+                    return J.parse(js(s, EXTRACT_JS + "(" + Math.max(1000, Math.min(30000, a.optInt("max_chars", 15000))) + ")", 15000));
+                } });
+            }
+        }).needs("browser"));
+        reg.register(new Spec("browser.select", "Choose an option in a dropdown (<select>) by ref and the option's visible text or value.",
+                Tools.obj(J.obj("ref", I, "option", S), "ref", "option"), Tools.EXTERNAL, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, final JSONObject a) throws Exception {
+                return act(ctx, new ActFn() { public Object run(Surface s) throws Exception {
+                    String r = js(s, "(function(v){var e=document.querySelector('[data-lb-ref=\"" + a.optInt("ref") + "\"]');if(!e)return 'missing';"
+                            + "if(e.tagName!=='SELECT')return 'notselect';var lv=v.toLowerCase(),hit=-1;for(var i=0;i<e.options.length;i++){var o=e.options[i];"
+                            + "if(o.text.trim().toLowerCase()===lv||o.value.toLowerCase()===lv){hit=i;break;}if(hit<0&&o.text.toLowerCase().indexOf(lv)>=0)hit=i;}"
+                            + "if(hit<0)return 'nooption:'+Array.prototype.map.call(e.options,function(o){return o.text.trim();}).slice(0,30).join(' | ');"
+                            + "e.selectedIndex=hit;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));return 'ok:'+e.options[hit].text.trim();})("
+                            + JSONObject.quote(a.optString("option")) + ")", 8000);
+                    if ("missing".equals(r)) throw new ToolError("Element ref " + a.optInt("ref") + " not found; call browser.read again.");
+                    if ("notselect".equals(r)) throw new ToolError("Element " + a.optInt("ref") + " is not a <select>. For a custom dropdown, click it and then click the option.");
+                    if (r.startsWith("nooption:")) throw new ToolError("No such option. Options: " + r.substring(9));
+                    Thread.sleep(400);
+                    return J.obj("selected", r.substring(3), "page", state(s));
+                } });
+            }
+        }).needs("browser").card(card("Choose in")));
+        reg.register(new Spec("browser.wait", "Wait up to 10 seconds for the page to finish loading or change.",
+                Tools.obj(J.obj("seconds", N)), Tools.READ, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, final JSONObject a) throws Exception {
+                return act(ctx, new ActFn() { public Object run(Surface s) throws Exception {
+                    Thread.sleep((long) (Math.max(0.5, Math.min(10, a.optDouble("seconds", 2))) * 1000));
+                    return state(s);
+                } });
+            }
+        }).needs("browser"));
+        reg.register(new Spec("browser.tabs", "Tabs of your browser: action list | new (optionally open url) | switch (index) | close (index). Up to 5 tabs.",
+                Tools.obj(J.obj("action", J.obj("type", "string", "enum", new JSONArray().put("list").put("new").put("switch").put("close")), "url", S, "index", I), "action"),
+                Tools.READ, "allow", new Tools.Executor() {
+            public Object run(Ctx ctx, final JSONObject a) throws Exception {
+                return act(ctx, new ActFn() { public Object run(Surface s) throws Exception {
+                    String act = a.optString("action");
+                    if ("new".equals(act)) { newTab(s); if (!a.optString("url").isEmpty()) navigate(s, a.optString("url")); }
+                    else if ("switch".equals(act)) switchTab(s, a.optInt("index", -1));
+                    else if ("close".equals(act)) closeTab(s, a.optInt("index", -1));
+                    JSONObject t = tabs(s);
+                    if (!"list".equals(act)) J.put(t, "page", state(s));
+                    return t;
                 } });
             }
         }).needs("browser"));
@@ -592,11 +703,22 @@ public final class Computer {
         }).needs("browser").card(card("Press")).escalate(new Tools.Escalate() {
             public String check(Ctx ctx, JSONObject a) { return keyCode(a.optString("key")) == KeyEvent.KEYCODE_ENTER ? "Pressing Enter may submit a form." : null; }
         }));
-        reg.register(new Spec("browser.scroll", "Scroll the page by dy CSS pixels.", Tools.obj(J.obj("dy", N)), Tools.READ, "allow", new Tools.Executor() {
+        reg.register(new Spec("browser.scroll", "Scroll: direction down/up by pages (default 1 screen), or dy CSS pixels, or to the first place showing text.",
+                Tools.obj(J.obj("direction", J.obj("type", "string", "enum", new JSONArray().put("down").put("up")), "pages", N, "dy", N, "text", S)), Tools.READ, "allow", new Tools.Executor() {
             public Object run(Ctx ctx, final JSONObject a) throws Exception {
                 return act(ctx, new ActFn() { public Object run(Surface s) throws Exception {
-                    js(s, "window.scrollBy(0," + a.optDouble("dy", 600) + ");'ok'", 5000);
-                    return state(s);
+                    if (!a.optString("text").isEmpty()) {
+                        String r = js(s, "(function(q){q=q.toLowerCase();var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT),n;"
+                                + "while((n=w.nextNode())){if(n.textContent.toLowerCase().indexOf(q)>=0&&n.parentElement&&n.parentElement.getClientRects().length){"
+                                + "n.parentElement.scrollIntoView({block:'center'});return 'ok';}}return 'none';})(" + JSONObject.quote(a.optString("text")) + ")", 8000);
+                        if (!"ok".equals(r)) throw new ToolError("Text not found on the page.");
+                    } else {
+                        String dy = a.has("dy") ? String.valueOf(a.optDouble("dy"))
+                                : ("up".equals(a.optString("direction")) ? "-" : "") + "window.innerHeight*0.85*" + Math.max(0.1, Math.min(10, a.optDouble("pages", 1)));
+                        js(s, "window.scrollBy(0," + dy + ");'ok'", 5000);
+                    }
+                    Thread.sleep(300);
+                    return readPage(s, 150, false);
                 } });
             }
         }).needs("browser"));
@@ -609,13 +731,21 @@ public final class Computer {
                 } });
             }
         }).needs("browser"));
-        reg.register(new Spec("browser.screenshot", "Take a screenshot of your browser tab. You will SEE the image in the next message (if the model supports images).", Tools.obj(new JSONObject()), Tools.READ, "allow", new Tools.Executor() {
-            public Object run(final Ctx ctx, JSONObject a) throws Exception {
+        reg.register(new Spec("browser.screenshot", "Screenshot of your tab with the interactive elements outlined and numbered (same numbers as browser.read). "
+                + "You SEE the image in the next message (if the model supports images). highlight=false gives a clean screenshot.",
+                Tools.obj(J.obj("highlight", J.obj("type", "boolean"))), Tools.READ, "allow", new Tools.Executor() {
+            public Object run(final Ctx ctx, final JSONObject a) throws Exception {
                 return act(ctx, new ActFn() { public Object run(Surface s) throws Exception {
-                    byte[] jpg = screenshot(s.id);
+                    boolean hl = !a.has("highlight") || a.optBoolean("highlight");
+                    JSONObject page = hl ? readPage(s, 150, false) : null;
+                    if (hl) { js(s, HIGHLIGHT_JS + "(true)", 5000); Thread.sleep(250); }
+                    byte[] jpg;
+                    try { jpg = screenshot(s.id); } finally { if (hl) js(s, HIGHLIGHT_JS + "(false)", 5000); }
                     JSONObject art = backend.artifacts.create("screenshot.jpg", jpg, "image/jpeg", ctx.task, ctx.run.optString("id"), ctx.bot.optString("id"), null);
-                    return J.obj("artifact_id", art.optString("id"), "image_artifact_id", art.optString("id"), "size", jpg.length,
-                            "note", "The screenshot is attached as an image in the next message.");
+                    JSONObject out = J.obj("artifact_id", art.optString("id"), "image_artifact_id", art.optString("id"), "size", jpg.length,
+                            "note", "The screenshot is attached as an image in the next message" + (hl ? "; boxes are numbered like the elements below." : "."));
+                    if (page != null) { J.put(out, "elements", page.optJSONArray("elements")); J.put(out, "scroll", page.optJSONObject("scroll")); J.put(out, "url", page.optString("url")); }
+                    return out;
                 } });
             }
         }).needs("browser"));

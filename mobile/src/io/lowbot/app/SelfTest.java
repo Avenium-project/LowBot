@@ -417,6 +417,17 @@ public class SelfTest extends BroadcastReceiver {
             c.navigate(s, "https://example.com/");
             JSONObject st = c.state(s);
             check(st.optString("title").toLowerCase().contains("example"), "browser loads a page");
+            JSONObject page = c.readPage(s, 150, false);
+            check(page.optJSONArray("elements").length() >= 1 && page.optJSONArray("elements").optString(0).startsWith("[1]<a")
+                    && page.has("scroll"), "browser-use style element list (" + J.truncate(page.optJSONArray("elements").optString(0), 60) + ")");
+            JSONObject md = J.parse(c.js(s, Computer.EXTRACT_JS + "(5000)", 10000));
+            check(md.optString("markdown").contains("# Example Domain"), "page extracted as Markdown");
+            c.js(s, Computer.HIGHLIGHT_JS + "(true)", 5000);
+            check("1".equals(c.js(s, "String(document.querySelectorAll('#__lb_hl > div').length)", 5000)), "screenshot highlight overlay");
+            c.js(s, Computer.HIGHLIGHT_JS + "(false)", 5000);
+            c.newTab(s);
+            check(c.tabs(s).optJSONArray("tabs").length() == 2, "second browser tab");
+            c.closeTab(s, 1);
             byte[] jpg = c.screenshot(s.id);
             check(jpg.length > 1000, "browser screenshot");
             c.close(s.id);
