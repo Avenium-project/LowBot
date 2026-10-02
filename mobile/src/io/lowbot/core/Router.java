@@ -406,6 +406,44 @@ public final class Router {
             }
         }
 
+        // ---------------------------------------------------------- workspace files (owner's file explorer)
+        if (a.equals("workspace") && "files".equals(id) && get) {
+            File root = b.core.workspace.getCanonicalFile();
+            File dir = wsPath(root, q(u, "path", ""));
+            if (!dir.isDirectory()) throw new ApiError(404, "Not a folder");
+            final String dirRel = dir.equals(root) ? "" : dir.getPath().substring(root.getPath().length() + 1);
+            File[] fs = dir.listFiles();
+            List<JSONObject> rows = new ArrayList<JSONObject>();
+            if (fs != null) for (File f : fs) {
+                if (f.getName().startsWith(".")) continue;
+                String rel = (dirRel.isEmpty() ? "" : dirRel + "/") + f.getName();
+                File[] kids = f.isDirectory() ? f.listFiles() : null;
+                rows.add(J.obj("name", f.getName(), "path", rel, "dir", f.isDirectory(), "size", f.isDirectory() ? (kids == null ? 0 : kids.length) : f.length(),
+                        "updated_at", J.iso(f.lastModified())));
+            }
+            java.util.Collections.sort(rows, new java.util.Comparator<JSONObject>() {
+                public int compare(JSONObject x, JSONObject y) {
+                    if (x.optBoolean("dir") != y.optBoolean("dir")) return x.optBoolean("dir") ? -1 : 1;
+                    return x.optString("name").compareToIgnoreCase(y.optString("name"));
+                }
+            });
+            return Response.json(J.obj("path", dirRel, "items", Db.toArray(rows)));
+        }
+        if (a.equals("workspace") && "file".equals(id) && get) {
+            File root = b.core.workspace.getCanonicalFile();
+            File f = wsPath(root, q(u, "path", ""));
+            if (!f.isFile()) throw new ApiError(404, "File does not exist");
+            if (f.length() > 25 * 1024 * 1024) throw new ApiError(413, "File is larger than 25 MB.");
+            Response r = new Response();
+            String ext = f.getName().contains(".") ? f.getName().substring(f.getName().lastIndexOf('.') + 1).toLowerCase() : "";
+            String mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
+            if (mime == null) mime = java.util.Arrays.asList("md", "txt", "log", "csv", "json", "py", "js", "ts", "sh", "yaml", "yml", "toml", "html", "css", "java", "c", "go", "rs").contains(ext) ? "text/plain" : "application/octet-stream";
+            r.type = mime;
+            r.bytes = readFile(f);
+            r.filename = f.getName();
+            return r;
+        }
+
         // ---------------------------------------------------------- usage/audit
         if (a.equals("usage")) return Response.json(b.providers.usageSummary(q(u, "bot_id", null)));
         if (a.equals("audit")) {
@@ -538,6 +576,14 @@ public final class Router {
     }
 
     /** Grok Bot search scopes: Messages, Bots, Group Chats, Files, Routines, All. */
+    /** Resolves a path inside the workspace; refuses anything outside it (also through symlinks). */
+    static File wsPath(File root, String rel) throws Exception {
+        String r = rel == null ? "" : rel.trim().replaceFirst("^/+", "");
+        File f = r.isEmpty() ? root : new File(root, r).getCanonicalFile();
+        if (!f.equals(root) && !f.getPath().startsWith(root.getPath() + File.separator)) throw new ApiError(403, "Outside the workspace.");
+        return f;
+    }
+
     JSONObject search(String text, String scope) {
         if (text.trim().length() < 2) throw new ApiError(422, "Type at least 2 characters.");
         String like = "%" + text.replace("%", "").replace("_", "") + "%";

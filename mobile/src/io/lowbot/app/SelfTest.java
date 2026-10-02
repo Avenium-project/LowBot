@@ -141,6 +141,11 @@ public class SelfTest extends BroadcastReceiver {
         b.engine.drain(20000);
         check("file written".equals(lastBotMessage(b, cid).optString("text")), "workspace.write tool");
         check(new File(b.core.workspace, "notes/a.txt").exists(), "file on disk");
+        JSONObject listing = api(r, "GET", "/api/v2/workspace/files?path=notes", null);
+        check(listing.optJSONArray("items").length() == 1 && "notes/a.txt".equals(listing.optJSONArray("items").optJSONObject(0).optString("path")), "file explorer lists the workspace");
+        Router.Response fileRes = r.handle("GET", "/api/v2/workspace/file?path=notes%2Fa.txt", null);
+        check(fileRes.status == 200 && "hello phone".equals(new String(fileRes.bytes, "UTF-8")), "file explorer opens a file");
+        check(r.handle("GET", "/api/v2/workspace/files?path=..%2F..", null).status == 403, "file explorer stays inside the workspace");
 
         // 3. approval → deny (external action needs approval, nothing is sent)
         JSONObject t3 = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "post it")).optJSONArray("tasks").getJSONObject(0);

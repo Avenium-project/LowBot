@@ -89,6 +89,53 @@ final class NativeBridge {
         return true;
     }
 
+    /**
+     * Opens a file in another app ("view") or the share sheet ("share"). The bytes are written to
+     * cache/shared/ and handed over through FilesProvider with a one-off read grant.
+     */
+    @JavascriptInterface
+    public String openFile(String name, String mime, String base64, String mode) {
+        if (!trusted() || base64 == null) return "denied";
+        try {
+            String safe = (name == null || name.trim().isEmpty() ? "file" : name.trim()).replaceAll("[\\\\/:*?\"<>|\\x00-\\x1f]", "_");
+            if (safe.length() > 120) safe = safe.substring(safe.length() - 120);
+            File root = FilesProvider.root(activity);
+            File[] old = root.listFiles();
+            long now = System.currentTimeMillis();
+            if (old != null) for (File d : old) if (now - d.lastModified() > 24 * 3600 * 1000L) { File[] fs = d.listFiles(); if (fs != null) for (File x : fs) x.delete(); d.delete(); }
+            File dir = new File(root, Long.toHexString(now) + Integer.toHexString((int) (Math.random() * 0xffff)));
+            if (!dir.mkdirs()) return "error";
+            File f = new File(dir, safe);
+            FileOutputStream out = new FileOutputStream(f);
+            try { out.write(Base64.decode(base64, Base64.DEFAULT)); } finally { out.close(); }
+            Uri uri = FilesProvider.uriFor(f, activity);
+            String type = mime == null || mime.isEmpty() ? "application/octet-stream" : mime;
+            final Intent i;
+            if ("share".equals(mode)) {
+                Intent send = new Intent(Intent.ACTION_SEND).setType(type).putExtra(Intent.EXTRA_STREAM, uri);
+                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                i = Intent.createChooser(send, safe);
+            } else {
+                Intent view = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, type);
+                view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                if (view.resolveActivity(activity.getPackageManager()) == null && !type.startsWith("text/")) {
+                    view.setDataAndType(uri, "*/*");
+                }
+                i = Intent.createChooser(view, "Open " + safe);
+            }
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            activity.runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try { activity.startActivity(i); }
+                    catch (Exception e) { Toast.makeText(activity, "No app on this phone can open this file", Toast.LENGTH_SHORT).show(); }
+                }
+            });
+            return "ok";
+        } catch (Exception e) {
+            return "error";
+        }
+    }
+
     /** Saves a downloaded artifact into Downloads/LowBot. */
     @JavascriptInterface
     public boolean saveFile(String name, String mime, String base64) {

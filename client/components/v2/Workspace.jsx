@@ -8,6 +8,7 @@ import { BotEditor, GroupCreator } from './BotEditor';
 import Conversation from './Conversation';
 import ComputerView from './ComputerView';
 import WorkspacesPanel from './WorkspacesPanel';
+import { FilesExplorer } from './Files';
 import InboxPanel from './InboxPanel';
 import SettingsPanel from './SettingsPanel';
 import SetupWizard from './SetupWizard';
@@ -16,20 +17,6 @@ import { MemoryPanel, RoutinesPanel, SkillsPanel } from './AutomationPanels';
 import { BotBlob, DialogHost, Empty, Section, botLabel, cls, fmtTime, inputCls } from './ui';
 import { useWorkspace } from './useWorkspace';
 import { applyAppearance } from '../../lib/v2/appearance';
-
-function FilesPanel({ ws, conversationId }) {
-  const [rows, setRows] = useState([]);
-  useEffect(() => { api(`/artifacts${conversationId ? `?conversation_id=${conversationId}` : ''}`).then(setRows); }, [conversationId, ws.tick]);
-  const dl = (a) => downloadPath(`/artifacts/${a.id}/download`, a.name);
-  return (
-    <Section title="Files">
-      {rows.length ? rows.map((a) => (
-        <button key={a.id} onClick={() => dl(a)} className="w-full text-left py-2 px-1 hover:bg-white/5 rounded text-[15px] min-h-[44px]">
-          📄 {a.name} <span className="text-[13px] text-zinc-500">v{a.version} · {(a.size / 1024).toFixed(1)} KB · {fmtTime(a.created_at)}{a.task_id ? ' · task' : ''}</span>
-        </button>)) : <Empty />}
-    </Section>
-  );
-}
 
 function SearchPanel({ onOpenConversation, onOpenTask }) {
   const [q, setQ] = useState('');
@@ -194,7 +181,7 @@ function Shell() {
     tasks: () => <TasksPanel ws={ws} />,
     inbox: () => <InboxPanel ws={ws} onOpenTask={openTask} />,
     computer: (botId) => <ComputerView ws={ws} botId={botId} />,
-    files: () => <FilesPanel ws={ws} conversationId={active} />,
+    files: () => <FilesExplorer ws={ws} local={isLocal()} />,
     routines: () => <RoutinesPanel ws={ws} />,
     workspaces: () => <WorkspacesPanel ws={ws} onOpenConversation={(id) => { setPage(null); openConv(id); }} />,
     memory: () => <MemoryPanel ws={ws} />,

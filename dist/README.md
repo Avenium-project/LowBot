@@ -2,9 +2,12 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **2.9.6** — Settings again has your name, Safety & permissions (Auto Review, tool rules), MCP servers and
+- Version **3.0.0** — files from bots open and download again (file names with Polish letters broke the download
+  silently); new file viewer (images, text, Markdown with tables) with Open in another app, Save to Downloads/LowBot and
+  Share; Menu → Files is a simple explorer: "From bots" and the shared "Workspace" folder.
+  SHA-256: `1b8d59ce4b4c58726bf69204ef1946a13398e3f84020f527811ac790beea7a5e`
+- 2.9.6 — Settings again has your name, Safety & permissions (Auto Review, tool rules), MCP servers and
   Backup & audit export, in the same plain list style.
-  SHA-256: `3c8d405e4e74494f96093c1c8447bb85f6a66660f413966ed4591967ebb37180`
 - 2.9.5 — bot profile is a plain list: Character, Model, Routines, Notifications, Workspaces (switch per
   workspace), Terminal — no captions, tabs, memory files, template sharing or Advanced section (pin/hide/pause/duplicate/delete
   stay in the ⋯ menu).

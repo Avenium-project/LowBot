@@ -46,9 +46,10 @@ function installLocalHooks() {
       for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
       body = new Blob([bytes], { type });
     } else body = payload;
-    const headers = { 'Content-Type': type };
-    if (filename) headers['Content-Disposition'] = `attachment; filename="${filename}"`;
-    p(new Response(body, { status, headers }));
+    // Header values must be Latin-1: non-ASCII file names (ą, ł, …) go in the RFC 5987 form.
+    const headers = { 'Content-Type': type || 'application/octet-stream' };
+    if (filename) headers['Content-Disposition'] = `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`;
+    try { p(new Response(body, { status, headers })); } catch { p(new Response(body, { status })); }
   };
 }
 
@@ -181,11 +182,42 @@ export async function saveBlob(blob, name) {
       r.onerror = reject;
       r.readAsDataURL(blob);
     });
-    return window.LowBotNative.saveFile(name || 'file', blob.type || 'application/octet-stream', b64);
+    if (!window.LowBotNative.saveFile(name || 'file', blob.type || 'application/octet-stream', b64)) throw new ApiError(500, 'Could not save the file to Downloads.');
+    return true;
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = name || 'file'; a.click();
   return true;
+}
+
+function blobToB64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
+/** Opens a downloaded file in another app (mode 'view') or the share sheet ('share'). */
+export async function openBlob(blob, name, mode = 'view') {
+  if (window.LowBotNative?.openFile) {
+    const r = window.LowBotNative.openFile(name || 'file', blob.type || 'application/octet-stream', await blobToB64(blob), mode);
+    if (r !== 'ok') throw new ApiError(500, 'Could not open the file.');
+    return true;
+  }
+  if (mode === 'share' && navigator.share && navigator.canShare?.({ files: [new File([blob], name || 'file', { type: blob.type })] })) {
+    await navigator.share({ files: [new File([blob], name || 'file', { type: blob.type })] });
+    return true;
+  }
+  window.open(URL.createObjectURL(blob), '_blank');
+  return true;
+}
+
+export async function fetchBlob(path) {
+  const res = await api(path, { raw: true });
+  if (!res.ok) throw new ApiError(res.status, res.status === 404 ? 'The file no longer exists.' : 'Download failed');
+  return res.blob();
 }
 
 export async function downloadPath(path, name) {

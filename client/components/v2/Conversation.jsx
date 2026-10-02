@@ -6,6 +6,7 @@ import { FiArrowUp, FiCheckCircle, FiChevronLeft, FiClock, FiLock, FiMic, FiMoni
 import { api, downloadPath, fetchBlobUrl, isLocal, pendingOutbox, sendMessage } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { ElicitationCard } from './InboxPanel';
+import { FileIcon, FileViewer, fmtSize } from './Files';
 import { BotBlob, cls } from './ui';
 
 const BUSY = ['working', 'queued', 'retrying', 'waiting'];
@@ -27,12 +28,12 @@ const MD = {
 };
 
 const isImage = (a) => a.kind === 'image' || /^image\//.test(a.mime || '') || /\.(png|jpe?g|gif|webp)$/i.test(a.name || '');
-function fmtSize(n) { return !n ? '' : n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`; }
 
-// Images show as a rounded thumbnail (tap to open full screen); other files as a compact file card.
+// Images show as a rounded thumbnail, other files as a compact card; tapping either opens the viewer
+// (preview, Open in another app, Save to Downloads, Share).
 function Attachment({ a }) {
   const [url, setUrl] = useState(null);
-  const [full, setFull] = useState(false);
+  const [open, setOpen] = useState(false);
   const image = isImage(a);
   useEffect(() => {
     if (!image || !a.artifact_id) return undefined;
@@ -41,34 +42,29 @@ function Attachment({ a }) {
     return () => { if (u) URL.revokeObjectURL(u); };
   }, [a.artifact_id, image]);
   if (!a.artifact_id) return null;
-  const download = () => downloadPath(`/artifacts/${a.artifact_id}/download`, a.name || 'file');
+  const viewer = open && <FileViewer file={{ path: `/artifacts/${a.artifact_id}/download`, name: a.name || 'file', mime: a.mime, size: a.size }} onClose={() => setOpen(false)} />;
   if (image) {
     return (
       <>
-        <button type="button" onClick={() => setFull(true)} className="lb-press block mt-1 overflow-hidden rounded-[18px] bg-black/30" aria-label={a.name || 'image'}>
+        <button type="button" onClick={() => setOpen(true)} className="lb-press block mt-1 overflow-hidden rounded-[18px] bg-black/30" aria-label={a.name || 'image'}>
           {url ? <img src={url} alt={a.name || 'image'} className="lb-backdrop-in block max-h-[320px] w-auto max-w-full object-contain" />
             : <span className="lb-skeleton block h-[200px] w-[160px]" />}
         </button>
-        {full && url && (
-          <div className="fixed inset-0 z-50 bg-black/95 flex flex-col lb-backdrop-in" onClick={() => setFull(false)}>
-            <div className="flex justify-end gap-2 p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
-              <button type="button" onClick={(e) => { e.stopPropagation(); download(); }} className="rounded-full bg-white/10 px-4 py-2 text-[14px]">Save</button>
-              <button type="button" className="rounded-full bg-white/10 px-4 py-2 text-[14px]">Close</button>
-            </div>
-            <div className="flex-1 min-h-0 flex items-center justify-center p-2"><img src={url} alt={a.name || 'image'} className="max-h-full max-w-full object-contain" /></div>
-          </div>)}
+        {viewer}
       </>
     );
   }
-  const ext = ((a.name || '').split('.').pop() || 'file').slice(0, 4).toUpperCase();
   return (
-    <button type="button" onClick={download} className="lb-press mt-1 flex w-full max-w-[280px] items-center gap-3 rounded-[16px] bg-black/25 px-3 py-2.5 text-left">
-      <span className="h-10 w-10 shrink-0 rounded-xl bg-white/10 flex items-center justify-center text-[11px] font-semibold text-zinc-300">{ext}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px] text-zinc-100">{a.name || 'file'}</span>
-        <span className="block text-[12px] text-zinc-500">{fmtSize(a.size) || 'Tap to download'}</span>
-      </span>
-    </button>
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="lb-press mt-1 flex w-full max-w-[280px] items-center gap-3 rounded-[16px] bg-black/25 px-3 py-2.5 text-left">
+        <FileIcon name={a.name || ''} mime={a.mime} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[14px] text-zinc-100">{a.name || 'file'}</span>
+          <span className="block text-[12px] text-zinc-500">{fmtSize(a.size) || 'Tap to open'}</span>
+        </span>
+      </button>
+      {viewer}
+    </>
   );
 }
 
