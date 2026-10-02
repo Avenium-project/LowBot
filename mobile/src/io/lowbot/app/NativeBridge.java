@@ -235,6 +235,43 @@ final class NativeBridge {
         return trusted() ? activity.consumeShare() : null;
     }
 
+    /**
+     * The image on the clipboard (copied from another app), as JSON {name, mime, data_base64}, or null.
+     * Read only when the user taps "Paste image" in the app.
+     */
+    @JavascriptInterface
+    public String clipboardImage() {
+        if (!trusted()) return null;
+        try {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+            if (cm == null || !cm.hasPrimaryClip()) return null;
+            android.content.ClipData clip = cm.getPrimaryClip();
+            if (clip == null) return null;
+            for (int i = 0; i < clip.getItemCount(); i++) {
+                Uri uri = clip.getItemAt(i).getUri();
+                if (uri == null) continue;
+                String mime = activity.getContentResolver().getType(uri);
+                if (mime == null || !mime.startsWith("image/")) continue;
+                java.io.InputStream in = activity.getContentResolver().openInputStream(uri);
+                if (in == null) continue;
+                java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[65536];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    bo.write(buf, 0, n);
+                    if (bo.size() > 15 * 1024 * 1024) { in.close(); return "{\"error\":\"Image is larger than 15 MB.\"}"; }
+                }
+                in.close();
+                String ext = mime.substring(6).replaceAll("[^a-z0-9]", "");
+                return new JSONObject().put("name", "pasted-" + System.currentTimeMillis() + "." + (ext.isEmpty() ? "png" : ext))
+                        .put("mime", mime).put("data_base64", Base64.encodeToString(bo.toByteArray(), Base64.NO_WRAP)).toString();
+            }
+        } catch (Exception e) {
+            return "{\"error\":\"Could not read the clipboard.\"}";
+        }
+        return null;
+    }
+
     /** Ask the launcher to put a bot-made widget on the phone's home screen. */
     @JavascriptInterface
     public boolean pinWidget(String widgetId) {

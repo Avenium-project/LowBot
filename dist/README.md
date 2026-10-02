@@ -2,11 +2,13 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **3.2.0** — browser-use style browsing for bots (ideas from github.com/browser-use/browser-use, rebuilt on the
+- Version **3.3.0** — paste images into the message field (Paste, or + → Paste image to take the image from the
+  phone's clipboard), several attachments at once, thumbnails with ✕ before sending.
+  SHA-256: `6f12d624a364be765fa93039154e48a32e3b790420d03c2b39ccf0a39ff2da6c`
+- 3.2.0 — browser-use style browsing for bots (ideas from github.com/browser-use/browser-use, rebuilt on the
   phone's WebView — the Python library itself cannot run inside an Android app): numbered elements of the visible page
   with scroll position, screenshots with numbered boxes, page → Markdown extract, dropdown select, scroll by page/to text,
   wait, and up to 5 tabs.
-  SHA-256: `629096146c3d4bd00ddef410512b26259d1180eb820aeaf8141a3b2c721973e1`
 - 3.1.0 — phone home-screen widget "Your bots" (working bots hop one after another, idle ones sleep,
   tap to open the chat); bots make widgets on request (Settings → Widgets to switch off): a card in the chat with
   "Add to home" (LowBot's home) and "Add to phone"; a widget can refresh itself through the bot's routine. Messages sent

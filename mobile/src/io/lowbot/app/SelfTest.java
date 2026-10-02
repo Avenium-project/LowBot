@@ -310,7 +310,9 @@ public class SelfTest extends BroadcastReceiver {
         api(r, "POST", "/api/v2/routines", J.obj("bot_id", bot.optString("id"), "name", "Morning", "prompt", "brief me", "schedule", "every weekday at 8:00"));
         JSONObject copy = api(r, "POST", "/api/v2/bots/" + bot.optString("id") + "/duplicate", null);
         check("Asystent copy".equals(copy.optString("name")), "duplicate name");
-        check(b.core.db.count("SELECT COUNT(*) FROM routines WHERE bot_id = ? AND enabled = 0", copy.optString("id")) == 1, "duplicate routines disabled");
+        check(b.core.db.count("SELECT COUNT(*) FROM routines WHERE bot_id = ? AND enabled = 0", copy.optString("id"))
+                == b.core.db.count("SELECT COUNT(*) FROM routines WHERE bot_id = ?", bot.optString("id"))
+                && b.core.db.count("SELECT COUNT(*) FROM routines WHERE bot_id = ? AND enabled = 1", copy.optString("id")) == 0, "duplicate routines disabled");
         check(b.core.db.count("SELECT COUNT(*) FROM memories WHERE bot_id = ?", copy.optString("id")) == 0, "duplicate has no memory");
 
         // 10. Routines: DST rules in Europe/Warsaw

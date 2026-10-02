@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { FiArrowUp, FiCheckCircle, FiChevronLeft, FiClock, FiLock, FiMic, FiMonitor, FiPaperclip, FiPlus, FiSquare, FiStopCircle, FiXCircle } from 'react-icons/fi';
+import { FiArrowUp, FiCheckCircle, FiClipboard, FiChevronLeft, FiClock, FiLock, FiMic, FiMonitor, FiPaperclip, FiPlus, FiSquare, FiStopCircle, FiXCircle } from 'react-icons/fi';
 import { api, downloadPath, fetchBlobUrl, isLocal, pendingOutbox, sendMessage } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { ElicitationCard } from './InboxPanel';
@@ -274,20 +274,54 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
   const submit = async (e) => {
     e?.preventDefault();
     if (!text.trim() && !attachments.length) return;
+    if (attachments.some((a) => a.uploading)) { setError('Wait until the attachments finish uploading.'); return; }
     setError('');
-    const body = text; const att = attachments;
+    const body = text;
+    const att = attachments.map(({ artifact_id, name, kind }) => ({ artifact_id, name, kind }));
+    attachments.forEach((a) => a.preview && URL.revokeObjectURL(a.preview));
     setText(''); setAttachments([]);
     try { await sendMessage(conversation.id, body, att); }
     catch (err) { setError(err.status ? err.message : ('Offline — will send when back online.')); }
     load();
   };
 
+  // Attachments upload right away; images get a thumbnail with ✕ until the message is sent.
   const upload = async (file, kind) => {
-    const form = new FormData();
-    form.append('file', file);
-    const art = await api(`/artifacts/upload?conversation_id=${conversation.id}`, { method: 'POST', form });
-    setAttachments((xs) => [...xs, { artifact_id: art.id, name: art.name, kind: kind || (file.type.startsWith('image/') ? 'image' : 'file') }]);
-    return art;
+    const key = `${Date.now()}_${Math.random()}`;
+    const image = file.type.startsWith('image/');
+    const preview = image ? URL.createObjectURL(file) : null;
+    setAttachments((xs) => [...xs, { key, name: file.name, kind: kind || (image ? 'image' : 'file'), preview, uploading: true }]);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const art = await api(`/artifacts/upload?conversation_id=${conversation.id}`, { method: 'POST', form });
+      setAttachments((xs) => xs.map((a) => (a.key === key ? { ...a, artifact_id: art.id, name: art.name, uploading: false } : a)));
+      return art;
+    } catch (e) {
+      setAttachments((xs) => xs.filter((a) => a.key !== key));
+      setError(e.message);
+      return null;
+    }
+  };
+  const removeAttachment = (key) => setAttachments((xs) => xs.filter((a) => a.key !== key));
+
+  // Paste: images on the clipboard become attachments (text pastes normally).
+  const onPaste = (e) => {
+    const files = Array.from(e.clipboardData?.items || []).filter((it) => it.kind === 'file' && it.type.startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
+    if (!files.length) return;
+    if (!e.clipboardData.getData('text/plain')) e.preventDefault();
+    files.forEach((f, i) => upload(new File([f], f.name && f.name !== 'image.png' ? f.name : `pasted-${Date.now()}-${i}.${(f.type.split('/')[1] || 'png').replace(/[^a-z0-9]/g, '')}`, { type: f.type })));
+  };
+  const pasteFromPhone = () => {
+    setPlusOpen(false);
+    const raw = window.LowBotNative?.clipboardImage?.();
+    if (!raw) { setError('No image on the clipboard. Copy an image first.'); return; }
+    const d = JSON.parse(raw);
+    if (d.error) { setError(d.error); return; }
+    const bin = atob(d.data_base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+    upload(new File([bytes], d.name, { type: d.mime }));
   };
 
   // Dictation: browser/OS speech recognition, only after an explicit tap.
@@ -429,18 +463,29 @@ export default function Conversation({ conversation, ws, onBack, skills, onOpenB
         {plusOpen && (
           <div className="lb-rise lb-stagger absolute bottom-full left-4 mb-2 rounded-2xl bg-[#262626] border border-white/10 overflow-hidden text-[15px] min-w-[220px] shadow-2xl">
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); fileRef.current.click(); }}><FiPaperclip /> {t('attach')}</button>
+            {window.LowBotNative?.clipboardImage && <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={pasteFromPhone}><FiClipboard /> Paste image</button>}
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); setText('/'); }}>⚡ {t('skills')}</button>
             <button type="button" className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5" onClick={() => { setPlusOpen(false); onOpenComputer?.(lead); }}><FiMonitor /> {t('computer')}</button>
           </div>
         )}
-        {attachments.length > 0 && <div className="text-[13px] text-zinc-400 mb-2">{attachments.map((a) => `📎 ${a.name}`).join('  ')}</div>}
+        {attachments.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto mb-2 pb-1">
+            {attachments.map((a) => (
+              <div key={a.key} className="lb-pop relative shrink-0">
+                {a.preview ? <img src={a.preview} alt={a.name} className={cls('h-20 w-20 rounded-2xl object-cover bg-[#2a2a2a]', a.uploading && 'opacity-50')} />
+                  : <div className={cls('h-20 max-w-[180px] rounded-2xl bg-[#2a2a2a] px-3 flex items-center text-[13px] text-zinc-300', a.uploading && 'opacity-50')}><span className="truncate">📎 {a.name}</span></div>}
+                {a.uploading && <span className="absolute inset-0 flex items-center justify-center"><span className="lb-spin h-5 w-5 rounded-full border-2 border-white/30 border-t-white" /></span>}
+                <button type="button" aria-label={`Remove ${a.name}`} onClick={() => removeAttachment(a.key)}
+                  className="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full bg-black/80 border border-white/20 text-[12px] flex items-center justify-center">✕</button>
+              </div>))}
+          </div>)}
         {error && <div className="text-[13px] text-amber-300 mb-2">{error}</div>}
-        <input type="file" ref={fileRef} className="hidden" onChange={(e) => e.target.files[0] && upload(e.target.files[0])} />
+        <input type="file" ref={fileRef} multiple className="hidden" onChange={(e) => { Array.from(e.target.files || []).forEach((f) => upload(f)); e.target.value = ''; }} />
         <div className="flex items-end gap-3">
           <button type="button" aria-label={t('more')} onClick={() => setPlusOpen(!plusOpen)}
             className={cls('h-14 w-14 shrink-0 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center text-2xl transition', plusOpen && 'rotate-45')}><FiPlus /></button>
           <div className="lb-composer flex-1 min-w-0 flex items-end rounded-[28px] bg-[#2a2a2a] border border-white/10 pl-5 pr-1.5 py-1.5 min-h-[56px]">
-            <textarea rows={1} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} aria-label={t('typeMessage')}
+            <textarea rows={1} value={text} onChange={(e) => setText(e.target.value)} onPaste={onPaste} placeholder={placeholder} aria-label={t('typeMessage')}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !suggestions.length) submit(e); }}
               className="flex-1 bg-transparent resize-none outline-none text-[17px] text-zinc-100 placeholder:text-zinc-500 max-h-36 py-2.5 min-w-0" />
             {(text.trim() || attachments.length) && !listening ? (
