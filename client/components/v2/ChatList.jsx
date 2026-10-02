@@ -2,7 +2,7 @@
 // Home screen. Pinned chats as big characters on top, then your sections, then the rest.
 // Long-press (or right-click) a chat: Mark as unread · Pin · New section · Hide · More.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FiChevronLeft, FiChevronRight, FiEye, FiEyeOff, FiFileText, FiFolderPlus, FiMessageSquare, FiMoreHorizontal, FiPlus, FiSearch, FiX } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiEye, FiEyeOff, FiFileText, FiFolderPlus, FiMessageSquare, FiMoreHorizontal, FiPlus, FiSearch, FiSettings, FiX } from 'react-icons/fi';
 import { BsPin, BsPinAngle } from 'react-icons/bs';
 import { api, downloadPath } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
@@ -161,13 +161,11 @@ export default function ChatList({ ws, activeId, onOpen, onProfile, onNew, atten
   const { t } = useT();
   const [q, setQ] = useState('');
   const [searching, setSearching] = useState(false);
-  const [initial, setInitial] = useState('•');
   const [prefs, setPrefsState] = useState({ sections: [], groupPinned: [], groupHidden: [] });
   const [menu, setMenu] = useState(null); // { row, at, more }
   const [showHidden, setShowHidden] = useState(false);
   const [naming, setNaming] = useState(null); // { row, name }
   useEffect(() => { setPrefsState(loadPrefs()); }, []);
-  useEffect(() => { setInitial(((window.localStorage.getItem('opendots.name') || '').trim()[0] || '•').toUpperCase()); }, [ws.tick]);
   const setPrefs = useCallback((fn) => setPrefsState((p) => { const n = fn(p); savePrefs(n); return n; }), []);
 
   const rows = useMemo(() => {
@@ -238,9 +236,7 @@ export default function ChatList({ ws, activeId, onOpen, onProfile, onNew, atten
     <header className="flex items-center justify-between px-4 pb-3 shrink-0" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
       {showHidden
         ? <RoundButton label="back" onClick={() => setShowHidden(false)}><FiChevronLeft /></RoundButton>
-        : <RoundButton label={t('menu')} onClick={onProfile} badge={attention}>
-            <span className="h-12 w-12 rounded-full bg-[#8d6e63] flex items-center justify-center text-lg font-semibold ring-2 ring-[#2a2a2a]">{initial}</span>
-          </RoundButton>}
+        : <RoundButton label={t('menu')} onClick={onProfile} badge={attention}><FiSettings /></RoundButton>}
       {showHidden ? <span className="flex-1 mx-3 text-[19px] font-semibold">Hidden chats</span>
         : searching
           ? <div className="lb-rise flex-1 mx-3 flex items-center rounded-full bg-[#2a2a2a] px-4 h-12">

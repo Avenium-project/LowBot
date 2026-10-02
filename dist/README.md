@@ -2,11 +2,12 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **2.9.1** — bots SEE their browser screenshots (the image is sent to the model, not just a file); every bot
+- Version **2.9.2** — the top-left button on the home screen is a settings (gear) button instead of the brown dot.
+  SHA-256: `f5887948f390b2fce9f2414d443f96f7fc784bd691fde9184447d70d9f83766e`
+- 2.9.1 — bots SEE their browser screenshots (the image is sent to the model, not just a file); every bot
   has the Linux terminal tools and is told it has them; images in chat show as thumbnails (tap for full screen), files as
   cards; no more "wrote a handoff" notices in chat; delete/edit confirmations are in-app dialogs instead of
   "message from the page at …".
-  SHA-256: `8bc816c0f390aaba6dcbcd64723951c251b72bac1c08cce9f072504376e2aebb`
 - 2.9.0 — Linux terminal for bots (Alpine 3.24 via proot): Settings → Linux terminal → Install (≈4 MB,
   SHA-256-checked), then switch on "Linux terminal" in a bot's profile. The bot runs commands with `linux.run`
   (`apk add python3 git …`) in its own persistent shell; each command asks you first (Settings → Execution).
