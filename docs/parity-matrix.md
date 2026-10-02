@@ -26,7 +26,7 @@ Legenda **Status**: ✅ zrobione i przetestowane · 🟡 częściowo · ⛔ brak
 | 7 | Stany: queued…cancelled + `unknown_outcome` | G/R | brief §4 | CHECK w `runs.status` | — | D | ✅ |
 | 8 | Dzierżawy, heartbeat, fencing, przejęcie po awarii | R | brief §4 | `lease_version` jako fencing token, `recover_expired` | — | D (stale worker, crash) | ✅ |
 | 9 | Idempotencja efektów zewnętrznych, brak ślepego ponawiania | R | brief §4 | tabela `operations`, `Idempotency-Key`, `unknown_outcome` + decyzja człowieka | brak gotowych „reconcilerów” dla konkretnych API | D (crash przy wysyłce) | ✅ |
-| 10 | Retry z backoffem i jitterem, limity kroków/czasu/kosztu | R | brief §4 | `_schedule_retry`, `max_steps`, `deadline_at`, budżet przed wywołaniem | brak limitu kosztu per run (jest dzienny i tokenowy) | D (retry), K (budżet) | ✅ |
+| 10 | Retry z backoffem i jitterem, limity czasu/kosztu; bez limitu kroków | R | brief §4 | `_schedule_retry`, `deadline_at`, budżet przed wywołaniem; historyczne `max_steps` nie jest egzekwowane | brak limitu kosztu per run (jest dzienny i tokenowy) | D (retry), K (budżet) | ✅ |
 | 11 | Stop zatrzymuje i uczciwie raportuje | G | brief §4 | `control=cancel`, raport wykonanych i przerwanych akcji | — | D (stop) | ✅ |
 | 12 | Pauza/wznowienie zadania i bota | G | brief §5 | `pause`/`resume`, `bots.paused` | — | L | ✅ |
 | 13 | Priorytet wiadomości użytkownika nad tłem | R | brief §4 | priorytety 80/60/30 w claim | brak wywłaszczania trwającego przebiegu | — (logika claim) | 🟡 |

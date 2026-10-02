@@ -290,7 +290,6 @@ class TaskService:
         root = (parent_task.get("root_task_id") or parent_task["id"]) if parent_task else None
         depth = parent_task["depth"] + 1 if parent_task else 0
         settings = self.core.settings
-        budget = bot.get("budget") or {}
 
         def _write():
             self.db.insert("tasks", {
@@ -307,7 +306,7 @@ class TaskService:
                 "id": run_id, "task_id": task_id, "bot_id": bot_id,
                 "status": "paused" if bot["paused"] else "queued", "priority": priority,
                 "max_attempts": settings.default_max_attempts,
-                "max_steps": int(budget.get("max_steps") or settings.default_max_steps),
+                "max_steps": 0,  # Legacy NOT NULL column; the engine no longer enforces a step cap.
                 "created_at": now, "updated_at": now,
             })
             self.core.emit("task.created", conversation_id=conversation_id, task_id=task_id, run_id=run_id,

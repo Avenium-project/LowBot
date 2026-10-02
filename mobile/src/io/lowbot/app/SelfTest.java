@@ -55,6 +55,7 @@ public class SelfTest extends BroadcastReceiver {
             b.start();
             b = scenario(ctx, b);
             PriorityMessageTest.run(ctx);
+            StepLimitTest.run(ctx);
             browser(ctx, b);
             watchers(ctx, b);
             linux(ctx, b);

@@ -31,6 +31,38 @@ def bot_named(req):
     return re.search(r"You are (.+?) \(@", req.system).group(1)
 
 
+@pytest.mark.parametrize("stored_cap", [0, 1, 24])
+def test_runs_continue_past_legacy_step_limits(tmp_path, monkeypatch, stored_cap):
+    monkeypatch.setenv("RUN_MAX_STEPS", "1")
+    rt = make_runtime(tmp_path)
+    calls = 0
+
+    def brain(req):
+        nonlocal calls
+        calls += 1
+        if calls <= 40:
+            return ModelResponse("", [ToolCall(f"list-{calls}", wire_name("workspace.list"), {})])
+        return ModelResponse("All forty steps completed", [])
+
+    try:
+        prof = mock_profile(rt, fn=brain)
+        bot = rt.services["bots"].create({"name": "Long task", "provider_profile_id": prof["id"],
+                                          "budget": {"max_steps": 1}})
+        tasks = rt.services["tasks"]
+        conv = tasks.private_conversation(bot["id"])
+        task = tasks.post_user_message(conv["id"], "Complete forty steps")["tasks"][0]
+        run = tasks.run_for_task(task["id"])
+        assert run["max_steps"] == 0  # Old per-bot and environment settings are ignored.
+        rt.core.db.update("runs", {"id": run["id"]}, {"max_steps": stored_cap})
+        drain(rt)
+        assert tasks.get_task(task["id"])["status"] == "completed"
+        assert calls == 41
+        assert rt.core.db.scalar("SELECT COUNT(*) FROM run_steps WHERE run_id = ? AND kind = 'model'",
+                                 (run["id"],)) == 41
+    finally:
+        rt.core.db.close()
+
+
 # --------------------------------------------------------------------- A ---
 def test_A_fifty_bots_persist_and_idle_bots_cost_nothing(tmp_path):
     rt = make_runtime(tmp_path)

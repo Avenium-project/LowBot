@@ -35,7 +35,6 @@ class V2Settings:
     lease_seconds: float = field(default_factory=lambda: _float("RUN_LEASE_SECONDS", 30.0))
     heartbeat_seconds: float = field(default_factory=lambda: _float("RUN_HEARTBEAT_SECONDS", 10.0))
     # Run limits.
-    default_max_steps: int = field(default_factory=lambda: _int("RUN_MAX_STEPS", 24))
     default_run_timeout_s: int = field(default_factory=lambda: _int("RUN_TIMEOUT_SECONDS", 1800))
     default_max_attempts: int = field(default_factory=lambda: _int("RUN_MAX_ATTEMPTS", 4))
     retry_base_s: float = field(default_factory=lambda: _float("RUN_RETRY_BASE_SECONDS", 2.0))

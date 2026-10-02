@@ -286,10 +286,8 @@ public final class Engine {
             JSONObject incoming = b.tasks.pendingSteer(task, run.optString("id"));
             if (incoming != null) { steeringStep(run, task, bot, incoming); continue; }
             JSONObject open = null, done = null;
-            int modelSteps = 0;
             for (JSONObject s : steps) {
                 if ("tool".equals(s.optString("kind")) && !TERMINAL_STEP.contains(s.optString("status")) && open == null) open = s;
-                if ("model".equals(s.optString("kind"))) modelSteps++;
                 if ("tool".equals(s.optString("kind")) && "task.complete".equals(s.optString("tool_name")) && "completed".equals(s.optString("status"))) done = s;
                 if ("steering".equals(s.optString("kind")) && !J.parse(s.optString("output_json")).optString("todo").isEmpty()) done = null;
             }
@@ -303,10 +301,6 @@ public final class Engine {
                     finish(run, task, "completed", result, null);
                 } });
                 if (deferred[0]) continue;
-                throw new Parked();
-            }
-            if (modelSteps >= run.optInt("max_steps")) {
-                fenced(run, new Tx() { public void run() { finish(run, task, "failed", null, "Step limit (" + run.optInt("max_steps") + ") reached."); } });
                 throw new Parked();
             }
             modelStep(run, task, bot, steps);

@@ -392,8 +392,6 @@ public final class Tasks {
                 String now = J.nowIso();
                 String corr = parent != null ? parent.optString("correlation_id") : J.id("corr");
                 String root = parent != null ? (J.str(parent, "root_task_id", null) != null ? parent.optString("root_task_id") : parent.optString("id")) : null;
-                JSONObject budget = bot.optJSONObject("budget");
-                int maxSteps = budget != null && budget.optInt("max_steps") > 0 ? budget.optInt("max_steps") : b.core.settings.defaultMaxSteps;
                 db.insert("tasks", J.obj("id", tid, "conversation_id", cid, "bot_id", botId, "requester_type", requesterType,
                         "requester_id", requesterId, "parent_task_id", parent == null ? null : parent.optString("id"), "root_task_id", root,
                         "correlation_id", corr, "depth", parent == null ? 0 : parent.optInt("depth") + 1,
@@ -402,7 +400,8 @@ public final class Tasks {
                         "skill_id", skill == null ? null : skill.optString("id"), "skill_version", skill == null ? null : skill.optInt("version"),
                         "source_message_id", sourceMessageId, "routine_run_id", routineRunId, "created_at", now, "updated_at", now));
                 db.insert("runs", J.obj("id", rid, "task_id", tid, "bot_id", botId, "status", bot.optBoolean("paused") ? "paused" : "queued",
-                        "priority", priority, "max_attempts", b.core.settings.maxAttempts, "max_steps", maxSteps,
+                        // Legacy NOT NULL column retained for database compatibility; no step cap is enforced.
+                        "priority", priority, "max_attempts", b.core.settings.maxAttempts, "max_steps", 0,
                         "created_at", now, "updated_at", now));
                 b.core.emit("task.created", cid, tid, rid, botId, J.obj("title", title, "requester_type", requesterType,
                         "requester_id", requesterId, "parent_task_id", parent == null ? null : parent.optString("id")));
