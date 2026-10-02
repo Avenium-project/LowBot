@@ -489,10 +489,10 @@ public class SelfTest extends BroadcastReceiver {
             c.js(s, Computer.HIGHLIGHT_JS + "(true)", 5000);
             check("1".equals(c.js(s, "String(document.querySelectorAll('#__lb_hl > div').length)", 5000)), "screenshot highlight overlay");
             c.js(s, Computer.HIGHLIGHT_JS + "(false)", 5000);
-            c.js(s, "document.body.innerHTML='<div role=\\'heading\\' aria-level=\\'1\\'>Prices</div><p><span style=\\'display:inline-block\\'>BTC</span><span style=\\'display:inline-block\\'>falls</span></p>"
+            c.js(s, "document.body.innerHTML='<div role=\\'heading\\' aria-level=\\'1\\'>Prices</div><p><span style=\\'display:inline-block\\'>BTC</span><span style=\\'display:inline-block\\'>falls</span></p><p><span>Sell</span> <span>now</span></p>"
                     + "<table><tr><th>a</th><th>b</th></tr><tr><td>1</td><td>2</td></tr></table>'; 1", 5000);
             String md2 = J.parse(c.js(s, Computer.EXTRACT_JS + "(5000)", 10000)).optString("markdown");
-            check(md2.contains("# Prices") && md2.contains("BTC falls") && md2.contains("| a | b |") && md2.contains("| 1 | 2 |"),
+            check(md2.contains("# Prices") && md2.contains("BTC falls") && md2.contains("Sell now") && md2.contains("| a | b |") && md2.contains("| 1 | 2 |"),
                     "extract keeps words, headings and tables (" + J.truncate(md2, 120) + ")");
             c.newTab(s);
             check(c.tabs(s).optJSONArray("tabs").length() == 2, "second browser tab");
