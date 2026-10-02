@@ -2,9 +2,12 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **3.3.0** — paste images into the message field (Paste, or + → Paste image to take the image from the
+- Version **3.3.1** — Markdown formatting really works now (lists with bullets/numbers, headings, spacing — the
+  typography styles were missing), single line breaks are kept, code blocks scroll instead of breaking lines and have
+  a Copy button.
+  SHA-256: `d42c53b0cbdcce5e5e609cf80aa7c0f5f49cdadd808c918f6d7f7c012a21e11f`
+- 3.3.0 — paste images into the message field (Paste, or + → Paste image to take the image from the
   phone's clipboard), several attachments at once, thumbnails with ✕ before sending.
-  SHA-256: `6f12d624a364be765fa93039154e48a32e3b790420d03c2b39ccf0a39ff2da6c`
 - 3.2.0 — browser-use style browsing for bots (ideas from github.com/browser-use/browser-use, rebuilt on the
   phone's WebView — the Python library itself cannot run inside an Android app): numbered elements of the visible page
   with scroll position, screenshots with numbered boxes, page → Markdown extract, dropdown select, scroll by page/to text,

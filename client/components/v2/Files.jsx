@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { FiChevronRight, FiDownload, FiExternalLink, FiFile, FiFileText, FiFolder, FiImage, FiSearch, FiShare2, FiX } from 'react-icons/fi';
 import { api, fetchBlob, openBlob, saveBlob } from '../../lib/v2/api';
 import { BotBlob, cls, shortTime } from './ui';
@@ -77,7 +78,7 @@ export function FileViewer({ file, onClose }) {
         {!blob && !err && <div className="lb-skeleton m-4 h-[50vh] rounded-[18px]" />}
         {kind === 'image' && url && <div className="min-h-full flex items-center justify-center p-2"><img src={url} alt={file.name} className="max-w-full max-h-[80vh] object-contain" /></div>}
         {kind === 'text' && text != null && (['md', 'markdown'].includes(ext)
-          ? <div className="lb-md lb-selectable prose prose-invert max-w-none p-4 text-[16px]"><ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>{text}</ReactMarkdown></div>
+          ? <div className="lb-md lb-selectable prose prose-invert max-w-none p-4 text-[16px]"><ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MD}>{text}</ReactMarkdown></div>
           : <pre className="lb-selectable p-4 text-[13px] leading-relaxed font-mono text-zinc-200 whitespace-pre-wrap break-words">{text}</pre>)}
         {blob && (kind === 'pdf' || kind === 'other' || (kind === 'text' && text == null)) && (
           <div className="h-full flex flex-col items-center justify-center gap-4 p-8 text-center">

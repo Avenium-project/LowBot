@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { FiArrowUp, FiCheckCircle, FiClipboard, FiChevronLeft, FiClock, FiLock, FiMic, FiMonitor, FiPaperclip, FiPlus, FiSquare, FiStopCircle, FiXCircle } from 'react-icons/fi';
 import { api, downloadPath, fetchBlobUrl, isLocal, pendingOutbox, sendMessage } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
@@ -26,7 +27,27 @@ function dayLabel(iso, lang) {
 const MD = {
   a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-sky-400 underline underline-offset-2">{children}</a>,
   table: ({ children }) => <div className="lb-table"><table>{children}</table></div>,
+  pre: CodeBlock,
 };
+
+// Code blocks scroll sideways (keys and commands stay intact) and have a Copy button.
+function CodeBlock({ children }) {
+  const ref = useRef(null);
+  const [done, setDone] = useState(false);
+  const copy = async () => {
+    const text = ref.current?.innerText || '';
+    try { await navigator.clipboard.writeText(text); } catch {
+      const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    }
+    setDone(true); setTimeout(() => setDone(false), 1500);
+  };
+  return (
+    <div className="lb-code">
+      <pre ref={ref}>{children}</pre>
+      <button type="button" onClick={copy} className="lb-code-copy">{done ? 'Copied' : 'Copy'}</button>
+    </div>
+  );
+}
 
 const isImage = (a) => a.kind === 'image' || /^image\//.test(a.mime || '') || /\.(png|jpe?g|gif|webp)$/i.test(a.name || '');
 
@@ -124,7 +145,7 @@ function Bubble({ m, bot, showName, onOpenComputer, animate, ws }) {
         onlyFile ? 'p-0' : 'px-4 py-3', onlyFile ? '' : mine ? 'bg-[#3a3a3c] text-white' : 'bg-[#262626] text-zinc-100')}>
         {showName && bot && <div className="flex items-center gap-1.5 mb-1 text-[13px] text-zinc-400"><BotBlob bot={bot} size={18} still />{bot.name}</div>}
         {onlyFile ? null : mine ? <div className="whitespace-pre-wrap">{m.text}</div>
-          : <div className="lb-md prose prose-invert max-w-none prose-p:my-1 prose-pre:my-2 prose-headings:mt-3 prose-headings:mb-1.5 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 text-[16px]"><ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>{m.text}</ReactMarkdown></div>}
+          : <div className="lb-md prose prose-invert max-w-none prose-p:my-1 prose-pre:my-2 prose-headings:mt-3 prose-headings:mb-1.5 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 text-[16px]"><ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MD}>{m.text}</ReactMarkdown></div>}
         {m.attachments?.length > 0 && <div className={cls('flex flex-col gap-1.5', mine && 'items-end')}>{m.attachments.map((a, i) => <Attachment key={i} a={a} />)}</div>}
       </div>
     </div>

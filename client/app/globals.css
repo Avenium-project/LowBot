@@ -189,9 +189,11 @@ input, textarea, select, [contenteditable="true"] { -webkit-user-select: text; u
 
 /* Markdown in chat bubbles never spills out: long code wraps instead of overflowing. */
 .lb-md { overflow-wrap: anywhere; min-width: 0; }
-.lb-md pre { white-space: pre-wrap; word-break: break-word; overflow-x: auto; max-width: 100%; background: #1a1a1a; border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+.lb-md pre { white-space: pre; overflow-x: auto; max-width: 100%; background: #1a1a1a; border-radius: 12px; padding: 10px 12px; font-size: 13px; overflow-wrap: normal; }
 .lb-md code { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; font-size: 14px; }
-.lb-md pre code { background: none; padding: 0; }
+.lb-md pre code { background: none; padding: 0; white-space: pre; overflow-wrap: normal; word-break: normal; }
+.lb-code { position: relative; }
+.lb-code-copy { position: absolute; top: 6px; right: 6px; font-size: 12px; padding: 3px 9px; border-radius: 9999px; background: #2a2a2a; color: #d4d4d8; border: 1px solid rgba(255,255,255,0.1); }
 .lb-md :not(pre) > code { background: #1a1a1a; border-radius: 6px; padding: 1px 5px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .lb-md :not(pre) > code::before, .lb-md :not(pre) > code::after { content: none; }
 .lb-md .lb-table { overflow-x: auto; overflow-wrap: normal; max-width: 100%; margin: 10px 0; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); }
@@ -212,3 +214,24 @@ input, textarea, select, [contenteditable="true"] { -webkit-user-select: text; u
 .lb-no-motion *, .lb-no-motion *::before, .lb-no-motion *::after { animation: none !important; transition: none !important; }
 .lb-still-ghosts .lb-ghost, .lb-still-ghosts .lb-ghost * { animation: none !important; }
 .lb-no-previews .lb-preview { display: none !important; }
+
+/* Markdown in replies, file previews and widgets (own styles; no typography plugin). */
+.lb-md { line-height: 1.5; }
+.lb-md > :first-child { margin-top: 0 !important; }
+.lb-md > :last-child { margin-bottom: 0 !important; }
+.lb-md p { margin: 0.45em 0; }
+.lb-md ul, .lb-md ol { margin: 0.45em 0; padding-left: 1.35em; }
+.lb-md ul { list-style: disc; }
+.lb-md ol { list-style: decimal; }
+.lb-md ul ul { list-style: circle; margin: 0.15em 0; }
+.lb-md li { margin: 0.2em 0; padding-left: 0.15em; }
+.lb-md li::marker { color: #a1a1aa; }
+.lb-md li > p { margin: 0.1em 0; }
+.lb-md li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.2em; }
+.lb-md h1, .lb-md h2, .lb-md h3, .lb-md h4 { font-weight: 650; line-height: 1.3; margin: 0.9em 0 0.35em; }
+.lb-md h4 { font-size: 1em; }
+.lb-md strong { font-weight: 650; color: #fafafa; }
+.lb-md em { font-style: italic; }
+.lb-md del { text-decoration: line-through; color: #a1a1aa; }
+.lb-md a { color: #38bdf8; text-decoration: underline; text-underline-offset: 2px; }
+.lb-md pre { margin: 0.6em 0; }

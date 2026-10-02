@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { FiHome, FiMoreHorizontal, FiSmartphone, FiTrash2 } from 'react-icons/fi';
 import { api, isLocal } from '../../lib/v2/api';
 import { BotBlob, Toggle, askConfirm, cls, shortTime } from './ui';
@@ -13,7 +14,7 @@ const MD = { table: ({ children }) => <div className="lb-table"><table>{children
 function Body({ w, clamp }) {
   return (
     <div className={cls('lb-md prose prose-invert max-w-none prose-p:my-0.5 prose-ul:my-0.5 prose-li:my-0 prose-headings:my-1 text-[14px] leading-snug text-zinc-200', clamp && 'max-h-[168px] overflow-hidden')}>
-      {w.content ? <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>{w.content}</ReactMarkdown> : <span className="text-zinc-500">Empty</span>}
+      {w.content ? <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MD}>{w.content}</ReactMarkdown> : <span className="text-zinc-500">Empty</span>}
     </div>
   );
 }
