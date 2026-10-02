@@ -9,7 +9,7 @@
   restart after a crash (max 5×/hour) and keep LowBot's work notification on. Starting one asks for approval like a
   Linux command; Settings → Terminal → Watchers shows status, pings and logs (Stop / Delete). Turning a bot's Terminal
   off also turns its watchers off. Needs Linux installed; not yet tried on a real phone.
-  SHA-256: `6e0b73602879e1156ebfc988b7d67e84f9bf63be3b98f8ff8120f6a8bf88abc5`
+  SHA-256: `aa132bd125f8a9159fb49796a1dfa598412ceebd15014885d70aa285aa456f6a`
 - 3.4.0 — secrets: every bot can show a secure field (one or several values, e.g. API key + secret) that
   stores them encrypted on the phone; bots only get {{secret:NAME}} placeholders and are told never to ask for keys in
   chat; any stored secret value that shows up in tool output, a reply or the terminal log is replaced by its placeholder;

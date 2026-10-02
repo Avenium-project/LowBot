@@ -99,6 +99,8 @@ public class SelfTest extends BroadcastReceiver {
         check("ok".equals(api(r, "GET", "/api/v2/health", null).optString("status")), "health");
 
         JSONArray script = new JSONArray()
+                // First: the handoff request quotes the whole chat, which would match the rules below.
+                .put(J.obj("when", "Write the new handoff now", "reply", "## Goal\nKeep testing LowBot.\n## Next steps\n- continue"))
                 .put(J.obj("when", "take it into account", "reply", "steered: {{last}}"))
                 .put(J.obj("when", "exchange keys", "call", J.obj("name", "secret.request", "arguments", J.obj("description", "Exchange API credentials",
                         "fields", new JSONArray().put(J.obj("name", "EX_KEY", "description", "API key")).put(J.obj("name", "EX_SECRET", "description", "API secret"))))))
@@ -106,7 +108,6 @@ public class SelfTest extends BroadcastReceiver {
                         J.obj("title", "Mail", "content", "- 2 new messages", "refresh", "Check my inbox", "schedule", "every hour"))))
                 .put(J.obj("after_tool", "widget.create", "reply", "widget made"))
                 .put(J.obj("when", "say nothing", "reply", ""))
-                .put(J.obj("when", "Write the new handoff now", "reply", "## Goal\nKeep testing LowBot.\n## Next steps\n- continue"))
                 .put(J.obj("when", "write a file", "call", J.obj("name", "workspace.write", "arguments", J.obj("path", "notes/a.txt", "content", "hello phone"))))
                 .put(J.obj("after_tool", "workspace.write", "reply", "file written"))
                 .put(J.obj("when", "post it", "call", J.obj("name", "http.post", "arguments", J.obj("url", "https://example.invalid/hook", "json", J.obj("a", 1)))))
