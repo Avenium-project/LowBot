@@ -54,6 +54,7 @@ public class SelfTest extends BroadcastReceiver {
             b = Backend.forTest(ctx, "selftest.db");
             b.start();
             b = scenario(ctx, b);
+            PriorityMessageTest.run(ctx);
             browser(ctx, b);
             watchers(ctx, b);
             linux(ctx, b);
@@ -99,6 +100,7 @@ public class SelfTest extends BroadcastReceiver {
         check("ok".equals(api(r, "GET", "/api/v2/health", null).optString("status")), "health");
 
         JSONArray script = new JSONArray()
+                .put(J.obj("when", "\\[Priority user message\\]", "reply", J.obj("reply", "I'll add a footnote before finishing.", "todo", "add a footnote").toString()))
                 // First: the handoff request quotes the whole chat, which would match the rules below.
                 .put(J.obj("when", "Write the new handoff now", "reply", "## Goal\nKeep testing LowBot.\n## Next steps\n- continue"))
                 .put(J.obj("when", "take it into account", "reply", "steered: {{last}}"))
@@ -247,6 +249,10 @@ public class SelfTest extends BroadcastReceiver {
         JSONObject steerRes = api(r, "POST", "/api/v2/conversations/" + cidSteer + "/messages", J.obj("text", "add a footnote"));
         check(steerRes.optJSONArray("tasks").length() == 0 && tSteer.optString("id").equals(steerRes.optString("steered_task"))
                 && b.core.db.count("SELECT COUNT(*) FROM tasks WHERE conversation_id = ?", cidSteer) == before, "message while working steers the run (no second task)");
+        b.engine.drain(20000);
+        check(lastBotMessage(b, cidSteer).optString("text").contains("add a footnote")
+                && "waiting_approval".equals(runStatus(b, tSteer.optString("id"))), "priority reply is sent without waiting for approval or executing the tool");
+        check(b.tasks.requireTask(tSteer.optString("id")).optString("instructions").contains("- [ ] add a footnote"), "follow-up is persisted in the task checklist");
         JSONObject aSteer = b.approvals.list("pending").get(0);
         b.approvals.decide(aSteer.optString("id"), "deny", aSteer.optString("args_hash"));
         b.engine.drain(20000);
