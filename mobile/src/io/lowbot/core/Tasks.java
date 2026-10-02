@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 public final class Tasks {
     static final Pattern MENTION = Pattern.compile("(?<![\\w@])@([A-Za-z0-9][A-Za-z0-9_\\-]{0,40})");
     static final Pattern SLASH = Pattern.compile("^/([a-z0-9][a-z0-9\\-]*)\\b");
-    public static final int PRIORITY_USER = 80, PRIORITY_DELEGATED = 60, PRIORITY_BACKGROUND = 30;
+    public static final int PRIORITY_REPLY = 95, PRIORITY_USER = 80, PRIORITY_DELEGATED = 60, PRIORITY_BACKGROUND = 30;
 
     private final Backend b;
     private final Db db;
@@ -200,7 +200,15 @@ public final class Tasks {
                     tasks.put(createTask(bot.optString("id"), cid, "user", Core.OWNER, text, J.truncate(text, 80), "",
                             null, PRIORITY_USER, msg.optString("id"), skill, null));
                 }
-                else b.core.emit("task.steered", cid, steerTask, null, targets.get(0).optString("id"), J.obj("message_id", msg.optString("id")));
+                else {
+                    b.core.emit("task.steered", cid, steerTask, null, targets.get(0).optString("id"), J.obj("message_id", msg.optString("id")));
+                    // The bot answers this message right away in a short parallel reply (status, result so far, "will do"),
+                    // while the running task picks the message up before its next step and carries on.
+                    JSONObject reply = createTask(targets.get(0).optString("id"), cid, "user", Core.OWNER, text, J.truncate(text, 80), QUICK_REPLY,
+                            null, PRIORITY_REPLY, msg.optString("id"), null, null);
+                    db.exec("UPDATE runs SET max_steps = 6 WHERE task_id = ?", reply.optString("id"));
+                    tasks.put(reply);
+                }
                 out[0] = J.obj("message_id", msg.optString("id"), "seq", msg.optLong("seq"), "tasks", tasks, "duplicate", false, "steered_task", steerTask);
             }
         });
@@ -244,9 +252,12 @@ public final class Tasks {
     }
 
     /** The bot's in-progress task for a user request in this chat (not one parked on a question). */
-    String activeUserTask(String cid, String botId) {
+    /** Marks the short reply a bot gives to a message sent while it works. */
+    public static final String QUICK_REPLY = "quick_reply";
+
+    public String activeUserTask(String cid, String botId) {
         return db.scalar("SELECT t.id FROM tasks t JOIN runs r ON r.task_id = t.id WHERE t.conversation_id = ? AND t.bot_id = ? "
-                + "AND t.requester_type = 'user' AND r.status IN ('queued','running','retry_scheduled','waiting_approval','waiting_dependency') "
+                + "AND t.requester_type = 'user' AND t.expected_output != 'quick_reply' AND r.status IN ('queued','running','retry_scheduled','waiting_approval','waiting_dependency') "
                 + "ORDER BY t.created_at DESC LIMIT 1", cid, botId);
     }
 

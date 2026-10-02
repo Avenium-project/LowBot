@@ -97,6 +97,10 @@ podatności w publicznym issue.
   `default-src 'none'` w iframe `sandbox="allow-scripts"` (bez dostępu do aplikacji i sieci); na ekranie
   telefonu HTML jest renderowany w WebView z zablokowaną siecią i bez mostka do aplikacji. Obraz musi być
   plikiem z workspace bota (kontrola ścieżki), maks. 1,5 MB.
+- Zatwierdzenia: domyślnie boty działają bez pytania (także polecenia w Linuksie, sieć, przeglądarka, zarządzanie
+  botami). Zawsze pytają tylko `linux.install` i `approval.request`, którego bot ma użyć przed płatnościami, zakupami,
+  zmianami kont, udostępnieniem danych osobowych i nieodwracalnym usuwaniem danych — to zależy od modelu, nie jest
+  wymuszone technicznie. Reguły Block użytkownika nadal obowiązują; „Ask before actions” przywraca dawne pytania.
 - Watchery (`watcher.start`) to programy bota działające w tle w tym samym Linuksie — ta sama zgoda co
   `linux.run`, te same ograniczenia (bez piaskownicy, sieć poza filtrem). Każdy bot ma własny folder
   pingów (`/lowbot/pings`), więc program budzi tylko swojego bota; bot jest ustalany po folderze, nie po

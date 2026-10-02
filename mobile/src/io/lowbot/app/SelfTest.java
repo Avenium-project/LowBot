@@ -97,11 +97,14 @@ public class SelfTest extends BroadcastReceiver {
     static Backend scenario(Context ctx, Backend b) throws Exception {
         Router r = new Router(b);
         check("ok".equals(api(r, "GET", "/api/v2/health", null).optString("status")), "health");
+        // The approval flow is tested with "Ask before actions" on; the default (no approvals) is checked in 7f.
+        b.core.kvSet("ask_before_actions", "1");
 
         JSONArray script = new JSONArray()
                 // First: the handoff request quotes the whole chat, which would match the rules below.
                 .put(J.obj("when", "Write the new handoff now", "reply", "## Goal\nKeep testing LowBot.\n## Next steps\n- continue"))
                 .put(J.obj("when", "take it into account", "reply", "steered: {{last}}"))
+                .put(J.obj("when", "add a footnote", "reply", "noted, I will add a footnote"))
                 .put(J.obj("when", "exchange keys", "call", J.obj("name", "secret.request", "arguments", J.obj("description", "Exchange API credentials",
                         "fields", new JSONArray().put(J.obj("name", "EX_KEY", "description", "API key")).put(J.obj("name", "EX_SECRET", "description", "API secret"))))))
                 .put(J.obj("when", "mail widget", "call", J.obj("name", "widget.create", "arguments",
@@ -244,8 +247,13 @@ public class SelfTest extends BroadcastReceiver {
         check("waiting_approval".equals(runStatus(b, tSteer.optString("id"))), "steer setup: run is waiting");
         long before = b.core.db.count("SELECT COUNT(*) FROM tasks WHERE conversation_id = ?", cidSteer);
         JSONObject steerRes = api(r, "POST", "/api/v2/conversations/" + cidSteer + "/messages", J.obj("text", "add a footnote"));
-        check(steerRes.optJSONArray("tasks").length() == 0 && tSteer.optString("id").equals(steerRes.optString("steered_task"))
-                && b.core.db.count("SELECT COUNT(*) FROM tasks WHERE conversation_id = ?", cidSteer) == before, "message while working steers the run (no second task)");
+        check(steerRes.optJSONArray("tasks").length() == 1 && tSteer.optString("id").equals(steerRes.optString("steered_task"))
+                && b.core.db.count("SELECT COUNT(*) FROM tasks WHERE conversation_id = ? AND expected_output = 'quick_reply'", cidSteer) == 1
+                && b.core.db.count("SELECT COUNT(*) FROM tasks WHERE conversation_id = ?", cidSteer) == before + 1, "message while working steers the run + a quick reply task");
+        b.engine.drain(20000);
+        check("waiting_approval".equals(runStatus(b, tSteer.optString("id")))
+                && b.core.db.count("SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND author_type = 'bot' AND text LIKE '%add a footnote%'", cidSteer) == 1,
+                "the bot answers at once while its long task still runs");
         JSONObject aSteer = b.approvals.list("pending").get(0);
         b.approvals.decide(aSteer.optString("id"), "deny", aSteer.optString("args_hash"));
         b.engine.drain(20000);
@@ -364,6 +372,15 @@ public class SelfTest extends BroadcastReceiver {
         check(bareTools.containsKey("bot.create") && bareTools.containsKey("self.set_role") && !bareTools.containsKey("linux.run"),
                 "team tools always available; -linux.* switches the terminal off");
         b.bots.delete(bare.optString("id"));
+
+        // 7f. Default: no approvals except Linux install and actions the bot itself flags as dangerous
+        b.core.kvSet("ask_before_actions", "0");
+        java.util.Map<String, io.lowbot.engine.Tools.Spec> specs = b.tools.forBot(b.bots.get(bot.optString("id")), null, null);
+        check("allow".equals(b.engine.decide(b.bots.get(bot.optString("id")), specs.get("http.post")))
+                && "allow".equals(b.engine.decide(b.bots.get(bot.optString("id")), specs.get("bot.delete")))
+                && "ask".equals(b.engine.decide(b.bots.get(bot.optString("id")), specs.get("approval.request")))
+                && io.lowbot.engine.Engine.ALWAYS_ASK.contains("linux.install"), "no approvals by default; approval.request and linux.install still ask");
+        b.core.kvSet("ask_before_actions", "1");
 
         // 8. Always allow stores a rule for this bot + tool
         JSONObject t8 = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "post it again")).optJSONArray("tasks").getJSONObject(0);

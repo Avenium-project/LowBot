@@ -291,7 +291,10 @@ function Safety({ ws }) {
   const botName = (id) => ws.bots.find((b) => b.id === id)?.name;
   return (
     <>
-      {cfg && <div className={group}><Row label="Auto Review" right={<Toggle on={cfg.auto_review} label="Auto Review" onChange={(v) => save({ auto_review: v })} />} /></div>}
+      {cfg && <div className={group}>
+        <Row label="Ask before actions" right={<Toggle on={cfg.ask_before_actions} label="Ask before actions" onChange={(v) => save({ ask_before_actions: v })} />} />
+        <Row label="Auto Review" right={<Toggle on={cfg.auto_review} label="Auto Review" onChange={(v) => save({ auto_review: v })} />} />
+      </div>}
       {pol && <>
         <Label>Tool permissions</Label>
         <div className={group}>

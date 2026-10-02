@@ -2,13 +2,18 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **3.7.0** — bots write their widgets' code (HTML/CSS/SVG/canvas/JS, no network; workspace images via
+- Version **3.8.0** — a message to a bot that is working gets an answer at once (a short parallel reply with the
+  status/result so far or "will do"); the long task picks the message up and finishes. No more approvals by default:
+  bots just act; they ask only to install Linux and before what they flag as truly dangerous (payments, purchases,
+  accounts, personal data, irreversible deletion) with approval.request. Settings → Safety → "Ask before actions"
+  brings the old prompts back. Your own Block rules still apply.
+  SHA-256: `d43a84dbfa9f7574047481985a04da27b7fe9364dc8ba41b45e171f87b6e2fc2`
+- 3.7.0 — bots write their widgets' code (HTML/CSS/SVG/canvas/JS, no network; workspace images via
   src="workspace:path"); chart/stat/image stay as shortcuts. The app no longer hangs on the LowBot splash when many bots
   work: slow calls (browser, terminal, backups) have their own lane, events reach the page in batches, home-screen widgets
   update off the main thread, watchers restart in the background, and the splash retries and says when bots are busy.
   After a reinstall (Linux removed with the app's data) bots know the terminal exists and can install it with
   linux.install (you approve the ≈4 MB download) instead of saying they have no terminal.
-  SHA-256: `19185a5c85ea1b747dba9dfc45ee761ec921b423f4101e3b6ccf51ab6691e432`
 - 3.6.0 — widgets can show more than text: a bot adds one visual — a chart from numbers (line, area, bar,
   pie, donut), a big number with change and trend line (stat), an image from its workspace (e.g. a matplotlib PNG made
   in Linux, or a photo) or its own HTML/SVG/CSS layout. In LowBot it shows in a sandboxed frame without network access;

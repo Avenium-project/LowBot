@@ -370,6 +370,7 @@ public final class Router {
             if (id == null && get) return Response.json(settings());
             if (id == null && (post || patch)) {
                 if (body.has("auto_review")) b.core.kvSet("auto_review", J.bool(body, "auto_review") ? "1" : "0");
+                if (body.has("ask_before_actions")) b.core.kvSet("ask_before_actions", J.bool(body, "ask_before_actions") ? "1" : "0");
                 if (body.has("local_execution")) {
                     String le = body.optString("local_execution");
                     if (!Arrays.asList("ask", "always", "never").contains(le)) throw new ApiError(422, "local_execution must be ask, always or never");
@@ -605,7 +606,7 @@ public final class Router {
     }
 
     JSONObject settings() {
-        return J.obj("auto_review", b.core.kvBool("auto_review", false), "local_execution", J.str(J.obj("v", b.core.kvGet("local_execution")), "v", "ask"),
+        return J.obj("auto_review", b.core.kvBool("auto_review", false), "ask_before_actions", b.core.kvBool("ask_before_actions", false), "local_execution", J.str(J.obj("v", b.core.kvGet("local_execution")), "v", "ask"),
                 "allow_private_network", b.core.settings.allowPrivateNetwork, "timezone", b.core.settings.timezone,
                 "hierarchy_enforced", b.core.kvBool("hierarchy_enforced", false));
     }

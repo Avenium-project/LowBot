@@ -379,6 +379,19 @@ public final class Builtin {
             }
         }));
 
+        reg.register(new Spec("approval.request", "Ask the user to approve ONE truly dangerous action before you do it: a payment or purchase, sending "
+                + "money, creating/deleting/changing an account or its login/security, sharing personal data, irreversibly deleting the user's data. "
+                + "Describe exactly what you will do. Returns approved only if the user approves; if they deny, do not do it. Do not use it for anything else.",
+                Tools.obj(props("action", S, "reason", S, "details", S), "action"), Tools.EXTERNAL, "ask", new Tools.Executor() {
+            public Object run(Ctx ctx, JSONObject a) {
+                return J.obj("approved", true, "action", a.optString("action"), "note", "The user approved this action. Do exactly this, nothing more.");
+            }
+        }).card(new Tools.Summarize() {
+            public JSONObject card(JSONObject a) {
+                return J.obj("summary", a.optString("action"), "effect", J.truncate(a.optString("reason") + (a.optString("details").isEmpty() ? "" : " — " + a.optString("details")), 400),
+                        "target", "dangerous action");
+            }
+        }));
         reg.register(new Spec("user.ask", "Ask the user a question and wait for the answer (frees compute while waiting).",
                 Tools.obj(props("question", S), "question"), Tools.INTERNAL, "allow", new Tools.Executor() {
             public Object run(final Ctx ctx, final JSONObject a) throws Exception {
