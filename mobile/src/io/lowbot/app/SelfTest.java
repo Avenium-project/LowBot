@@ -483,8 +483,9 @@ public class SelfTest extends BroadcastReceiver {
             JSONObject page = c.readPage(s, 150, false);
             check(page.optJSONArray("elements").length() >= 1 && page.optJSONArray("elements").optString(0).startsWith("[1]<a")
                     && page.has("scroll"), "browser-use style element list (" + J.truncate(page.optJSONArray("elements").optString(0), 60) + ")");
-            JSONObject md = J.parse(c.js(s, Computer.EXTRACT_JS + "(5000)", 10000));
-            check(md.optString("markdown").contains("# Example Domain"), "page extracted as Markdown");
+            String mdRaw = c.js(s, Computer.EXTRACT_JS + "(5000)", 10000);
+            JSONObject md = J.parse(mdRaw);
+            check(md.optString("markdown").contains("Example Domain"), "page extracted as Markdown (" + J.truncate(String.valueOf(mdRaw), 200) + ")");
             c.js(s, Computer.HIGHLIGHT_JS + "(true)", 5000);
             check("1".equals(c.js(s, "String(document.querySelectorAll('#__lb_hl > div').length)", 5000)), "screenshot highlight overlay");
             c.js(s, Computer.HIGHLIGHT_JS + "(false)", 5000);
