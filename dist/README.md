@@ -8,8 +8,9 @@
   instructions); pings faster than the watcher's min interval are dropped; up to 3 watchers per bot, 8 in total; they
   restart after a crash (max 5×/hour) and keep LowBot's work notification on. Starting one asks for approval like a
   Linux command; Settings → Terminal → Watchers shows status, pings and logs (Stop / Delete). Turning a bot's Terminal
-  off also turns its watchers off. Needs Linux installed; not yet tried on a real phone.
-  SHA-256: `c53ff3ac6a0820a84275a5b44b21764ec47f3b20ef4ef823fb3cda4219dd9179`
+  off also turns its watchers off. Needs Linux installed; not yet tried on a real phone. Also: page → Markdown
+  extract no longer glues words together on pages that space words with CSS, and keeps role=heading headings.
+  SHA-256: `415383bb833f606b7f6205a8553accab1a470575f3dcea394c6237df626b70af`
 - 3.4.0 — secrets: every bot can show a secure field (one or several values, e.g. API key + secret) that
   stores them encrypted on the phone; bots only get {{secret:NAME}} placeholders and are told never to ask for keys in
   chat; any stored secret value that shows up in tool output, a reply or the terminal log is replaced by its placeholder;
