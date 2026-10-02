@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api, isLocal, saveBlob } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
-import { BotBlob, Button, Card, Empty, Field, Section, TaskBadge, Toggle, botLabel, fmtTime, inputCls } from './ui';
+import { BotBlob, Button, Card, Empty, Field, Section, TaskBadge, Toggle, askConfirm, askText, botLabel, fmtTime, inputCls } from './ui';
 
 export function RoutinesPanel({ ws }) {
   const { t } = useT();
@@ -68,7 +68,7 @@ export function RoutinesPanel({ ws }) {
               <Button small onClick={() => api(`/routines/${r.id}/test-run`, { method: 'POST' }).then(load)}>{t('testRun')}</Button>
               <Button small onClick={() => api(`/routines/${r.id}/simulate`, { method: 'POST' }).then((x) => setMsg(`${x.prompt}\n${t('nextRuns')}: ${x.next_runs_local.join(' · ')}`))}>{t('simulate')}</Button>
               <Button small onClick={() => (hist[r.id] ? setHist({ ...hist, [r.id]: null }) : api(`/routines/${r.id}/history`).then((h) => setHist({ ...hist, [r.id]: h })))}>{t('history')}</Button>
-              <Button small kind="danger" onClick={() => confirm('Delete?') && api(`/routines/${r.id}`, { method: 'DELETE' }).then(load)}>{t('delete')}</Button>
+              <Button small kind="danger" onClick={async () => { if (await askConfirm({ title: `Delete ${r.name}?`, confirmLabel: 'Delete', danger: true })) api(`/routines/${r.id}`, { method: 'DELETE' }).then(load); }}>{t('delete')}</Button>
             </div>
             {hist[r.id] && <div className="lb-rise mt-3 space-y-2">{hist[r.id].length ? hist[r.id].map((h) => (
               <div key={h.id} className="flex items-center gap-2 text-[13px]"><TaskBadge status={h.task_status || h.status} />
@@ -106,7 +106,7 @@ export function MemoryPanel({ ws }) {
           <div className="text-[13px] text-zinc-500">{m.scope}{m.bot_id ? ` · ${ws.bots.find((b) => b.id === m.bot_id)?.name || m.bot_id}` : ''} · {m.source} · {fmtTime(m.updated_at)}</div>
           <div className="text-[15px] whitespace-pre-wrap">{m.content}</div>
           <div className="flex gap-2 mt-1">
-            <Button small onClick={() => { const c = prompt('Edit', m.content); if (c != null) api(`/memories/${m.id}`, { method: 'PATCH', body: { content: c } }).then(load); }}>{t('edit')}</Button>
+            <Button small onClick={async () => { const c = await askText({ title: 'Edit memory', value: m.content }); if (c != null) api(`/memories/${m.id}`, { method: 'PATCH', body: { content: c } }).then(load); }}>{t('edit')}</Button>
             <Button small kind="danger" onClick={() => api(`/memories/${m.id}`, { method: 'DELETE' }).then(load)}>{t('delete')}</Button>
           </div>
         </Card>
@@ -141,7 +141,7 @@ export function SkillsPanel({ ws, skills, reloadSkills }) {
             <div className="flex justify-between flex-wrap gap-2"><div><b>/{s.slug}</b> — {s.name} · v{s.version} · {s.source}</div>
               <div className="flex gap-1">
                 <Button small onClick={() => api(`/skills/${s.id}/export`).then((x) => saveBlob(new Blob([JSON.stringify(x, null, 2)], { type: 'application/json' }), `${s.slug}.skill.json`))}>{t('export')}</Button>
-                <Button small onClick={() => { const v = prompt('Instructions', s.instructions); if (v != null) api(`/skills/${s.id}`, { method: 'PATCH', body: { instructions: v } }).then(reloadSkills); }}>{t('edit')}</Button>
+                <Button small onClick={async () => { const v = await askText({ title: 'Skill instructions', value: s.instructions }); if (v != null) api(`/skills/${s.id}`, { method: 'PATCH', body: { instructions: v } }).then(reloadSkills); }}>{t('edit')}</Button>
                 <Button small kind="danger" onClick={() => api(`/skills/${s.id}`, { method: 'DELETE' }).then(reloadSkills)}>{t('delete')}</Button>
               </div></div>
             <pre className="text-[13px] text-zinc-400 whitespace-pre-wrap max-h-32 overflow-y-auto">{s.instructions}</pre>

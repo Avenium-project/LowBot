@@ -87,6 +87,7 @@ public final class Backend {
         started = true;
         bots.upgradeTeamTools();
         bots.upgradeSprites();
+        bots.upgradeLinuxTools();
         engine.start();
         try {
             routines.tick();

@@ -13,7 +13,7 @@ import SettingsPanel from './SettingsPanel';
 import SetupWizard from './SetupWizard';
 import TasksPanel, { TaskDetail } from './TasksPanel';
 import { MemoryPanel, RoutinesPanel, SkillsPanel } from './AutomationPanels';
-import { BotBlob, Empty, Section, botLabel, cls, fmtTime, inputCls } from './ui';
+import { BotBlob, DialogHost, Empty, Section, botLabel, cls, fmtTime, inputCls } from './ui';
 import { useWorkspace } from './useWorkspace';
 
 function FilesPanel({ ws, conversationId }) {
@@ -88,6 +88,7 @@ export default function Workspace() {
           <span className="text-zinc-500 text-[15px] tracking-wide">LowBot</span>
         </div>)
         : authed === 'ok' ? <Shell /> : <SetupWizard startAt={authed === 'empty' ? 2 : 0} onReady={() => { setAuthed('ok'); }} />}
+      <DialogHost />
     </LangContext.Provider>
   );
 }

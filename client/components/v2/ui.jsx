@@ -1,6 +1,6 @@
 'use client';
 // Small shared UI primitives for the v2 workspace.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useT } from '../../lib/v2/i18n';
 
 export function cls(...xs) { return xs.filter(Boolean).join(' '); }
@@ -203,3 +203,43 @@ export function Toggle({ on, onChange, label }) {
   );
 }
 
+
+// In-app dialogs (instead of the browser's confirm/prompt, which Android shows as "message from the page at …").
+let dialogSetter = null;
+export function askConfirm({ title, message = '', confirmLabel = 'OK', danger = false }) {
+  return new Promise((resolve) => {
+    if (!dialogSetter) { resolve(false); return; }
+    dialogSetter({ kind: 'confirm', title, message, confirmLabel, danger, resolve });
+  });
+}
+export function askText({ title, value = '', confirmLabel = 'Save', multiline = true }) {
+  return new Promise((resolve) => {
+    if (!dialogSetter) { resolve(null); return; }
+    dialogSetter({ kind: 'text', title, value, confirmLabel, multiline, resolve });
+  });
+}
+
+export function DialogHost() {
+  const [d, setD] = useState(null);
+  const [text, setText] = useState('');
+  useEffect(() => { dialogSetter = (x) => { setText(x.value || ''); setD(x); }; return () => { dialogSetter = null; }; }, []);
+  if (!d) return null;
+  const done = (v) => { d.resolve(v); setD(null); };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 lb-backdrop-in" onClick={() => done(d.kind === 'confirm' ? false : null)}>
+      <div role="dialog" aria-modal="true" aria-label={d.title} onClick={(e) => e.stopPropagation()}
+        className="lb-sheet-in w-full sm:max-w-sm m-3 rounded-[28px] bg-[#1f1f1f] border border-white/10 p-5" style={{ marginBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+        <div className="text-[19px] font-semibold">{d.title}</div>
+        {d.message && <div className="mt-2 text-[15px] text-zinc-400 leading-snug">{d.message}</div>}
+        {d.kind === 'text' && (d.multiline
+          ? <textarea autoFocus className={cls(inputCls, 'mt-3 h-36 lb-selectable')} value={text} onChange={(e) => setText(e.target.value)} />
+          : <input autoFocus className={cls(inputCls, 'mt-3')} value={text} onChange={(e) => setText(e.target.value)} />)}
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => done(d.kind === 'confirm' ? false : null)} className="lb-press rounded-full bg-[#2a2a2a] py-3 text-[16px] font-medium">Cancel</button>
+          <button type="button" onClick={() => done(d.kind === 'confirm' ? true : text)}
+            className={cls('lb-press rounded-full py-3 text-[16px] font-semibold', d.danger ? 'bg-rose-600 text-white' : 'bg-white text-black')}>{d.confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -2,13 +2,17 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **2.9.0** — Linux terminal for bots (Alpine 3.24 via proot): Settings → Linux terminal → Install (≈4 MB,
+- Version **2.9.1** — bots SEE their browser screenshots (the image is sent to the model, not just a file); every bot
+  has the Linux terminal tools and is told it has them; images in chat show as thumbnails (tap for full screen), files as
+  cards; no more "wrote a handoff" notices in chat; delete/edit confirmations are in-app dialogs instead of
+  "message from the page at …".
+  SHA-256: `8bc816c0f390aaba6dcbcd64723951c251b72bac1c08cce9f072504376e2aebb`
+- 2.9.0 — Linux terminal for bots (Alpine 3.24 via proot): Settings → Linux terminal → Install (≈4 MB,
   SHA-256-checked), then switch on "Linux terminal" in a bot's profile. The bot runs commands with `linux.run`
   (`apk add python3 git …`) in its own persistent shell; each command asks you first (Settings → Execution).
   Computer → Terminals shows the shells live and lets you type into them. Network inside Linux is NOT covered by
   LowBot's LAN/SSRF guard. Tested: install on the Android 15 emulator; running commands could only be tested on arm64
   hardware (the x86_64 emulator blocks fork) — not yet verified on a real phone.
-  SHA-256: `e77f86ccdeebf66e5d0310c542bfb338dd30026eebfd96b9ad433bd8957682cb`
 - 2.8.3 — every bot is a character: new bots (also ones created by other bots) get a random shape in a
   random colour, never an emoji; existing emoji bots are switched once to a random character.
 - 2.8.2 — search on the home screen finds message text and files (not only chat names), includes hidden

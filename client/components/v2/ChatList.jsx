@@ -6,7 +6,7 @@ import { FiChevronLeft, FiChevronRight, FiEye, FiEyeOff, FiFileText, FiFolderPlu
 import { BsPin, BsPinAngle } from 'react-icons/bs';
 import { api, downloadPath } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
-import { BotBlob, RoundButton, cls, shortTime } from './ui';
+import { BotBlob, RoundButton, askConfirm, cls, shortTime } from './ui';
 
 const BUSY = ['working', 'queued', 'retrying', 'waiting'];
 const ATTN = ['needs_approval', 'needs_input', 'needs_resolution'];
@@ -292,7 +292,7 @@ export default function ChatList({ ws, activeId, onOpen, onProfile, onNew, atten
               <MenuItem key={s.id} icon={<FiFolderPlus />} label={`Move to ${s.name}`} onClick={() => { moveTo(m, s.id); close(); }} />))}
             {sectionOf(m.key) && <MenuItem icon={<FiX />} label={`Remove from ${sectionOf(m.key).name}`} onClick={() => { moveTo(m, null); close(); }} />}
             {!m.group && <MenuItem icon={<FiMoreHorizontal />} label={t('duplicate')} onClick={() => { close(); api(`/bots/${m.bot.id}/duplicate`, { method: 'POST' }).then(reload); }} />}
-            {!m.group && <MenuItem danger icon={<FiX />} label={t('delete')} onClick={() => { close(); if (confirm(`Delete ${m.name}? Its routines and memory are removed too.`)) api(`/bots/${m.bot.id}`, { method: 'DELETE' }).then(reload); }} />}
+            {!m.group && <MenuItem danger icon={<FiX />} label={t('delete')} onClick={async () => { close(); if (await askConfirm({ title: `Delete ${m.name}?`, message: 'Its chat, routines and memory files are removed too. This cannot be undone.', confirmLabel: 'Delete', danger: true })) api(`/bots/${m.bot.id}`, { method: 'DELETE' }).then(reload); }} />}
           </> : <>
             <MenuItem icon={<FiMessageSquare />} label={m.conv?.unread > 0 ? 'Mark as read' : 'Mark as unread'} onClick={() => { close(); toggleUnread(m); }} />
             <MenuItem icon={m.pinned ? <BsPinAngle /> : <BsPin />} label={m.pinned ? 'Unpin' : 'Pin'} onClick={() => { close(); togglePin(m); }} />

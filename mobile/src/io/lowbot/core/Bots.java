@@ -17,7 +17,7 @@ public final class Bots {
     public static final String[] DEFAULT_TOOLS = {
         "workspace.*", "web.fetch", "http.post", "memory.*", "handoff.write", "soul.update", "project.*", "user.ask", "secret.request",
         "task.delegate", "task.get_status", "task.complete", "bot.*", "artifact.share",
-        "browser.*", "routine.create",
+        "browser.*", "routine.create", "linux.*",
     };
     public static final int MAX_BOTS = 50;
     // Same shapes and colours as the app's character picker (client/components/v2/ui.jsx).
@@ -345,6 +345,18 @@ public final class Bots {
             } else db.exec("UPDATE bots SET can_create_bots = 1 WHERE id = ?", r.optString("id"));
         }
         b.core.kvSet("upgrade:team_tools", "1");
+    }
+
+    /** One-time upgrade: every bot gets the Linux terminal tools (each command still needs approval). */
+    void upgradeLinuxTools() {
+        if (b.core.kvGet("upgrade:linux_tools") != null) return;
+        for (JSONObject r : db.all("SELECT id, tools_json FROM bots")) {
+            JSONArray t = J.parseArr(r.optString("tools_json"));
+            if (J.anyGlob(J.strings(t), "linux.run")) continue;
+            t.put("linux.*");
+            db.exec("UPDATE bots SET tools_json = ? WHERE id = ?", t.toString(), r.optString("id"));
+        }
+        b.core.kvSet("upgrade:linux_tools", "1");
     }
 
     /** One-time upgrade: bots with an emoji avatar get a random character sprite. */

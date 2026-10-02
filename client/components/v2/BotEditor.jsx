@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FiChevronLeft, FiChevronRight, FiFileText, FiMoreHorizontal, FiPlus, FiShare, FiCpu } from 'react-icons/fi';
 import { api, downloadPath, isLocal, saveBlob } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
-import { Ghost, Toggle, AVATAR_COLORS, BotBlob, Button, Field, SHAPES, Section, ShapeIcon, botLabel, cls, colorFor, inputCls, parseAvatar, randomAvatar, shortTime } from './ui';
+import { Ghost, Toggle, AVATAR_COLORS, BotBlob, Button, Field, SHAPES, Section, ShapeIcon, botLabel, cls, colorFor, inputCls, askConfirm, parseAvatar, randomAvatar, shortTime } from './ui';
 
 const card = 'rounded-[22px] bg-[#1f1f1f]';
 
@@ -309,7 +309,7 @@ export function BotEditor({ ws, bot: initial, onDone }) {
               [bot.paused ? t('resume_bot') : t('pause_bot'), () => action(bot.paused ? '/resume' : '/pause')],
               [t('duplicate'), () => action('/duplicate')],
             ].map(([label, fn]) => <button key={label} onClick={fn} className="block w-full text-left px-4 py-3 hover:bg-white/5">{label}</button>)}
-            <button onClick={() => confirm(`${t('delete')} ${bot.name}?`) && action('', 'DELETE')} className="block w-full text-left px-4 py-3 text-rose-400 hover:bg-white/5">{t('delete')}</button>
+            <button onClick={async () => { setMenu(false); if (await askConfirm({ title: `Delete ${bot.name}?`, message: 'Its chat, routines and memory files are removed too. This cannot be undone.', confirmLabel: 'Delete', danger: true })) action('', 'DELETE'); }} className="block w-full text-left px-4 py-3 text-rose-400 hover:bg-white/5">{t('delete')}</button>
           </div>}
         </div>}
       </header>

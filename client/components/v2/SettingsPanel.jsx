@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { api, downloadPath, isLocal } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
-import { Button, Card, Empty, Field, Section, fmtTime, inputCls } from './ui';
+import { Button, Card, Empty, Field, Section, askConfirm, fmtTime, inputCls } from './ui';
 import Integrations from './Integrations';
 
 function Providers({ ws }) {
@@ -56,7 +56,7 @@ function Providers({ ws }) {
             <div className="flex gap-1 flex-wrap">
               <Button small onClick={() => test(p.id)}>{t('testConnection')}</Button>
               <Button small onClick={() => api(`/providers/${p.id}/default`, { method: 'POST' }).then(load)}>default</Button>
-              <Button small kind="danger" onClick={() => confirm('Delete?') && api(`/providers/${p.id}`, { method: 'DELETE' }).then(load)}>{t('delete')}</Button>
+              <Button small kind="danger" onClick={async () => { if (await askConfirm({ title: `Delete ${p.name}?`, message: 'Bots using this provider fall back to the default one.', confirmLabel: 'Delete', danger: true })) api(`/providers/${p.id}`, { method: 'DELETE' }).then(load); }}>{t('delete')}</Button>
             </div>
           </div>
           {tests[p.id] && <pre className="text-[12px] text-zinc-300 whitespace-pre-wrap mt-2 max-h-48 overflow-y-auto">{tests[p.id].running ? '…' : JSON.stringify(tests[p.id], null, 1)}</pre>}

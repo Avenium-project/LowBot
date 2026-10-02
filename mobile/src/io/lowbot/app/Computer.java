@@ -609,12 +609,13 @@ public final class Computer {
                 } });
             }
         }).needs("browser"));
-        reg.register(new Spec("browser.screenshot", "Capture the tab as an image file shared in the chat.", Tools.obj(new JSONObject()), Tools.READ, "allow", new Tools.Executor() {
+        reg.register(new Spec("browser.screenshot", "Take a screenshot of your browser tab. You will SEE the image in the next message (if the model supports images).", Tools.obj(new JSONObject()), Tools.READ, "allow", new Tools.Executor() {
             public Object run(final Ctx ctx, JSONObject a) throws Exception {
                 return act(ctx, new ActFn() { public Object run(Surface s) throws Exception {
                     byte[] jpg = screenshot(s.id);
                     JSONObject art = backend.artifacts.create("screenshot.jpg", jpg, "image/jpeg", ctx.task, ctx.run.optString("id"), ctx.bot.optString("id"), null);
-                    return J.obj("artifact_id", art.optString("id"), "size", jpg.length);
+                    return J.obj("artifact_id", art.optString("id"), "image_artifact_id", art.optString("id"), "size", jpg.length,
+                            "note", "The screenshot is attached as an image in the next message.");
                 } });
             }
         }).needs("browser"));

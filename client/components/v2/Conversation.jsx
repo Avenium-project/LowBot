@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { FiArrowUp, FiCheckCircle, FiChevronLeft, FiClock, FiLock, FiMic, FiMonitor, FiPaperclip, FiPlus, FiSquare, FiStopCircle, FiXCircle } from 'react-icons/fi';
-import { api, downloadPath, isLocal, pendingOutbox, sendMessage } from '../../lib/v2/api';
+import { api, downloadPath, fetchBlobUrl, isLocal, pendingOutbox, sendMessage } from '../../lib/v2/api';
 import { useT } from '../../lib/v2/i18n';
 import { ElicitationCard } from './InboxPanel';
 import { BotBlob, cls } from './ui';
@@ -19,10 +19,50 @@ function dayLabel(iso, lang) {
   return d.toLocaleString(lang, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 }
 
+const isImage = (a) => a.kind === 'image' || /^image\//.test(a.mime || '') || /\.(png|jpe?g|gif|webp)$/i.test(a.name || '');
+function fmtSize(n) { return !n ? '' : n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`; }
+
+// Images show as a rounded thumbnail (tap to open full screen); other files as a compact file card.
 function Attachment({ a }) {
-  const open = () => downloadPath(`/artifacts/${a.artifact_id}/download`, a.name || 'file');
+  const [url, setUrl] = useState(null);
+  const [full, setFull] = useState(false);
+  const image = isImage(a);
+  useEffect(() => {
+    if (!image || !a.artifact_id) return undefined;
+    let u;
+    fetchBlobUrl(`/artifacts/${a.artifact_id}/download`).then((x) => { u = x; setUrl(x); }).catch(() => {});
+    return () => { if (u) URL.revokeObjectURL(u); };
+  }, [a.artifact_id, image]);
   if (!a.artifact_id) return null;
-  return <button onClick={open} className="mt-1 mr-2 inline-flex items-center gap-1 rounded-full bg-black/30 px-3 py-1 text-[13px] text-sky-300">📎 {a.name || 'file'}</button>;
+  const download = () => downloadPath(`/artifacts/${a.artifact_id}/download`, a.name || 'file');
+  if (image) {
+    return (
+      <>
+        <button type="button" onClick={() => setFull(true)} className="lb-press block mt-1 overflow-hidden rounded-[18px] bg-black/30" aria-label={a.name || 'image'}>
+          {url ? <img src={url} alt={a.name || 'image'} className="lb-backdrop-in block max-h-[320px] w-auto max-w-full object-contain" />
+            : <span className="lb-skeleton block h-[200px] w-[160px]" />}
+        </button>
+        {full && url && (
+          <div className="fixed inset-0 z-50 bg-black/95 flex flex-col lb-backdrop-in" onClick={() => setFull(false)}>
+            <div className="flex justify-end gap-2 p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+              <button type="button" onClick={(e) => { e.stopPropagation(); download(); }} className="rounded-full bg-white/10 px-4 py-2 text-[14px]">Save</button>
+              <button type="button" className="rounded-full bg-white/10 px-4 py-2 text-[14px]">Close</button>
+            </div>
+            <div className="flex-1 min-h-0 flex items-center justify-center p-2"><img src={url} alt={a.name || 'image'} className="max-h-full max-w-full object-contain" /></div>
+          </div>)}
+      </>
+    );
+  }
+  const ext = ((a.name || '').split('.').pop() || 'file').slice(0, 4).toUpperCase();
+  return (
+    <button type="button" onClick={download} className="lb-press mt-1 flex w-full max-w-[280px] items-center gap-3 rounded-[16px] bg-black/25 px-3 py-2.5 text-left">
+      <span className="h-10 w-10 shrink-0 rounded-xl bg-white/10 flex items-center justify-center text-[11px] font-semibold text-zinc-300">{ext}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[14px] text-zinc-100">{a.name || 'file'}</span>
+        <span className="block text-[12px] text-zinc-500">{fmtSize(a.size) || 'Tap to download'}</span>
+      </span>
+    </button>
+  );
 }
 
 // Grok-style secure secret request: the value goes to the encrypted vault, never into the chat or the model.
@@ -67,18 +107,20 @@ function TakeoverCard({ m, onOpenComputer }) {
 function Bubble({ m, bot, showName, onOpenComputer, animate }) {
   if (m.meta?.secret_request && m.author_type === 'bot') return <SecretCard m={m} />;
   if (m.meta?.takeover_request && m.author_type === 'bot') return <TakeoverCard m={m} onOpenComputer={onOpenComputer} />;
+  if (m.author_type === 'system' && m.meta?.handoff && /^🔁/.test(m.text || '')) return null; // old "wrote a handoff" notices
   if (m.author_type === 'system') {
     return <div className={cls('text-center text-[13px] text-zinc-500 my-2 px-8 whitespace-pre-wrap', animate && 'lb-rise')}>{m.text}</div>;
   }
   const mine = m.author_type === 'user';
+  const onlyFile = m.attachments?.length > 0 && (!m.text || /^📎/.test(m.text.trim()) || m.attachments.some((a) => a.name && m.text.trim() === a.name));
   return (
     <div className={cls('flex my-1.5', mine ? 'justify-end' : 'justify-start', animate && (mine ? 'lb-msg-right' : 'lb-msg-left'))}>
-      <div className={cls('min-w-0 max-w-[85%] px-4 py-3 text-[16px] leading-snug break-words [overflow-wrap:anywhere] rounded-[22px]', !mine && 'lb-selectable',
-        mine ? 'bg-[#3a3a3c] text-white' : 'bg-[#262626] text-zinc-100')}>
+      <div className={cls('min-w-0 max-w-[85%] text-[16px] leading-snug break-words [overflow-wrap:anywhere] rounded-[22px]', !mine && 'lb-selectable',
+        onlyFile ? 'p-0' : 'px-4 py-3', onlyFile ? '' : mine ? 'bg-[#3a3a3c] text-white' : 'bg-[#262626] text-zinc-100')}>
         {showName && bot && <div className="flex items-center gap-1.5 mb-1 text-[13px] text-zinc-400"><BotBlob bot={bot} size={18} still />{bot.name}</div>}
-        {mine ? <div className="whitespace-pre-wrap">{m.text}</div>
+        {onlyFile ? null : mine ? <div className="whitespace-pre-wrap">{m.text}</div>
           : <div className="lb-md prose prose-invert max-w-none prose-p:my-1 prose-pre:my-2 text-[16px]"><ReactMarkdown>{m.text}</ReactMarkdown></div>}
-        {m.attachments?.length > 0 && <div>{m.attachments.map((a, i) => <Attachment key={i} a={a} />)}</div>}
+        {m.attachments?.length > 0 && <div className={cls('flex flex-col gap-1.5', mine && 'items-end')}>{m.attachments.map((a, i) => <Attachment key={i} a={a} />)}</div>}
       </div>
     </div>
   );
