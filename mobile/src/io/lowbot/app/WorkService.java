@@ -48,7 +48,10 @@ public class WorkService extends Service {
         if (Build.VERSION.SDK_INT >= 29) startForeground(42, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
         else startForeground(42, notif);
         running = true;
-        LowBotApp.of(this).backend.wake();
+        // Backend.wake() reports work state back to update(), which starts this
+        // service again while work is queued. Wake only the engine here: calling
+        // back into the platform creates an endless main-thread notification/DB loop.
+        LowBotApp.of(this).backend.engine.wake();
         return START_STICKY;
     }
 
