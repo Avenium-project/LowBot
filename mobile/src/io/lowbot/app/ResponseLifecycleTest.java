@@ -79,7 +79,10 @@ final class ResponseLifecycleTest {
                         JSONObject output = mode == 2
                                 ? J.obj("type", "function_call", "call_id", "partial-complete", "name", Tools.wireName("task.complete"), "arguments", J.obj("result", "Premature").toString())
                                 : message("I will inspect the workspace now.", mode == 0 ? "commentary" : "final_answer");
-                        return Model.Responses.parse(J.obj("status", mode == 0 ? "completed" : "incomplete", "output", new JSONArray().put(output)));
+                        JSONArray items = new JSONArray();
+                        if (mode == 2) items.put(message("Preparing the result", "commentary"));
+                        items.put(output);
+                        return Model.Responses.parse(J.obj("status", mode == 0 ? "completed" : "incomplete", "output", items));
                     }
                     if (n == 2) {
                         SelfTest.check(b.core.db.count("SELECT COUNT(*) FROM tasks WHERE status = 'completed'") == 0,

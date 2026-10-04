@@ -426,7 +426,7 @@ public final class Engine {
             throw new Parked();
         }
         b.providers.confirm(usageId, res.profile, res.model, resp.inputTokens, resp.outputTokens);
-        if (!resp.canFinishTask() && !"commentary".equals(resp.phase) && !resp.toolCalls.isEmpty()) {
+        if (resp.isIncomplete() && !resp.toolCalls.isEmpty()) {
             scheduleRetry(run, "Model response was truncated during tool generation; no partial tools were executed.", 1);
             throw new Parked();
         }

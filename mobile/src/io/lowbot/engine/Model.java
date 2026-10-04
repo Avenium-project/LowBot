@@ -60,9 +60,12 @@ public final class Model {
         public boolean incomplete;
 
         public boolean canFinishTask() {
-            return !incomplete && !"commentary".equals(phase)
-                    && !"length".equals(finish) && !"max_tokens".equals(finish)
-                    && !"max_output_tokens".equals(finish) && !"pause_turn".equals(finish);
+            return !isIncomplete() && !"commentary".equals(phase);
+        }
+
+        public boolean isIncomplete() {
+            return incomplete || "length".equals(finish) || "max_tokens".equals(finish)
+                    || "max_output_tokens".equals(finish) || "pause_turn".equals(finish);
         }
     }
 
