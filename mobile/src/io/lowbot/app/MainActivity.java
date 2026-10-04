@@ -459,11 +459,18 @@ public class MainActivity extends Activity implements Computer.Host {
     protected void onResume() {
         super.onResume();
         LowBotApp.uiVisible = true;
+        final LowBotApp app = LowBotApp.of(this);
+        app.foregroundActivity = this;
+        // A foreground-service start rejected while backgrounded can now succeed.
+        // Counting persisted work stays off the UI thread.
+        new Thread(new Runnable() { public void run() { app.backend.wake(); } }, "lowbot-resume").start();
     }
 
     @Override
     protected void onPause() {
         LowBotApp.uiVisible = false;
+        LowBotApp app = LowBotApp.of(this);
+        if (app.foregroundActivity == this) app.foregroundActivity = null;
         super.onPause();
     }
 

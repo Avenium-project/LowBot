@@ -25,8 +25,11 @@ browser version, served from the APK's own assets and talking to the in-app back
 | Secrets | `Core.secretPut` | AES-256-GCM, key in the Android Keystore; never in messages, events or the model context |
 
 **Limits (honest):** work continues when you leave the app, but **not when the phone is off**;
-Android may stop a foreground `dataSync` service after ~6 h/day (Android 15) — it resumes the next
-time the app opens. ChatGPT sign-in (Codex CLI), stdio MCP servers, webhooks and Team Bots need a
+User-started agent work uses a `specialUse` foreground service with a bounded, renewable partial
+wake lock. On first work while the activity is visible, Android asks whether LowBot may ignore
+battery optimization; declining does not block work or repeatedly reopen the prompt. Manufacturer
+background restrictions and explicit Force stop can still interrupt the process. Reopening the app
+reconciles the service and resumes durable tasks; process death does not consume provider retries. ChatGPT sign-in (Codex CLI), stdio MCP servers, webhooks and Team Bots need a
 computer/server and are not available in the phone-only build. Model calls go to the provider you
 configure with your own API key.
 

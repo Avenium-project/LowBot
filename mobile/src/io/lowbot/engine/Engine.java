@@ -96,7 +96,7 @@ public final class Engine {
 
     public int activeCount() { return inFlight.get(); }
 
-    /** The process died while runs were running: count it as an attempt and requeue. */
+    /** Resume checkpoints after process death without consuming provider retries. */
     void recoverAfterRestart() {
         final List<JSONObject> rows = db.all("SELECT id, task_id, bot_id, owner FROM runs WHERE status = 'running'");
         if (rows.isEmpty()) return;
@@ -104,13 +104,9 @@ public final class Engine {
             @Override public void run() {
                 String now = J.nowIso();
                 for (JSONObject r : rows) {
-                    db.exec("UPDATE runs SET status = CASE WHEN attempt + 1 >= max_attempts THEN 'failed' ELSE 'queued' END, attempt = attempt + 1, "
-                            + "owner = NULL, updated_at = ?, error = CASE WHEN attempt + 1 >= max_attempts THEN 'App stopped repeatedly during this run.' ELSE error END "
+                    db.exec("UPDATE runs SET status = 'queued', "
+                            + "owner = NULL, updated_at = ? "
                             + "WHERE id = ? AND status = 'running'", now, r.optString("id"));
-                    if ("failed".equals(db.scalar("SELECT status FROM runs WHERE id = ?", r.optString("id")))) {
-                        JSONObject task = b.tasks.getTask(r.optString("task_id"));
-                        if (task != null) b.tasks.finishTask(task, "failed", null, "App stopped repeatedly during this run.");
-                    }
                     b.core.emit("run.recovered", null, r.optString("task_id"), r.optString("id"), r.optString("bot_id"),
                             J.obj("previous_owner", r.opt("owner")));
                     b.core.audit("run.recover", "system", null, r.optString("task_id"), r.optString("id"), null, null, null, null);
@@ -363,6 +359,7 @@ public final class Engine {
         if ("cancel".equals(control(run))) { finalizeCancel(run); throw new Parked(); }
         fenced(run, new Tx() { public void run() {
             String now = J.nowIso();
+            setRun(run, "attempt = 0, error = NULL");
             db.insert("run_steps", J.obj("id", J.id("stp"), "run_id", run.optString("id"), "seq", nextSeq(run.optString("id")),
                     "kind", "steering", "status", "completed", "input_json", J.obj("message_id", message.optString("id")).toString(),
                     "output_json", J.obj("message_id", message.optString("id"), "message_seq", message.optLong("seq"), "reply", reply, "todo", todo).toString(),
@@ -429,6 +426,10 @@ public final class Engine {
             throw new Parked();
         }
         b.providers.confirm(usageId, res.profile, res.model, resp.inputTokens, resp.outputTokens);
+        if (!resp.canFinishTask() && !"commentary".equals(resp.phase) && !resp.toolCalls.isEmpty()) {
+            scheduleRetry(run, "Model response was truncated during tool generation; no partial tools were executed.", 1);
+            throw new Parked();
+        }
         if (resp.text.trim().isEmpty() && resp.toolCalls.isEmpty()) {
             String why = "The model returned an empty answer (provider " + res.profile.optString("name") + ", model " + res.model
                     + (resp.finish.isEmpty() ? "" : ", finish reason " + resp.finish) + ").";
@@ -450,7 +451,8 @@ public final class Engine {
             String now = J.nowIso();
             db.insert("run_steps", J.obj("id", sid, "run_id", run.optString("id"), "seq", seq, "kind", "model", "status", "completed",
                     "input_json", J.obj("model", res.model, "provider", res.profile.optString("kind"), "mock", res.profile.optBoolean("is_mock")).toString(),
-                    "output_json", J.obj("text", resp.text, "tool_calls", J.arr(calls), "usage", new JSONArray().put(resp.inputTokens).put(resp.outputTokens), "requested_at", requestedAt).toString(),
+                    "output_json", J.obj("text", resp.text, "tool_calls", J.arr(calls), "usage", new JSONArray().put(resp.inputTokens).put(resp.outputTokens), "requested_at", requestedAt,
+                            "phase", resp.phase, "can_finish", resp.canFinishTask()).toString(),
                     "created_at", now, "updated_at", now));
             for (int i = 0; i < calls.size(); i++) {
                 JSONObject c = calls.get(i);
@@ -459,12 +461,14 @@ public final class Engine {
                         "input_json", J.obj("arguments", c.opt("arguments"), "wire", c.optString("wire")).toString(),
                         "idempotency_key", run.optString("id") + ":" + c.optString("id"), "created_at", now, "updated_at", now));
             }
-            setRun(run, "step_count = step_count + 1");
+            // The retry budget belongs to consecutive failures, not to the whole
+            // lifetime of a long task with successful progress between failures.
+            setRun(run, "step_count = step_count + 1, attempt = 0, error = NULL");
             JSONArray names = new JSONArray();
             for (JSONObject c : calls) names.put(J.obj("name", c.optString("name")));
             b.core.emit("run.step", null, task.optString("id"), run.optString("id"), bot.optString("id"),
                     J.obj("step_id", sid, "kind", "model", "text", J.truncate(resp.text, 500), "tool_calls", names));
-            if (calls.isEmpty() && b.tasks.pendingSteer(task, run.optString("id")) == null) {
+            if (calls.isEmpty() && resp.canFinishTask() && b.tasks.pendingSteer(task, run.optString("id")) == null) {
                 String text = resp.text.trim().isEmpty() ? "(no response)" : resp.text.trim();
                 if (J.str(task, "conversation_id", null) != null) b.tasks.postBotMessage(task, text, J.obj("run_id", run.optString("id")), true);
                 finish(run, task, "completed", text, null);
@@ -932,7 +936,8 @@ public final class Engine {
                 + "or use secret.request for API keys. NEVER ask the user to paste a key, token, password or private key into the chat: call secret.request (a secure field; "
                 + "the value goes to the encrypted vault and you only get {{secret:NAME}}). Use secrets only through placeholders and never try to print, echo or reveal them. After an action, verify its result before claiming success. If you need a decision, use user.ask. "
                 + "When delegating, give the other bot concrete instructions and the expected output. "
-                + "Your final message (without tool calls) is delivered to the requester as the task result. Reply in the user's language.");
+                + "Complete the user's entire request before ending. A plan or a promise to act is only a progress update: continue with the required tools. "
+                + "Your final answer is delivered to the requester as the task result; commentary and incomplete responses do not finish the task. Reply in the user's language.");
         if ("bot".equals(task.optString("requester_type"))) parts.add("This task was assigned to you by bot " + task.optString("requester_id") + " (depth " + task.optInt("depth") + ").");
         if ("routine".equals(task.optString("requester_type"))) parts.add("This task was started by one of your scheduled routines.");
         if ("watcher".equals(task.optString("requester_type"))) parts.add("This task was started by a ping from one of your watcher programs. The ping text came from a program "
@@ -1098,7 +1103,9 @@ public final class Engine {
                     JSONObject c = calls.optJSONObject(i);
                     tcs.put(J.obj("id", c.optString("id"), "name", c.optString("wire"), "arguments", c.opt("arguments")));
                 }
-                merged.add(J.obj("role", "assistant", "content", out.optString("text"), "tool_calls", tcs));
+                merged.add(J.obj("role", "assistant", "content", out.optString("text"), "tool_calls", tcs, "phase", out.optString("phase")));
+                if (tcs.length() == 0 && out.has("can_finish") && !out.optBoolean("can_finish"))
+                    merged.add(J.obj("role", "user", "content", "[Your preceding response was a progress update or was cut short. Continue the current task from the saved results, using tools where needed. Finish only after fulfilling the user's request. Do not repeat completed actions.]"));
             } else if ("tool".equals(s.optString("kind")) && TERMINAL_STEP.contains(s.optString("status"))) {
                 merged.add(J.obj("role", "tool", "call_id", s.optString("call_id"), "name", Tools.wireName(s.optString("tool_name")),
                         "content", "<untrusted_tool_output>\n" + J.truncate(out.toString(), TOOL_OUTPUT_LIMIT) + "\n</untrusted_tool_output>"));

@@ -4,6 +4,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -55,6 +56,14 @@ public final class Model {
         public int inputTokens, outputTokens;
         public String model = "";
         public String finish = "";
+        public String phase = "";
+        public boolean incomplete;
+
+        public boolean canFinishTask() {
+            return !incomplete && !"commentary".equals(phase)
+                    && !"length".equals(finish) && !"max_tokens".equals(finish)
+                    && !"max_output_tokens".equals(finish) && !"pause_turn".equals(finish);
+        }
     }
 
     /** Text from a Chat Completions "content", which may be a string or an array of parts. */
@@ -265,6 +274,7 @@ public final class Model {
             Response r = new Response();
             r.text = contentText(msg.opt("content"));
             r.finish = choices.optJSONObject(0).optString("finish_reason", "");
+            r.phase = msg.optString("phase", "");
             JSONArray tcs = msg.optJSONArray("tool_calls");
             if (tcs != null) for (int i = 0; i < tcs.length(); i++) {
                 JSONObject c = tcs.optJSONObject(i);
@@ -298,8 +308,12 @@ public final class Model {
                     if (images != null) for (int i = 0; i < images.length(); i++) content.put(J.obj("type", "input_image", "image_url", images.optString(i)));
                     items.put(J.obj("role", "user", "content", content));
                 } else if ("assistant".equals(role)) {
-                    if (!m.optString("content").isEmpty())
-                        items.put(J.obj("role", "assistant", "content", new JSONArray().put(J.obj("type", "output_text", "text", m.optString("content")))));
+                    if (!m.optString("content").isEmpty()) {
+                        JSONObject message = J.obj("role", "assistant", "content", new JSONArray().put(J.obj("type", "output_text", "text", m.optString("content"))));
+                        if ("commentary".equals(m.optString("phase")) || "final_answer".equals(m.optString("phase")))
+                            J.put(message, "phase", m.optString("phase"));
+                        items.put(message);
+                    }
                     JSONArray tcs = m.optJSONArray("tool_calls");
                     if (tcs != null) for (int i = 0; i < tcs.length(); i++) {
                         JSONObject c = tcs.optJSONObject(i);
@@ -323,6 +337,7 @@ public final class Model {
             if ("failed".equals(data.optString("status"))) throw new ProviderError("server", "Responses API reported a failed response.", true, 0);
             Response r = new Response();
             r.finish = data.optString("status", "");
+            r.incomplete = "incomplete".equals(r.finish) || "in_progress".equals(r.finish) || "queued".equals(r.finish);
             JSONObject inc = data.optJSONObject("incomplete_details");
             if (inc != null) r.finish = inc.optString("reason", r.finish);
             StringBuilder text = new StringBuilder();
@@ -330,6 +345,7 @@ public final class Model {
             if (out != null) for (int i = 0; i < out.length(); i++) {
                 JSONObject item = out.optJSONObject(i);
                 if ("message".equals(item.optString("type"))) {
+                    if (item.has("phase")) r.phase = item.optString("phase", "");
                     JSONArray parts = item.optJSONArray("content");
                     if (parts != null) for (int k = 0; k < parts.length(); k++) {
                         JSONObject p = parts.optJSONObject(k);
@@ -345,6 +361,43 @@ public final class Model {
             if (usage != null) { r.inputTokens = usage.optInt("input_tokens"); r.outputTokens = usage.optInt("output_tokens"); }
             r.model = data.optString("model");
             return r;
+        }
+
+        /** Only a terminal SSE event proves the response has actually finished. */
+        public static Response parseStream(BufferedReader reader) throws Exception {
+            StringBuilder data = new StringBuilder(), deltas = new StringBuilder();
+            JSONArray items = new JSONArray();
+            while (true) {
+                String line = reader.readLine();
+                if (line != null && line.startsWith("data:")) {
+                    if (data.length() > 0) data.append('\n');
+                    data.append(line.substring(5).trim());
+                    continue;
+                }
+                if (line != null && !line.trim().isEmpty()) continue;
+                if (data.length() > 0) {
+                    JSONObject event = J.parse(data.toString());
+                    data.setLength(0);
+                    String type = event.optString("type");
+                    if ("response.output_text.delta".equals(type)) deltas.append(event.optString("delta"));
+                    if ("response.output_item.done".equals(type) && event.optJSONObject("item") != null)
+                        items.put(event.optJSONObject("item"));
+                    if ("response.failed".equals(type) || "error".equals(type))
+                        throw new ProviderError("server", "Model stream failed before completion.", true, 0);
+                    if ("response.completed".equals(type) || "response.incomplete".equals(type)) {
+                        JSONObject done = event.optJSONObject("response");
+                        if (done == null) throw new ProviderError("server", "Model stream has no final response.", true, 0);
+                        if (!done.has("status")) J.put(done, "status", "response.completed".equals(type) ? "completed" : "incomplete");
+                        JSONArray output = done.optJSONArray("output");
+                        if ((output == null || output.length() == 0) && items.length() > 0) J.put(done, "output", items);
+                        Response response = parse(done);
+                        if (response.text.isEmpty() && response.toolCalls.isEmpty() && deltas.length() > 0)
+                            response.text = deltas.toString();
+                        return response;
+                    }
+                }
+                if (line == null) throw new ProviderError("network", "Model stream was interrupted before completion.", true, 0);
+            }
         }
     }
 

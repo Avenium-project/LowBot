@@ -335,33 +335,11 @@ public final class ChatGpt {
                 throw new Model.ProviderError("bad_request", "ChatGPT backend refused the request (HTTP " + code + "). " + detail);
             }
             BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
-            StringBuilder data = new StringBuilder();
-            String line;
-            JSONObject done = null;
-            StringBuilder deltas = new StringBuilder();
-            JSONArray items = new JSONArray();
-            while ((line = r.readLine()) != null) {
-                if (line.startsWith("data:")) { data.append(line.substring(5).trim()); continue; }
-                if (!line.trim().isEmpty() || data.length() == 0) continue;
-                JSONObject ev = J.parse(data.toString());
-                data.setLength(0);
-                String type = ev.optString("type");
-                if ("response.output_text.delta".equals(type)) deltas.append(ev.optString("delta"));
-                if ("response.output_item.done".equals(type) && ev.optJSONObject("item") != null) items.put(ev.optJSONObject("item"));
-                if ("response.completed".equals(type) || "response.incomplete".equals(type)) { done = ev.optJSONObject("response"); break; }
-                if ("response.failed".equals(type) || "error".equals(type))
-                    throw new Model.ProviderError("server", "ChatGPT stream ended with " + type + ".", true, 0);
+            try {
+                return Model.Responses.parseStream(r);
+            } finally {
+                r.close();
             }
-            r.close();
-            if (done == null && items.length() == 0 && deltas.length() == 0)
-                throw new Model.ProviderError("server", "ChatGPT stream ended before completion.", true, 0);
-            if (done == null) done = new JSONObject();
-            // The Codex backend streams the output items; the final event may carry an empty "output".
-            JSONArray out = done.optJSONArray("output");
-            if ((out == null || out.length() == 0) && items.length() > 0) J.put(done, "output", items);
-            Model.Response resp = Model.Responses.parse(done);
-            if (resp.text.isEmpty() && resp.toolCalls.isEmpty() && deltas.length() > 0) resp.text = deltas.toString();
-            return resp;
         } catch (Model.ProviderError e) {
             throw e;
         } catch (SocketTimeoutException e) {

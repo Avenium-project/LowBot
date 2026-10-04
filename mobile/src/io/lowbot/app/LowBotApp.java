@@ -34,6 +34,7 @@ import io.lowbot.tools.Mcp;
 public class LowBotApp extends Application {
     static final String CH_WORK = "work", CH_ATTENTION = "attention", CH_DONE = "done";
     static volatile boolean uiVisible = false;
+    MainActivity foregroundActivity;
 
     Backend backend;
     Router router;
@@ -86,7 +87,13 @@ public class LowBotApp extends Application {
         };
         backend.platform = new Backend.Platform() {
             public void scheduleAlarm(long at) { LowBotApp.this.scheduleAlarm(at); }
-            public void workStateChanged(int active, int queued) { WorkService.update(LowBotApp.this, active, queued); }
+            public void workStateChanged(int active, int queued) {
+                WorkService.update(LowBotApp.this, active, queued);
+                if (Math.max(active, queued) > 0) main.post(new Runnable() { public void run() {
+                    MainActivity activity = foregroundActivity;
+                    if (activity != null) BackgroundAccess.request(activity);
+                } });
+            }
             public boolean browserAvailable() { return true; }
         };
         backend.core.notifier = new Core.Notifier() {

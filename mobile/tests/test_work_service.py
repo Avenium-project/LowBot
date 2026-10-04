@@ -19,6 +19,7 @@ public class Context {
     public void startForegroundService(Intent i) { io.lowbot.app.LowBotApp.starts.add(i); }
     public void startService(Intent i) { io.lowbot.app.LowBotApp.starts.add(i); }
     public void stopService(Intent i) { io.lowbot.app.LowBotApp.stops++; }
+    public <T> T getSystemService(Class<T> cls) { return cls.cast(android.os.PowerManager.INSTANCE); }
     public String getString(int id, Object... args) { return "notification"; }
 }
 """,
@@ -68,12 +69,45 @@ public class PendingIntent {
 """,
     "android/content/pm/ServiceInfo.java": """
 package android.content.pm;
-public class ServiceInfo { public static final int FOREGROUND_SERVICE_TYPE_DATA_SYNC = 1; }
+public class ServiceInfo { public static final int FOREGROUND_SERVICE_TYPE_SPECIAL_USE = 1073741824; }
 """,
     "android/os/Build.java": """
 package android.os;
 public class Build { public static class VERSION { public static int SDK_INT = 35; } }
 """,
+    "android/os/PowerManager.java": """
+package android.os;
+public class PowerManager {
+    public static final PowerManager INSTANCE = new PowerManager();
+    public static final int PARTIAL_WAKE_LOCK = 1;
+    public WakeLock last;
+    public WakeLock newWakeLock(int level, String tag) {
+        if (level != PARTIAL_WAKE_LOCK) throw new AssertionError("must not keep screen awake");
+        return last = new WakeLock();
+    }
+    public static class WakeLock {
+        public boolean held; public int renewals; public long timeout;
+        public void setReferenceCounted(boolean value) {
+            if (value) throw new AssertionError("must not accumulate lock references");
+        }
+        public void acquire(long ms) { held = true; timeout = ms; renewals++; }
+        public boolean isHeld() { return held; }
+        public void release() { held = false; }
+    }
+}
+""",
+    "android/os/Looper.java": "package android.os; public class Looper { public static Looper getMainLooper() { return new Looper(); } }",
+    "android/os/Handler.java": """
+package android.os;
+public class Handler {
+    public static final java.util.ArrayDeque<Runnable> callbacks = new java.util.ArrayDeque<>();
+    public Handler(Looper l) {}
+    public void post(Runnable r) { callbacks.add(r); }
+    public void removeCallbacksAndMessages(Object o) { callbacks.clear(); }
+    public static void drain() { while (!callbacks.isEmpty()) callbacks.remove().run(); }
+}
+""",
+    "android/util/Log.java": "package android.util; public class Log { public static void e(String tag, String msg, Throwable e) { throw new AssertionError(msg, e); } }",
     "android/os/IBinder.java": "package android.os; public interface IBinder {}",
     "io/lowbot/app/MainActivity.java": "package io.lowbot.app; public class MainActivity {}",
     "io/lowbot/app/R.java": """
@@ -96,12 +130,14 @@ public class LowBotApp extends Context {
     final Backend backend = new Backend();
     static LowBotApp of(Context c) { return INSTANCE; }
     static class Engine {
-        int wakes;
+        int wakes, active;
+        int activeCount() { return active; }
         void wake() { wakes++; }
     }
     static class Backend {
         final Engine engine = new Engine();
-        int queued = 4, stateReports;
+        int queued = 4, stateReports, backgroundJobs;
+        long queuedCount() { return queued; }
         // Backend.wake's platform contract: wake the engine, count pending
         // work, and report that count to WorkService.update.
         void wake() {
@@ -135,6 +171,11 @@ public class WorkServiceTest {
         backend.wake();
         dispatch(service);
         check(WorkService.running, "work service starts");
+        android.os.PowerManager.WakeLock cpu = android.os.PowerManager.INSTANCE.last;
+        check(cpu.isHeld() && cpu.timeout == 120000, "work owns a bounded partial wake lock");
+        service.checkWork();
+        android.os.Handler.drain();
+        check(cpu.renewals == 2, "live work renews the CPU lease");
         check(LowBotApp.notifications == 1, "one notification for initial start");
         check(backend.stateReports == 1, "service must not query/report work state on the main thread");
         check(backend.engine.wakes == 2, "service still wakes engine");
@@ -150,6 +191,9 @@ public class WorkServiceTest {
         check(LowBotApp.stops == 1, "service stops when work finishes");
         service.onDestroy();
         check(!WorkService.running, "destroy clears running state");
+        check(!cpu.isHeld(), "finished work releases the CPU lease");
+        service = new WorkService();
+        backend.backgroundJobs = 1;
 
         // Background watcher work follows the same path, with no active runs.
         WorkService.update(LowBotApp.INSTANCE, 0, 1);
@@ -162,9 +206,26 @@ public class WorkServiceTest {
         service.onStartCommand(null, 0, 5);
         check(backend.engine.wakes == wakes + 1, "sticky restart wakes engine");
         check(LowBotApp.starts.isEmpty(), "sticky restart must not restart itself");
+        service.checkWork();
+        android.os.Handler.drain();
+        check(LowBotApp.stops == 1, "watchers count as durable work during monitoring");
+        backend.backgroundJobs = 0;
+        service.checkWork(); // stale idle snapshot must not stop newly started work
+        WorkService.update(LowBotApp.INSTANCE, 1, 0);
+        android.os.Handler.drain();
+        check(LowBotApp.stops == 1, "new active work invalidates an old idle snapshot");
+        dispatch(service);
         service.onTimeout(5, 1);
         check(LowBotApp.stops == 2, "Android timeout still stops service");
-        System.out.println("PASS: bounded service dispatch, updates, stop, watchers, restart, timeout");
+        service.onDestroy();
+        check(!android.os.PowerManager.INSTANCE.last.isHeld(), "OS timeout releases the CPU lease");
+        service = new WorkService();
+        service.onStartCommand(null, 0, 6);
+        service.checkWork();
+        android.os.Handler.drain();
+        check(LowBotApp.stops == 3, "idle sticky restart stops instead of holding CPU forever");
+        service.onDestroy();
+        System.out.println("PASS: bounded dispatch, CPU lease, stop, watchers, restart, stale snapshot, timeout");
     }
 }
 """,

@@ -56,6 +56,7 @@ public class SelfTest extends BroadcastReceiver {
             b = scenario(ctx, b);
             PriorityMessageTest.run(ctx);
             StepLimitTest.run(ctx);
+            ResponseLifecycleTest.run(ctx);
             browser(ctx, b);
             watchers(ctx, b);
             linux(ctx, b);
@@ -412,12 +413,13 @@ public class SelfTest extends BroadcastReceiver {
         JSONObject t12 = b.tasks.createTask(bot.optString("id"), cid, "user", "local-user", "hello again", "", "", null, 80, null, null, null);
         b.engine.stop();
         final String rid = t12.optString("run_id");
-        b.core.db.exec("UPDATE runs SET status = 'running', owner = 'dead-process' WHERE id = ?", rid);
+        b.core.db.exec("UPDATE runs SET status = 'running', owner = 'dead-process', attempt = max_attempts - 1 WHERE id = ?", rid);
         b.core.db.close();
         Backend b2 = Backend.reopen(ctx, "selftest.db");
         b2.start();
         b2.engine.drain(20000);
         check("completed".equals(b2.core.db.scalar("SELECT status FROM runs WHERE id = ?", rid)), "run recovered after restart");
+        check(b2.core.db.count("SELECT attempt FROM runs WHERE id = ?", rid) == 0, "process death does not exhaust provider retries; successful progress resets them");
         check(b2.core.db.count("SELECT COUNT(*) FROM events WHERE type = 'run.recovered'") >= 1, "recovery audited");
         b2.engine.stop();
 
