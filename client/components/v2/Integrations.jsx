@@ -22,6 +22,12 @@ export function CodexConnect({ status, onChanged, compact }) {
     const h = setInterval(() => onChanged(), 3000);
     return () => clearInterval(h);
   }, [login, onChanged]);
+  const logout = async () => {
+    setErr(''); setBusy(true);
+    try { await api('/integrations/codex/logout', { method: 'POST' }); setLogin(null); await onChanged(); }
+    catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  };
   if (!codex.installed) {
     return <div className="text-[15px] text-zinc-400">{'Codex CLI is not installed on the server.'}</div>;
   }
@@ -29,7 +35,8 @@ export function CodexConnect({ status, onChanged, compact }) {
     return (
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span className="text-[15px] text-emerald-400">● {'Connected to ChatGPT'}</span>
-        {!compact && <Button small onClick={() => api('/integrations/codex/logout', { method: 'POST' }).then(onChanged)}>{'Sign out'}</Button>}
+        <Button small disabled={busy} onClick={logout}>{busy ? 'Signing out…' : 'Sign out'}</Button>
+        {err && <div role="alert" className="w-full text-[13px] text-rose-400">{err}</div>}
       </div>
     );
   }
@@ -64,6 +71,7 @@ export function ChatGptPhone({ status, onChanged, ws, compact }) {
   const pl = lang === 'pl';
   const [accept, setAccept] = useState(Boolean(status?.chatgpt?.accepted_risk));
   const [err, setErr] = useState('');
+  const [signingOut, setSigningOut] = useState(false);
   const c = status?.chatgpt || {};
   const waiting = c.login?.status === 'waiting_for_user';
   useEffect(() => {
@@ -71,6 +79,15 @@ export function ChatGptPhone({ status, onChanged, ws, compact }) {
     const h = setInterval(() => { onChanged(); ws?.reload?.(); }, 2500);
     return () => clearInterval(h);
   }, [waiting, onChanged, ws]);
+  const logout = async () => {
+    setErr(''); setSigningOut(true);
+    try {
+      await api('/integrations/chatgpt/logout', { method: 'POST' });
+      await onChanged();
+      ws?.reload?.();
+    } catch (e) { setErr(e.message); }
+    finally { setSigningOut(false); }
+  };
   const start = async () => {
     setErr('');
     try {
@@ -85,7 +102,7 @@ export function ChatGptPhone({ status, onChanged, ws, compact }) {
       {c.logged_in ? (
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <span className="text-[15px] text-emerald-400">● {'Connected'}{c.account ? ` · ${c.account}` : ''}{c.plan ? ` · ${c.plan}` : ''}</span>
-          {!compact && <Button small onClick={() => api('/integrations/chatgpt/logout', { method: 'POST' }).then(onChanged)}>{'Sign out'}</Button>}
+          <Button small disabled={signingOut} onClick={logout}>{signingOut ? 'Signing out…' : 'Sign out'}</Button>
         </div>
       ) : (
         <>

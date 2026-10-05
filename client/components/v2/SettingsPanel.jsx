@@ -113,6 +113,33 @@ function ProviderForm({ presets, onDone }) {
   );
 }
 
+function ProviderModelEditor({ profile, onSaved }) {
+  const [model, setModel] = useState(profile.default_model || '');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  useEffect(() => { setModel(profile.default_model || ''); }, [profile.id, profile.default_model]);
+  const save = async () => {
+    setBusy(true); setErr('');
+    try {
+      await api(`/providers/${profile.id}`, { method: 'PATCH', body: { default_model: model.trim() } });
+      await onSaved();
+    } catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="w-full space-y-2">
+      <label className="block text-[13px] text-zinc-400">
+        Model ID
+        <input className={inputCls} aria-label="Provider model ID" value={model} disabled={busy}
+          placeholder="Empty = automatic" onChange={(e) => setModel(e.target.value)} />
+      </label>
+      <div className="text-[13px] text-zinc-500">Enter any model ID supported by this provider. Bots with their own model keep that selection.</div>
+      <Button small disabled={busy || model.trim() === (profile.default_model || '')} onClick={save}>{busy ? 'Saving…' : 'Save model'}</Button>
+      {err && <div role="alert" className="text-[13px] text-rose-400">{err}</div>}
+    </div>
+  );
+}
+
 function Models({ ws }) {
   const [data, setData] = useState({ profiles: [] });
   const [presets, setPresets] = useState([]);
@@ -143,6 +170,7 @@ function Models({ ws }) {
               onClick={() => setOpen(open === p.id ? null : p.id)} right={<FiChevronRight className={cls('text-zinc-500 transition-transform', open === p.id && 'rotate-90')} />} />
             {open === p.id && (
               <div className="lb-rise px-5 pb-4 flex flex-wrap gap-2 items-center">
+                <ProviderModelEditor profile={p} onSaved={async () => { await load(); ws?.reload?.(); }} />
                 <Button small onClick={() => runTest(p.id)}>Test</Button>
                 {data.default_profile_id !== p.id && <Button small onClick={() => api(`/providers/${p.id}/default`, { method: 'POST' }).then(load)}>Make default</Button>}
                 <Button small kind="danger" onClick={async () => { if (await askConfirm({ title: `Delete ${p.name}?`, confirmLabel: 'Delete', danger: true })) api(`/providers/${p.id}`, { method: 'DELETE' }).then(load); }}>Delete</Button>

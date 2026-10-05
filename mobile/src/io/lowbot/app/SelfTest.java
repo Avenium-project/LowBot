@@ -437,7 +437,11 @@ public class SelfTest extends BroadcastReceiver {
         String payload = android.util.Base64.encodeToString("{\"https://api.openai.com/auth\":{\"chatgpt_account_id\":\"acc_1\"}}".getBytes("UTF-8"),
                 android.util.Base64.URL_SAFE | android.util.Base64.NO_WRAP | android.util.Base64.NO_PADDING);
         check("acc_1".equals(io.lowbot.core.ChatGpt.accountIdOf("h." + payload + ".s")), "chatgpt account id from JWT");
-        b2.chatgpt.logout();
+        b2.core.secretPut("chatgpt_oauth", "oauth", "Test account", J.obj("refresh", "offline-test-refresh").toString(), null);
+        check(b2.chatgpt.status().optBoolean("logged_in"), "stored ChatGPT session reports signed in");
+        api(new Router(b2), "POST", "/api/v2/integrations/chatgpt/logout", J.obj());
+        check(!b2.chatgpt.status().optBoolean("logged_in") && b2.core.secretIdByName("chatgpt_oauth") == null,
+                "sign-out API removes the ChatGPT session from the encrypted vault");
 
         // 13. SSRF guard
         boolean blocked = false;

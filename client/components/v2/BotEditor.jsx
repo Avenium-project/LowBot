@@ -81,24 +81,30 @@ function Routines({ bot, pl, tick }) {
 }
 
 function ModelPicker({ f, setF, providers, pl, onCommit }) {
+  const [custom, setCustom] = useState(false);
   const profile = providers.find((p) => p.id === f.provider_profile_id) || providers.find((p) => p.is_default);
   const models = profile ? Array.from(new Set([...(profile.models || []), ...(profile.last_test?.models || []), profile.default_model].filter(Boolean))) : [];
   return (
     <div className={cls(card, 'p-4 space-y-3')}>
       <Field label={'Provider'}>
-        <select className={inputCls} value={f.provider_profile_id} onChange={(e) => { const v = { ...f, provider_profile_id: e.target.value, model: '' }; setF(v); onCommit(v); }}>
+        <select className={inputCls} value={f.provider_profile_id} onChange={(e) => { const v = { ...f, provider_profile_id: e.target.value, model: '' }; setCustom(false); setF(v); onCommit(v); }}>
           <option value="">{'Default'}{providers.find((p) => p.is_default) ? ` (${providers.find((p) => p.is_default).name})` : ''}</option>
           {providers.map((p) => <option key={p.id} value={p.id}>{p.name}{p.is_mock ? ' [mock]' : ''}</option>)}
         </select></Field>
       <Field label={'Model'}>
         {models.length ? (
-          <select className={inputCls} value={models.includes(f.model) ? f.model : (f.model ? '__custom' : '')}
-            onChange={(e) => { if (e.target.value === '__custom') return; const v = { ...f, model: e.target.value }; setF(v); onCommit(v); }}>
+          <select aria-label="Model" className={inputCls} value={custom || (f.model && !models.includes(f.model)) ? '__custom' : f.model}
+            onChange={(e) => { if (e.target.value === '__custom') { setCustom(true); return; } setCustom(false); const v = { ...f, model: e.target.value }; setF(v); onCommit(v); }}>
             <option value="">{'Provider default'}{profile?.default_model ? ` (${profile.default_model})` : ''}</option>
             {models.map((m) => <option key={m} value={m}>{m}</option>)}
-            {f.model && !models.includes(f.model) && <option value="__custom">{f.model}</option>}
+            <option value="__custom">Custom model ID…</option>
           </select>
-        ) : <input className={inputCls} value={f.model} placeholder={profile?.default_model || 'model id'} onChange={(e) => setF({ ...f, model: e.target.value })} onBlur={() => onCommit(f)} />}
+        ) : null}
+        {(!models.length || custom || (f.model && !models.includes(f.model))) && (
+          <input className={inputCls} aria-label="Custom model ID" value={f.model} placeholder={profile?.default_model || 'Exact model ID'}
+            onChange={(e) => setF({ ...f, model: e.target.value })}
+            onBlur={(e) => { const v = { ...f, model: e.target.value.trim() }; setF(v); onCommit(v); }} />
+        )}
       </Field>
     </div>
   );

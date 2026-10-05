@@ -111,6 +111,15 @@ def test_M_phone_flow(server):
         expect(page.get_by_text("Saved")).to_be_visible(timeout=5000)
         assert api(server, "/bots")[0]["avatar"].startswith("shape:triangle:")
         expect(page.get_by_text("Provider", exact=True)).to_be_visible()
+        # Advertised model lists must still allow arbitrary per-bot IDs.
+        page.get_by_label("Model", exact=True).select_option("__custom")
+        custom = page.get_by_role("textbox", name="Custom model ID", exact=True)
+        custom.fill("  vendor/private-model-v2  ")
+        with page.expect_response(lambda r: "/api/v2/bots/" in r.url and r.request.method == "PATCH"):
+            custom.press("Tab")
+        assert api(server, "/bots")[0]["model"] == "vendor/private-model-v2"
+        page.get_by_label("Model", exact=True).select_option("")
+        expect(custom).to_have_count(0)
         assert no_horizontal_scroll(page)
         page.wait_for_timeout(500)
         page.screenshot(path=SHOTS / "04-bot-profile.png")
@@ -292,4 +301,68 @@ def test_chat_history_pages_and_live_updates(server):
         expect(messages).to_have_count(186, timeout=20000)
         assert len(set(messages.all_text_contents())) == 186
         assert all("limit=50" in url for url in requests)
+        browser.close()
+
+
+def test_provider_custom_models_and_compact_logout(server):
+    """Native settings bridge: real provider storage, simulated account session."""
+    profiles = [api(server, "/providers", {"kind": kind, "name": "Custom ID " + kind,
+                "default_model": "listed-model", "models": ["listed-model"],
+                **({"base_url": "https://example.com/v1"} if kind == "local" else {})})
+                for kind in ("scripted_mock", "xai", "openai_responses", "openrouter", "opencode_go", "local", "codex_cli")]
+    api(server, "/bots", {"name": "Settings test bot", "provider_profile_id": profiles[0]["id"]})
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 360, "height": 740}, locale="en-US")
+        assert ctx.request.post(f"{server}/api/v1/auth/login", data={"token": TOKEN}).ok
+        ctx.add_init_script(BRIDGE_MOCK + """
+window.__loggedIn = true;
+window.__logoutCalls = 0;
+window.LowBotNative.isLocal = () => true;
+window.LowBotNative.subscribe = () => {};
+window.LowBotNative.request = async (id, method, path, body) => {
+  if (path === '/api/v2/integrations') {
+    window.__lowbotResolve(id, 200, 'application/json', JSON.stringify({chatgpt: {logged_in: window.__loggedIn, accepted_risk: true}}), false);
+  } else if (path === '/api/v2/integrations/chatgpt/logout') {
+    window.__logoutCalls++;
+    const fail = window.__logoutCalls === 1;
+    if (!fail) window.__loggedIn = false;
+    window.__lowbotResolve(id, fail ? 503 : 200, 'application/json', JSON.stringify(fail ? {detail: 'Sign-out temporarily unavailable'} : {ok: true}), false);
+  } else {
+    const r = await fetch(path, {method, headers: {'Content-Type': 'application/json'}, ...(body ? {body} : {})});
+    window.__lowbotResolve(id, r.status, 'application/json', await r.text(), false);
+  }
+};
+""")
+        page = ctx.new_page()
+        page.goto(f"{server}/bots/")
+        page.get_by_role("button", name="Menu", exact=True).click()
+        page.get_by_role("button", name="Settings", exact=True).click()
+        page.get_by_role("button", name="Model", exact=True).click()
+        page.get_by_role("button", name="Sign out", exact=True).click()
+        expect(page.get_by_text("Sign-out temporarily unavailable", exact=True)).to_be_visible()
+        expect(page.get_by_role("button", name="Sign out", exact=True)).to_be_enabled()
+        page.get_by_role("button", name="Sign out", exact=True).click()
+        expect(page.get_by_role("button", name="Sign in with ChatGPT", exact=True)).to_be_visible()
+        expect(page.get_by_role("button", name="Sign out", exact=True)).to_have_count(0)
+        assert page.evaluate("window.__logoutCalls") == 2
+        for profile in profiles:
+            page.get_by_role("button", name=profile["name"], exact=False).click()
+            field = page.get_by_role("textbox", name="Provider model ID", exact=True)
+            field.fill("  vendor/private-custom-v3  ")
+            with page.expect_response(lambda r: r.url.endswith("/providers/" + profile["id"]) and r.request.method == "PATCH"):
+                page.get_by_role("button", name="Save model", exact=True).click()
+            saved = next(x for x in api(server, "/providers")["profiles"] if x["id"] == profile["id"])
+            assert saved["default_model"] == "vendor/private-custom-v3"
+            assert saved["kind"] == profile["kind"]
+            expect(page.get_by_role("button", name="Save model", exact=True)).to_be_disabled()
+        assert no_horizontal_scroll(page)
+        page.get_by_role("button", name=profiles[-1]["name"], exact=False).click()
+        page.get_by_role("button", name=profiles[-1]["name"], exact=False).click()
+        field = page.get_by_role("textbox", name="Provider model ID", exact=True)
+        expect(field).to_have_value("vendor/private-custom-v3")
+        field.fill("")
+        with page.expect_response(lambda r: r.url.endswith("/providers/" + profiles[-1]["id"]) and r.request.method == "PATCH"):
+            page.get_by_role("button", name="Save model", exact=True).click()
+        assert next(x for x in api(server, "/providers")["profiles"] if x["id"] == profiles[-1]["id"])["default_model"] == ""
         browser.close()
