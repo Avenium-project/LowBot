@@ -302,8 +302,10 @@ public final class Engine {
                 } });
                 throw new Parked();
             }
-            if (modelSteps >= run.optInt("max_steps")) {
-                fenced(run, new Tx() { public void run() { finish(run, task, "failed", null, "Step limit (" + run.optInt("max_steps") + ") reached."); } });
+            // No step limit for real work (the user can press Stop). Only a quick reply, which must stay short, ends itself after a few
+            // steps — quietly, as completed, not as an error.
+            if (io.lowbot.core.Tasks.QUICK_REPLY.equals(task.optString("expected_output")) && modelSteps >= 8) {
+                fenced(run, new Tx() { public void run() { finish(run, task, "completed", "", null); } });
                 throw new Parked();
             }
             modelStep(run, task, bot, steps);

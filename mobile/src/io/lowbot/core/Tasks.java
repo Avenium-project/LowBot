@@ -206,7 +206,6 @@ public final class Tasks {
                     // while the running task picks the message up before its next step and carries on.
                     JSONObject reply = createTask(targets.get(0).optString("id"), cid, "user", Core.OWNER, text, J.truncate(text, 80), QUICK_REPLY,
                             null, PRIORITY_REPLY, msg.optString("id"), null, null);
-                    db.exec("UPDATE runs SET max_steps = 6 WHERE task_id = ?", reply.optString("id"));
                     tasks.put(reply);
                 }
                 out[0] = J.obj("message_id", msg.optString("id"), "seq", msg.optLong("seq"), "tasks", tasks, "duplicate", false, "steered_task", steerTask);
@@ -373,8 +372,7 @@ public final class Tasks {
                 String now = J.nowIso();
                 String corr = parent != null ? parent.optString("correlation_id") : J.id("corr");
                 String root = parent != null ? (J.str(parent, "root_task_id", null) != null ? parent.optString("root_task_id") : parent.optString("id")) : null;
-                JSONObject budget = bot.optJSONObject("budget");
-                int maxSteps = budget != null && budget.optInt("max_steps") > 0 ? budget.optInt("max_steps") : b.core.settings.defaultMaxSteps;
+                int maxSteps = 0; // 0 = no step limit
                 db.insert("tasks", J.obj("id", tid, "conversation_id", cid, "bot_id", botId, "requester_type", requesterType,
                         "requester_id", requesterId, "parent_task_id", parent == null ? null : parent.optString("id"), "root_task_id", root,
                         "correlation_id", corr, "depth", parent == null ? 0 : parent.optInt("depth") + 1,

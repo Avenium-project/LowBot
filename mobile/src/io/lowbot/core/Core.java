@@ -41,7 +41,6 @@ public final class Core {
     public static final class Settings {
         public int maxActiveRuns = 4;
         public int maxActiveSurfaces = 2;
-        public int defaultMaxSteps = 24;
         public int runTimeoutS = 1800;
         public int maxAttempts = 4;
         public int maxDelegationDepth = 4;

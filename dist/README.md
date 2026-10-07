@@ -2,10 +2,13 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **3.9.1** — fixes OpenCode Go ("bad_request … Request is missing x-opencode-session"): requests to that
+- Version **3.9.2** — the step limit is gone: a bot works until it is done (the Stop button still ends it). Only the
+  short quick reply to a message sent mid-work has an internal cap, and it ends quietly. The 30-minute limit per run
+  is a separate setting and still applies.
+  SHA-256: `c34ee2dd0dc68a10069cbff8fa6fd578964939eeeadd0607aed4b6ebabfed45f`
+- 3.9.1 — fixes OpenCode Go ("bad_request … Request is missing x-opencode-session"): requests to that
   provider now carry an x-opencode-session header (one stable value per chat and bot, so the provider can route them
   together). Other providers get no such header.
-  SHA-256: `9d4b0be97443254d2e67dbe56b2d7dd885bf863ac256c89503146e37c213777e`
 - 3.9.0 — no more repeated answers: a message that got a quick reply no longer starts a second full
   answer when the task ends (a follow-up only does what is left, or stays silent), and the final message is told not
   to repeat the quick reply. The chat shows "X is typing" while a bot writes a reply and "X is working" while it uses

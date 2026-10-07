@@ -107,6 +107,9 @@ public class SelfTest extends BroadcastReceiver {
                 .put(J.obj("when", "take it into account", "reply", "steered: {{last}}"))
                 .put(J.obj("when", "add a footnote", "reply", "noted, I will add a footnote"))
                 .put(J.obj("when", "nothing left here", "reply", "NO_REPLY"))
+                .put(J.obj("after_tool", "memory.search", "tool_msgs_below", 40, "call", J.obj("name", "memory.search", "arguments", J.obj("query", "loop"))))
+                .put(J.obj("after_tool", "memory.search", "reply", "long job done"))
+                .put(J.obj("when", "long job", "call", J.obj("name", "memory.search", "arguments", J.obj("query", "loop"))))
                 .put(J.obj("when", "exchange keys", "call", J.obj("name", "secret.request", "arguments", J.obj("description", "Exchange API credentials",
                         "fields", new JSONArray().put(J.obj("name", "EX_KEY", "description", "API key")).put(J.obj("name", "EX_SECRET", "description", "API secret"))))))
                 .put(J.obj("when", "mail widget", "call", J.obj("name", "widget.create", "arguments",
@@ -382,6 +385,13 @@ public class SelfTest extends BroadcastReceiver {
         check(bareTools.containsKey("bot.create") && bareTools.containsKey("self.set_role") && !bareTools.containsKey("linux.run"),
                 "team tools always available; -linux.* switches the terminal off");
         b.bots.delete(bare.optString("id"));
+
+        // 7e2. No step limit: a job with 40 tool calls (the old limit was 24) still completes
+        JSONObject tLong = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "start the long job")).optJSONArray("tasks").getJSONObject(0);
+        b.engine.drain(60000);
+        check("completed".equals(b.core.db.scalar("SELECT status FROM tasks WHERE id = ?", tLong.optString("id")))
+                && b.core.db.count("SELECT COUNT(*) FROM run_steps s JOIN runs r ON r.id = s.run_id WHERE r.task_id = ? AND s.kind = 'tool'", tLong.optString("id")) >= 40
+                && "long job done".equals(lastBotMessage(b, cid).optString("text")), "no step limit: 40 tool calls complete");
 
         // 7f. Default: no approvals except Linux install and actions the bot itself flags as dangerous
         b.core.kvSet("ask_before_actions", "0");

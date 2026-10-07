@@ -396,6 +396,11 @@ public final class Model {
                     String at = rule.optString("after_tool");
                     if (lastTool == null || !(lastTool.equals(at) || lastTool.equals(Tools.wireName(at)))) continue;
                 }
+                if (rule.has("tool_msgs_below")) {
+                    int tools = 0;
+                    for (JSONObject m : req.messages) if ("tool".equals(m.optString("role"))) tools++;
+                    if (tools >= rule.optInt("tool_msgs_below")) continue;
+                }
                 if (rule.has("when") && !Pattern.compile(rule.optString("when"), Pattern.CASE_INSENSITIVE | Pattern.DOTALL).matcher(lastText).find()) continue;
                 JSONArray calls = rule.optJSONArray("calls");
                 if (calls == null && rule.optJSONObject("call") != null) calls = new JSONArray().put(rule.optJSONObject("call"));
