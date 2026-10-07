@@ -180,9 +180,12 @@ public final class Providers {
         if (preset.optBoolean("key_required") && (key == null || key.isEmpty()))
             throw new Model.ProviderError("config", "API key missing for provider '" + p.optString("name") + "'.");
         JSONObject headers = "openrouter".equals(p.optString("kind")) ? J.obj("X-Title", "LowBot") : null;
-        return "responses".equals(preset.optString("adapter"))
+        Model.Http http = "responses".equals(preset.optString("adapter"))
                 ? new Model.Responses(p.optString("base_url"), key, headers)
                 : new Model.ChatCompletions(p.optString("base_url"), key, headers);
+        // OpenCode Go refuses requests without a session id ("cannot be routed efficiently").
+        if ("opencode_go".equals(p.optString("kind"))) http.sessionHeader("x-opencode-session");
+        return http;
     }
 
     /** Probe real capabilities; nothing is assumed from the preset. Runs off the UI thread. */

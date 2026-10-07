@@ -336,6 +336,7 @@ public final class Engine {
         boolean[] dropped = new boolean[1];
         Model.Request req = new Model.Request();
         req.model = res.model;
+        req.session = sessionOf(task);
         if (steps.isEmpty()) maybeRotate(run, task, bot, res);
         final String requestedAt = J.nowIso(); // steering sent after this moment is not in this request
         req.messages = transcript(task, bot, steps, vision, dropped);
@@ -522,6 +523,12 @@ public final class Engine {
     }
 
     /** allow/ask/deny: the most restrictive explicit rule wins; hard_ask tools can never be silently allowed. */
+    /** Session id sent to providers that route by session: one per conversation (bot + chat), else per task. */
+    static String sessionOf(JSONObject task) {
+        String cid = J.str(task, "conversation_id", null);
+        return cid != null ? cid + ":" + task.optString("bot_id") : task.optString("id");
+    }
+
     /** Tools that always wait for the user, whatever the settings. */
     public static final java.util.Set<String> ALWAYS_ASK = new java.util.HashSet<String>(java.util.Arrays.asList("linux.install", "approval.request"));
 
@@ -565,6 +572,7 @@ public final class Engine {
             io.lowbot.core.Providers.Resolved res = b.providers.resolve(who);
             Model.Request req = new Model.Request();
             req.model = res.model;
+            req.session = sessionOf(task);
             req.timeoutS = 60;
             req.system = "You are LowBot Auto Review, a cautious security reviewer. Decide whether an AI agent may perform an action "
                     + "WITHOUT asking its human owner. Reply with JSON only: {\"decision\":\"allow\"|\"ask\"|\"deny\",\"reason\":\"...\"}. "
@@ -835,6 +843,7 @@ public final class Engine {
         String text = log.length() > 60000 ? log.substring(log.length() - 60000) : log.toString();
         Model.Request req = new Model.Request();
         req.model = res.model;
+        req.session = sessionOf(task);
         req.timeoutS = 120;
         req.system = b.mind.promptSection(bot.optString("id"), projectOf(task))
                 + "\n\nYou are ending this session. Write the HANDOFF for the next session of yourself. It fully replaces agents.md, "

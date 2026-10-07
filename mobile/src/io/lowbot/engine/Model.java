@@ -41,6 +41,8 @@ public final class Model {
         public List<JSONObject> messages = new ArrayList<JSONObject>();
         public List<ToolWire> tools = new ArrayList<ToolWire>();
         public int timeoutS = 120;
+        /** Conversation (or task) this request belongs to; sent to providers that route by session (OpenCode Go). */
+        public String session;
     }
 
     public static final class ToolCall {
@@ -110,6 +112,18 @@ public final class Model {
     public abstract static class Http implements Adapter {
         final String base, key;
         final JSONObject headers;
+        /** Name of a request header carrying the session id ("x-opencode-session"), or null. Set only for providers that need it. */
+        String sessionHeader;
+        final String ownSession = "lowbot-" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+
+        public Http sessionHeader(String name) { this.sessionHeader = name; return this; }
+
+        /** Header value for a conversation, or null when this provider takes no session header. The same conversation always
+         *  gives the same value, so the provider can route its requests to one place (and reuse its cache). */
+        public String sessionValue(String session) {
+            if (sessionHeader == null) return null;
+            return session == null || session.isEmpty() ? ownSession : session.replaceAll("[^A-Za-z0-9_.:-]", "_");
+        }
 
         Http(String base, String key, JSONObject headers) throws ProviderError {
             if (base == null || base.isEmpty()) throw new ProviderError("config", "Provider base URL is not configured.");
@@ -118,7 +132,9 @@ public final class Model {
             this.headers = headers == null ? new JSONObject() : headers;
         }
 
-        HttpURLConnection open(String path, String method, int timeoutS) throws Exception {
+        HttpURLConnection open(String path, String method, int timeoutS) throws Exception { return open(path, method, timeoutS, null); }
+
+        HttpURLConnection open(String path, String method, int timeoutS, String session) throws Exception {
             HttpURLConnection c = (HttpURLConnection) new URL(base + path).openConnection();
             c.setRequestMethod(method);
             c.setConnectTimeout(15000);
@@ -130,13 +146,14 @@ public final class Model {
             if (!key.isEmpty()) c.setRequestProperty("Authorization", "Bearer " + key);
             java.util.Iterator<String> it = headers.keys();
             while (it.hasNext()) { String k = it.next(); c.setRequestProperty(k, headers.optString(k)); }
+            if (sessionHeader != null) c.setRequestProperty(sessionHeader, sessionValue(session));
             return c;
         }
 
-        JSONObject post(String path, JSONObject body, int timeoutS) throws ProviderError {
+        JSONObject post(String path, JSONObject body, int timeoutS, String session) throws ProviderError {
             HttpURLConnection c = null;
             try {
-                c = open(path, "POST", timeoutS);
+                c = open(path, "POST", timeoutS, session);
                 c.setDoOutput(true);
                 OutputStream os = c.getOutputStream();
                 os.write(body.toString().getBytes(StandardCharsets.UTF_8));
@@ -257,7 +274,7 @@ public final class Model {
         }
 
         @Override public Response complete(Request req) throws ProviderError {
-            JSONObject data = post("/chat/completions", body(req), req.timeoutS);
+            JSONObject data = post("/chat/completions", body(req), req.timeoutS, req.session);
             JSONArray choices = data.optJSONArray("choices");
             if (choices == null || choices.length() == 0) throw new ProviderError("server", "Provider returned no choices.", true, 0);
             JSONObject msg = choices.optJSONObject(0).optJSONObject("message");
@@ -283,7 +300,7 @@ public final class Model {
         public Responses(String base, String key, JSONObject headers) throws ProviderError { super(base, key, headers); }
 
         @Override public Response complete(Request req) throws ProviderError {
-            JSONObject data = post("/responses", body(req), req.timeoutS);
+            JSONObject data = post("/responses", body(req), req.timeoutS, req.session);
             return parse(data);
         }
 

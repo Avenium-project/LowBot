@@ -2,11 +2,14 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **3.9.0** — no more repeated answers: a message that got a quick reply no longer starts a second full
+- Version **3.9.1** — fixes OpenCode Go ("bad_request … Request is missing x-opencode-session"): requests to that
+  provider now carry an x-opencode-session header (one stable value per chat and bot, so the provider can route them
+  together). Other providers get no such header.
+  SHA-256: `9d4b0be97443254d2e67dbe56b2d7dd885bf863ac256c89503146e37c213777e`
+- 3.9.0 — no more repeated answers: a message that got a quick reply no longer starts a second full
   answer when the task ends (a follow-up only does what is left, or stays silent), and the final message is told not
   to repeat the quick reply. The chat shows "X is typing" while a bot writes a reply and "X is working" while it uses
   tools.
-  SHA-256: `c4949a8a25da25a932d1a062c99cd76f1ad8e063a5a45a83151d84b29c390faa`
 - 3.8.0 — a message to a bot that is working gets an answer at once (a short parallel reply with the
   status/result so far or "will do"); the long task picks the message up and finishes. No more approvals by default:
   bots just act; they ask only to install Linux and before what they flag as truly dangerous (payments, purchases,

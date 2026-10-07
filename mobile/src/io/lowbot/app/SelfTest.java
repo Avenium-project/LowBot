@@ -56,6 +56,7 @@ public class SelfTest extends BroadcastReceiver {
             b = scenario(ctx, b);
             browser(ctx, b);
             watchers(ctx, b);
+            providerHeaders();
             linux(ctx, b);
             String r = "LOWBOT_SELFTEST PASS " + passed.size() + " " + passed;
             write(ctx, r);
@@ -499,6 +500,20 @@ public class SelfTest extends BroadcastReceiver {
             check(refused, "watcher.start refuses without Linux");
         }
         b.core.kvSet("linux_watchers", "[]");
+    }
+
+    /** OpenCode Go refuses requests without x-opencode-session: the header must go out, and only for that provider. */
+    static void providerHeaders() throws Exception {
+        io.lowbot.engine.Model.Http oc = new io.lowbot.engine.Model.ChatCompletions("https://opencode.ai/zen/go/v1", "k", null).sessionHeader("x-opencode-session");
+        io.lowbot.engine.Model.Http other = new io.lowbot.engine.Model.ChatCompletions("https://api.x.ai/v1", "k", null);
+        check("conv_1:bot_1".equals(oc.sessionValue("conv_1:bot_1")) && oc.sessionValue("conv_1:bot_1").equals(oc.sessionValue("conv_1:bot_1")),
+                "OpenCode Go request carries the conversation as x-opencode-session");
+        check(oc.sessionValue(null) != null && oc.sessionValue(null).startsWith("lowbot-") && oc.sessionValue(null).equals(oc.sessionValue("")),
+                "OpenCode Go request without a conversation still has a stable session id");
+        check(other.sessionValue("conv_1:bot_1") == null, "other providers get no session header");
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://opencode.ai/zen/go/v1/chat/completions").openConnection();
+        c.setRequestProperty("x-opencode-session", oc.sessionValue("c:b"));
+        check("c:b".equals(c.getRequestProperty("x-opencode-session")), "session header is a valid HTTP header value");
     }
 
     static File dir(File root, String name) { File d = new File(root, name); d.mkdirs(); return d; }
