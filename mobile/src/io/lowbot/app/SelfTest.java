@@ -393,6 +393,12 @@ public class SelfTest extends BroadcastReceiver {
                 && b.core.db.count("SELECT COUNT(*) FROM run_steps s JOIN runs r ON r.id = s.run_id WHERE r.task_id = ? AND s.kind = 'tool'", tLong.optString("id")) >= 40
                 && "long job done".equals(lastBotMessage(b, cid).optString("text")), "no step limit: 40 tool calls complete");
 
+        // 7e3. No run time limit: a run whose old deadline long passed still finishes
+        JSONObject tOld = api(r, "POST", "/api/v2/conversations/" + cid + "/messages", J.obj("text", "hello from an old run")).optJSONArray("tasks").getJSONObject(0);
+        b.core.db.exec("UPDATE runs SET deadline_at = ? WHERE task_id = ?", "2000-01-01T00:00:00.000Z", tOld.optString("id"));
+        b.engine.drain(20000);
+        check("completed".equals(b.core.db.scalar("SELECT status FROM tasks WHERE id = ?", tOld.optString("id"))), "no run time limit: a run past its old deadline completes");
+
         // 7f. Default: no approvals except Linux install and actions the bot itself flags as dangerous
         b.core.kvSet("ask_before_actions", "0");
         java.util.Map<String, io.lowbot.engine.Tools.Spec> specs = b.tools.forBot(b.bots.get(bot.optString("id")), null, null);

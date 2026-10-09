@@ -2,10 +2,13 @@
 
 **[Pobierz LowBot.apk](LowBot.apk)** → na GitHubie kliknij plik, potem „Download raw file”.
 
-- Version **3.9.2** — the step limit is gone: a bot works until it is done (the Stop button still ends it). Only the
+- Version **3.9.3** — the 30-minute run limit is gone too: a task runs until it is done or you press Stop. Single
+  calls still have their own timeouts (a model request, a terminal command, a page load) so one stuck call cannot hang
+  a run forever, but the run as a whole has no limit.
+  SHA-256: `e8a09fd44afed4988af7a89bc3347fb92f32ff427ec505bee98dc6806ab2f5a9`
+- 3.9.2 — the step limit is gone: a bot works until it is done (the Stop button still ends it). Only the
   short quick reply to a message sent mid-work has an internal cap, and it ends quietly. The 30-minute limit per run
   is a separate setting and still applies.
-  SHA-256: `c34ee2dd0dc68a10069cbff8fa6fd578964939eeeadd0607aed4b6ebabfed45f`
 - 3.9.1 — fixes OpenCode Go ("bad_request … Request is missing x-opencode-session"): requests to that
   provider now carry an x-opencode-session header (one stable value per chat and bot, so the provider can route them
   together). Other providers get no such header.

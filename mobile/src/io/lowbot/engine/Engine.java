@@ -179,10 +179,10 @@ public final class Engine {
                         + " ORDER BY r.priority DESC, r.created_at", now);
                 if (row == null) return;
                 String owner = engineId + ":" + (++claimCounter);
-                String deadline = J.str(row, "deadline_at", null) != null ? row.optString("deadline_at") : J.isoIn(b.core.settings.runTimeoutS);
+                // No run time limit: a run goes on until it is done (or the user stops it).
                 int n = db.change("UPDATE runs SET status = 'running', owner = ?, attempt = attempt + CASE WHEN status = 'retry_scheduled' THEN 1 ELSE 0 END, "
-                        + "started_at = COALESCE(started_at, ?), deadline_at = ?, updated_at = ? WHERE id = ? AND status = ?",
-                        owner, now, deadline, now, row.optString("id"), row.optString("status"));
+                        + "started_at = COALESCE(started_at, ?), updated_at = ? WHERE id = ? AND status = ?",
+                        owner, now, now, row.optString("id"), row.optString("status"));
                 if (n != 1) return;
                 db.exec("UPDATE tasks SET status = 'running', updated_at = ? WHERE id = ? AND status != 'running'", now, row.optString("task_id"));
                 JSONObject run = db.one("SELECT * FROM runs WHERE id = ?", row.optString("id"));
@@ -278,11 +278,6 @@ public final class Engine {
                     setRun(run, "status = 'paused', owner = NULL, control = ''");
                     b.core.emit("run.paused", null, task.optString("id"), run.optString("id"), run.optString("bot_id"), null);
                 } });
-                throw new Parked();
-            }
-            String deadline = J.str(run, "deadline_at", null);
-            if (deadline != null && J.nowIso().compareTo(deadline) > 0) {
-                fenced(run, new Tx() { public void run() { finish(run, task, "failed", null, "Run time limit exceeded."); } });
                 throw new Parked();
             }
             List<JSONObject> steps = steps(run.optString("id"));
